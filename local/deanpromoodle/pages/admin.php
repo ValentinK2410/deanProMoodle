@@ -966,6 +966,15 @@ switch ($tab) {
         // Вкладка "Программы"
         echo html_writer::start_div('local-deanpromoodle-admin-content', ['style' => 'margin-bottom: 30px;']);
         
+        // Проверяем существование таблиц БД
+        try {
+            $DB->get_records('local_deanpromoodle_programs', [], '', 'id', 0, 1);
+        } catch (Exception $e) {
+            echo html_writer::div('Таблицы программ еще не созданы. Пожалуйста, обновите плагин через админ-панель Moodle (Настройки сайта → Уведомления → Обновить).', 'alert alert-warning');
+            echo html_writer::end_div();
+            break;
+        }
+        
         // Обработка действий
         if ($action == 'create' || ($action == 'edit' && $programid > 0)) {
             // Создание или редактирование программы
@@ -973,9 +982,14 @@ switch ($tab) {
             $isedit = ($action == 'edit' && $programid > 0);
             
             if ($isedit) {
-                $program = $DB->get_record('local_deanpromoodle_programs', ['id' => $programid]);
-                if (!$program) {
-                    echo html_writer::div('Программа не найдена.', 'alert alert-danger');
+                try {
+                    $program = $DB->get_record('local_deanpromoodle_programs', ['id' => $programid]);
+                    if (!$program) {
+                        echo html_writer::div('Программа не найдена.', 'alert alert-danger');
+                        break;
+                    }
+                } catch (Exception $e) {
+                    echo html_writer::div('Ошибка при получении программы: ' . $e->getMessage(), 'alert alert-danger');
                     break;
                 }
             }
@@ -1041,15 +1055,23 @@ switch ($tab) {
             }
             
             // Получаем все предметы для выбора
-            $allsubjects = $DB->get_records('local_deanpromoodle_subjects', ['visible' => 1], 'sortorder ASC, name ASC');
+            try {
+                $allsubjects = $DB->get_records('local_deanpromoodle_subjects', ['visible' => 1], 'sortorder ASC, name ASC');
+            } catch (Exception $e) {
+                $allsubjects = [];
+            }
             $selectedsubjectids = [];
             if ($isedit && $program) {
-                $selectedsubjectids = $DB->get_fieldset_select(
-                    'local_deanpromoodle_program_subjects',
-                    'subjectid',
-                    'programid = ?',
-                    [$programid]
-                );
+                try {
+                    $selectedsubjectids = $DB->get_fieldset_select(
+                        'local_deanpromoodle_program_subjects',
+                        'subjectid',
+                        'programid = ?',
+                        [$programid]
+                    );
+                } catch (Exception $e) {
+                    $selectedsubjectids = [];
+                }
             }
             
             // Отображение формы
@@ -1216,21 +1238,33 @@ switch ($tab) {
                 $programsdata = [];
                 foreach ($programs as $program) {
                     // Подсчет связанных предметов
-                    $subjectscount = $DB->count_records('local_deanpromoodle_program_subjects', ['programid' => $program->id]);
+                    try {
+                        $subjectscount = $DB->count_records('local_deanpromoodle_program_subjects', ['programid' => $program->id]);
+                    } catch (Exception $e) {
+                        $subjectscount = 0;
+                    }
                     
                     // Подсчет связанных когорт
-                    $cohortscount = $DB->count_records('local_deanpromoodle_program_cohorts', ['programid' => $program->id]);
+                    try {
+                        $cohortscount = $DB->count_records('local_deanpromoodle_program_cohorts', ['programid' => $program->id]);
+                    } catch (Exception $e) {
+                        $cohortscount = 0;
+                    }
                     
                     // Получаем список предметов для отображения
-                    $subjects = $DB->get_records_sql(
-                        "SELECT s.name, s.code
-                         FROM {local_deanpromoodle_program_subjects} ps
-                         JOIN {local_deanpromoodle_subjects} s ON s.id = ps.subjectid
-                         WHERE ps.programid = ?
-                         ORDER BY ps.sortorder ASC
-                         LIMIT 3",
-                        [$program->id]
-                    );
+                    try {
+                        $subjects = $DB->get_records_sql(
+                            "SELECT s.name, s.code
+                             FROM {local_deanpromoodle_program_subjects} ps
+                             JOIN {local_deanpromoodle_subjects} s ON s.id = ps.subjectid
+                             WHERE ps.programid = ?
+                             ORDER BY ps.sortorder ASC
+                             LIMIT 3",
+                            [$program->id]
+                        );
+                    } catch (Exception $e) {
+                        $subjects = [];
+                    }
                     $subjectslist = [];
                     foreach ($subjects as $s) {
                         $subjectslist[] = htmlspecialchars($s->name, ENT_QUOTES, 'UTF-8');
