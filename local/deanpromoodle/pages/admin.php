@@ -1141,6 +1141,72 @@ switch ($tab) {
             }
         }
         
+        // Обработка копирования программы
+        if ($action == 'copy' && $programid > 0) {
+            try {
+                $sourceprogram = $DB->get_record('local_deanpromoodle_programs', ['id' => $programid]);
+                if (!$sourceprogram) {
+                    echo html_writer::div('Программа не найдена.', 'alert alert-danger');
+                } else {
+                    // Определяем название для копии
+                    $basename = trim($sourceprogram->name);
+                    $copyname = $basename;
+                    $copynumber = 1;
+                    
+                    // Проверяем, есть ли уже копии с таким названием
+                    while ($DB->record_exists('local_deanpromoodle_programs', ['name' => $copyname])) {
+                        $copynumber++;
+                        $copyname = $basename . ' (копия ' . $copynumber . ')';
+                    }
+                    
+                    // Если это первая копия и базовое название не содержит "копия"
+                    if ($copynumber == 1 && strpos($basename, 'копия') === false) {
+                        $copyname = $basename . ' (копия)';
+                        // Проверяем, не существует ли уже такое название
+                        if ($DB->record_exists('local_deanpromoodle_programs', ['name' => $copyname])) {
+                            $copynumber = 2;
+                            $copyname = $basename . ' (копия ' . $copynumber . ')';
+                        }
+                    }
+                    
+                    $transaction = $DB->start_delegated_transaction();
+                    try {
+                        // Создаем новую программу
+                        $newprogram = new stdClass();
+                        $newprogram->name = $copyname;
+                        $newprogram->code = ''; // Код не копируем
+                        $newprogram->description = $sourceprogram->description;
+                        $newprogram->visible = $sourceprogram->visible;
+                        $newprogram->timecreated = time();
+                        $newprogram->timemodified = time();
+                        $newprogramid = $DB->insert_record('local_deanpromoodle_programs', $newprogram);
+                        
+                        // Копируем связи с предметами
+                        $subjects = $DB->get_records('local_deanpromoodle_program_subjects', ['programid' => $programid], 'sortorder ASC');
+                        foreach ($subjects as $subject) {
+                            $newsubject = new stdClass();
+                            $newsubject->programid = $newprogramid;
+                            $newsubject->subjectid = $subject->subjectid;
+                            $newsubject->sortorder = $subject->sortorder;
+                            $newsubject->timecreated = time();
+                            $newsubject->timemodified = time();
+                            $DB->insert_record('local_deanpromoodle_program_subjects', $newsubject);
+                        }
+                        
+                        $transaction->allow_commit();
+                        
+                        // Редирект на список программ
+                        redirect(new moodle_url('/local/deanpromoodle/pages/admin.php', ['tab' => 'programs']), 'Программа успешно скопирована', null, \core\output\notification::NOTIFY_SUCCESS);
+                    } catch (\Exception $e) {
+                        $transaction->rollback($e);
+                        echo html_writer::div('Ошибка при копировании программы: ' . $e->getMessage(), 'alert alert-danger');
+                    }
+                }
+            } catch (\Exception $e) {
+                echo html_writer::div('Ошибка: ' . $e->getMessage(), 'alert alert-danger');
+            }
+        }
+        
         // Обработка действий
         if ($action == 'create' || ($action == 'edit' && $programid > 0)) {
             // Создание или редактирование программы
@@ -1821,6 +1887,14 @@ switch ($tab) {
                         [
                             'class' => 'action-btn action-btn-edit',
                             'title' => 'Редактировать'
+                        ]
+                    );
+                    echo html_writer::link(
+                        new moodle_url('/local/deanpromoodle/pages/admin.php', ['tab' => 'programs', 'action' => 'copy', 'programid' => $programid]),
+                        '<span>📋</span>',
+                        [
+                            'class' => 'action-btn action-btn-copy',
+                            'title' => 'Копировать'
                         ]
                     );
                     echo html_writer::link('#', '<span>✕</span>', [
