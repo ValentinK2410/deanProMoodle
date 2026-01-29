@@ -220,24 +220,40 @@ echo html_writer::start_tag('form', [
 
 // Search field
 echo html_writer::start_div('form-group', ['style' => 'margin-right: 10px;']);
-echo html_writer::label(get_string('searchteachers', 'local_deanpromoodle'), 'search', false, ['class' => 'sr-only']);
+$searchlabel = get_string('searchteachers', 'local_deanpromoodle');
+if (strpos($searchlabel, '[[') !== false) {
+    $searchlabel = 'Search teachers'; // Fallback
+}
+echo html_writer::label($searchlabel, 'search', false, ['class' => 'sr-only']);
+$searchplaceholder = get_string('searchteachers', 'local_deanpromoodle');
+if (strpos($searchplaceholder, '[[') !== false) {
+    $searchplaceholder = 'Search teachers'; // Fallback
+}
 echo html_writer::empty_tag('input', [
     'type' => 'text',
     'name' => 'search',
     'id' => 'search',
     'value' => $search,
-    'placeholder' => get_string('searchteachers', 'local_deanpromoodle'),
+    'placeholder' => $searchplaceholder,
     'class' => 'form-control',
     'style' => 'width: 300px; display: inline-block;'
 ]);
 echo html_writer::end_div();
 
 // Course filter
-if (count($teachercourses) > 1) {
+if (count($allcourses) > 1) {
     echo html_writer::start_div('form-group', ['style' => 'margin-right: 10px;']);
-    echo html_writer::label(get_string('filterbycourse', 'local_deanpromoodle'), 'courseid', false, ['class' => 'sr-only']);
-    $courseoptions = [0 => get_string('allcourses', 'local_deanpromoodle')];
-    foreach ($teachercourses as $cid => $c) {
+    $filterlabel = get_string('filterbycourse', 'local_deanpromoodle');
+    if (strpos($filterlabel, '[[') !== false) {
+        $filterlabel = 'Filter by course'; // Fallback
+    }
+    echo html_writer::label($filterlabel, 'courseid', false, ['class' => 'sr-only']);
+    $allcoursesstr = get_string('allcourses', 'local_deanpromoodle');
+    if (strpos($allcoursesstr, '[[') !== false) {
+        $allcoursesstr = 'All courses'; // Fallback
+    }
+    $courseoptions = [0 => $allcoursesstr];
+    foreach ($allcourses as $cid => $c) {
         $courseoptions[$cid] = $c->fullname;
     }
     echo html_writer::select($courseoptions, 'courseid', $courseid, false, ['class' => 'form-control', 'style' => 'display: inline-block;']);
@@ -245,9 +261,13 @@ if (count($teachercourses) > 1) {
 }
 
 // Submit button
+$searchbutton = get_string('search', 'local_deanpromoodle');
+if (strpos($searchbutton, '[[') !== false) {
+    $searchbutton = get_string('search'); // Use Moodle core string
+}
 echo html_writer::empty_tag('input', [
     'type' => 'submit',
-    'value' => get_string('search', 'local_deanpromoodle'),
+    'value' => $searchbutton,
     'class' => 'btn btn-primary'
 ]);
 
@@ -270,11 +290,31 @@ if (empty($paginatedteachers)) {
     // Table header
     echo html_writer::start_tag('thead');
     echo html_writer::start_tag('tr');
-    echo html_writer::tag('th', get_string('fullname', 'local_deanpromoodle'), ['style' => 'width: 20%;']);
-    echo html_writer::tag('th', get_string('email', 'local_deanpromoodle'), ['style' => 'width: 20%;']);
-    echo html_writer::tag('th', get_string('username', 'local_deanpromoodle'), ['style' => 'width: 15%;']);
-    echo html_writer::tag('th', get_string('courses', 'local_deanpromoodle'), ['style' => 'width: 35%;']);
-    echo html_writer::tag('th', get_string('actions', 'local_deanpromoodle'), ['style' => 'width: 10%;']);
+    $fullnamestr = get_string('fullname', 'local_deanpromoodle');
+    if (strpos($fullnamestr, '[[') !== false) {
+        $fullnamestr = get_string('fullname');
+    }
+    $emailstr = get_string('email', 'local_deanpromoodle');
+    if (strpos($emailstr, '[[') !== false) {
+        $emailstr = get_string('email');
+    }
+    $usernamestr = get_string('username', 'local_deanpromoodle');
+    if (strpos($usernamestr, '[[') !== false) {
+        $usernamestr = get_string('username');
+    }
+    $coursesstr = get_string('courses', 'local_deanpromoodle');
+    if (strpos($coursesstr, '[[') !== false) {
+        $coursesstr = get_string('courses');
+    }
+    $actionsstr = get_string('actions', 'local_deanpromoodle');
+    if (strpos($actionsstr, '[[') !== false) {
+        $actionsstr = 'Actions';
+    }
+    echo html_writer::tag('th', $fullnamestr, ['style' => 'width: 20%;']);
+    echo html_writer::tag('th', $emailstr, ['style' => 'width: 20%;']);
+    echo html_writer::tag('th', $usernamestr, ['style' => 'width: 15%;']);
+    echo html_writer::tag('th', $coursesstr, ['style' => 'width: 35%;']);
+    echo html_writer::tag('th', $actionsstr, ['style' => 'width: 10%;']);
     echo html_writer::end_tag('tr');
     echo html_writer::end_tag('thead');
     
@@ -299,9 +339,13 @@ if (empty($paginatedteachers)) {
         
         // Actions
         $profileurl = new moodle_url('/user/profile.php', ['id' => $teacher->id]);
+        $viewprofilestr = get_string('viewprofile', 'local_deanpromoodle');
+        if (strpos($viewprofilestr, '[[') !== false) {
+            $viewprofilestr = get_string('viewprofile');
+        }
         $actions = html_writer::link(
             $profileurl,
-            get_string('viewprofile', 'local_deanpromoodle'),
+            $viewprofilestr,
             ['class' => 'btn btn-sm btn-primary']
         );
         echo html_writer::tag('td', $actions);
