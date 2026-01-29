@@ -138,15 +138,27 @@ echo $OUTPUT->heading(get_string('teacherpagetitle', 'local_deanpromoodle'));
 
 // Tabs
 $tabs = [];
+$assignmentsstr = get_string('assignments', 'local_deanpromoodle');
+if (strpos($assignmentsstr, '[[') !== false) {
+    $assignmentsstr = 'Assignments';
+}
+$quizzesstr = get_string('quizzes', 'local_deanpromoodle');
+if (strpos($quizzesstr, '[[') !== false) {
+    $quizzesstr = 'Quizzes';
+}
+$forumsstr = get_string('forums', 'local_deanpromoodle');
+if (strpos($forumsstr, '[[') !== false) {
+    $forumsstr = 'Forums';
+}
 $tabs[] = new tabobject('assignments', 
     new moodle_url('/local/deanpromoodle/pages/teacher.php', ['tab' => 'assignments', 'courseid' => $courseid]),
-    get_string('assignments', 'local_deanpromoodle'));
+    $assignmentsstr);
 $tabs[] = new tabobject('quizzes', 
     new moodle_url('/local/deanpromoodle/pages/teacher.php', ['tab' => 'quizzes', 'courseid' => $courseid]),
-    get_string('quizzes', 'local_deanpromoodle'));
+    $quizzesstr);
 $tabs[] = new tabobject('forums', 
     new moodle_url('/local/deanpromoodle/pages/teacher.php', ['tab' => 'forums', 'courseid' => $courseid]),
-    get_string('forums', 'local_deanpromoodle'));
+    $forumsstr);
 
 echo $OUTPUT->tabtree($tabs, $tab);
 
