@@ -1066,28 +1066,67 @@ switch ($tab) {
         break;
     
     case 'categories':
-        // Вкладка "Категории курсов" - дубликат вкладки "Программы"
+        // Вкладка "Категории курсов" с поддержкой вложенных категорий
         echo html_writer::start_div('local-deanpromoodle-admin-content', ['style' => 'margin-bottom: 30px;']);
         echo html_writer::tag('h2', 'Категории курсов', ['style' => 'margin-bottom: 20px;']);
         
-        // Получение всех категорий курсов
-        $categories = $DB->get_records('course_categories', null, 'name ASC');
+        // Добавляем стили для дерева категорий
+        echo html_writer::start_tag('style');
+        echo "
+            .category-row {
+                transition: background-color 0.2s;
+            }
+            .category-row:hover {
+                background-color: #f5f5f5;
+            }
+            .category-toggle {
+                user-select: none;
+                transition: color 0.2s;
+            }
+            .category-toggle:hover {
+                color: #007bff !important;
+            }
+            .category-child {
+                background-color: #fafafa;
+            }
+        ";
+        echo html_writer::end_tag('style');
         
-        if (empty($categories)) {
+        // Получение всех категорий курсов
+        $allcategories = $DB->get_records('course_categories', null, 'name ASC');
+        
+        if (empty($allcategories)) {
             echo html_writer::div('Категории курсов не найдены.', 'alert alert-info');
         } else {
-            // Подготовка данных для каждой категории
-            $programsdata = [];
-            foreach ($categories as $category) {
-                // Количество курсов в категории (исключаем системный курс с id=1)
+            // Функция для получения всех дочерних категорий рекурсивно
+            $getchildcategories = function($parentid, $categories) use (&$getchildcategories) {
+                $children = [];
+                foreach ($categories as $cat) {
+                    if ($cat->parent == $parentid) {
+                        $children[] = $cat->id;
+                        $subchildren = $getchildcategories($cat->id, $categories);
+                        $children = array_merge($children, $subchildren);
+                    }
+                }
+                return $children;
+            };
+            
+            // Функция для подсчета статистики категории (включая дочерние)
+            $calculatecategorystats = function($categoryid, $allcategories) use ($DB, $getchildcategories) {
+                // Получаем все дочерние категории
+                $childids = $getchildcategories($categoryid, $allcategories);
+                $allcategoryids = array_merge([$categoryid], $childids);
+                
+                // Подсчет курсов
+                $placeholders = implode(',', array_fill(0, count($allcategoryids), '?'));
                 $coursescount = $DB->count_records_sql(
-                    "SELECT COUNT(*) FROM {course} WHERE category = ? AND id > 1",
-                    [$category->id]
+                    "SELECT COUNT(*) FROM {course} WHERE category IN ($placeholders) AND id > 1",
+                    $allcategoryids
                 );
                 
-                // Получаем курсы категории для подсчета студентов и преподавателей
-                $categorycourses = $DB->get_records('course', ['category' => $category->id], '', 'id');
-                $courseids = array_keys($categorycourses);
+                // Получаем все курсы для подсчета студентов и преподавателей
+                $allcourses = $DB->get_records_select('course', "category IN ($placeholders) AND id > 1", $allcategoryids, '', 'id');
+                $courseids = array_keys($allcourses);
                 
                 $studentscount = 0;
                 $teacherscount = 0;
@@ -1131,16 +1170,133 @@ switch ($tab) {
                     }
                 }
                 
-                $programsdata[] = (object)[
-                    'id' => $category->id,
-                    'name' => $category->name,
-                    'description' => $category->description,
+                return [
                     'coursescount' => $coursescount,
                     'studentscount' => $studentscount,
-                    'teacherscount' => $teacherscount,
-                    'visible' => $category->visible
+                    'teacherscount' => $teacherscount
                 ];
-            }
+            };
+            
+            // Функция для рекурсивного отображения категорий
+            $rendercategorytree = function($parentid, $categories, $level = 0, $parentrowid = null) use (&$rendercategorytree, $calculatecategorystats, $allcategories) {
+                $children = [];
+                
+                // Находим дочерние категории
+                foreach ($categories as $cat) {
+                    if ($cat->parent == $parentid) {
+                        $children[] = $cat;
+                    }
+                }
+                
+                // Сортируем по имени
+                usort($children, function($a, $b) {
+                    return strcmp($a->name, $b->name);
+                });
+                
+                // Отображаем каждую категорию
+                foreach ($children as $category) {
+                    $stats = $calculatecategorystats($category->id, $allcategories);
+                    $haschildren = false;
+                    
+                    // Проверяем, есть ли дочерние категории
+                    foreach ($categories as $cat) {
+                        if ($cat->parent == $category->id) {
+                            $haschildren = true;
+                            break;
+                        }
+                    }
+                    
+                    $rowid = 'category-row-' . $category->id;
+                    $rowclass = 'category-row';
+                    $rowstyle = '';
+                    
+                    // Если это дочерняя категория, скрываем по умолчанию
+                    if ($level > 0 && $parentrowid) {
+                        $rowclass .= ' category-child category-child-of-' . $parentrowid;
+                        $rowstyle = 'display: none;';
+                    }
+                    
+                    $indentstyle = 'padding-left: ' . ($level * 30) . 'px;';
+                    
+                    echo html_writer::start_tag('tr', [
+                        'id' => $rowid,
+                        'class' => $rowclass,
+                        'data-category-id' => $category->id,
+                        'data-level' => $level,
+                        'data-parent-id' => $parentrowid,
+                        'style' => $rowstyle
+                    ]);
+                    
+                    // Колонка ID
+                    echo html_writer::tag('td', $category->id);
+                    
+                    // Колонка названия с кнопкой раскрытия/сворачивания
+                    $namecell = '';
+                    if ($haschildren) {
+                        $namecell .= html_writer::link('#', '▶', [
+                            'class' => 'category-toggle',
+                            'data-category-id' => $category->id,
+                            'data-row-id' => $rowid,
+                            'style' => 'text-decoration: none; color: #666; margin-right: 5px; font-size: 12px; display: inline-block; width: 15px;',
+                            'title' => 'Раскрыть/свернуть'
+                        ]);
+                    } else {
+                        $namecell .= html_writer::span('', ['style' => 'display: inline-block; width: 15px;']);
+                    }
+                    $namecell .= htmlspecialchars($category->name);
+                    echo html_writer::tag('td', $namecell, ['style' => $indentstyle]);
+                    
+                    // Количество курсов - ссылка если > 0
+                    $coursescell = $stats['coursescount'];
+                    if ($stats['coursescount'] > 0) {
+                        $coursescell = html_writer::link('#', $stats['coursescount'], [
+                            'class' => 'category-link',
+                            'data-category-id' => $category->id,
+                            'data-type' => 'courses',
+                            'data-category-name' => htmlspecialchars($category->name),
+                            'style' => 'color: #007bff; font-weight: bold; text-decoration: none; cursor: pointer;'
+                        ]);
+                    }
+                    echo html_writer::tag('td', html_writer::tag('strong', $coursescell));
+                    
+                    // Количество студентов - ссылка если > 0
+                    $studentscell = $stats['studentscount'];
+                    if ($stats['studentscount'] > 0) {
+                        $studentscell = html_writer::link('#', $stats['studentscount'], [
+                            'class' => 'category-link',
+                            'data-category-id' => $category->id,
+                            'data-type' => 'students',
+                            'data-category-name' => htmlspecialchars($category->name),
+                            'style' => 'color: green; font-weight: bold; text-decoration: none; cursor: pointer;'
+                        ]);
+                    }
+                    echo html_writer::tag('td', html_writer::tag('span', $studentscell));
+                    
+                    // Количество преподавателей - ссылка если > 0
+                    $teacherscell = $stats['teacherscount'];
+                    if ($stats['teacherscount'] > 0) {
+                        $teacherscell = html_writer::link('#', $stats['teacherscount'], [
+                            'class' => 'category-link',
+                            'data-category-id' => $category->id,
+                            'data-type' => 'teachers',
+                            'data-category-name' => htmlspecialchars($category->name),
+                            'style' => 'color: orange; font-weight: bold; text-decoration: none; cursor: pointer;'
+                        ]);
+                    }
+                    echo html_writer::tag('td', html_writer::tag('span', $teacherscell));
+                    
+                    // Статус
+                    $status = $category->visible ? html_writer::tag('span', 'Активна', ['style' => 'color: green;']) : html_writer::tag('span', 'Скрыта', ['style' => 'color: red;']);
+                    echo html_writer::tag('td', $status);
+                    
+                    echo html_writer::end_tag('tr');
+                    
+                    // Рекурсивно отображаем дочерние категории
+                    if ($haschildren) {
+                        $rendercategorytree($category->id, $categories, $level + 1, $rowid);
+                    }
+                }
+            };
             
             // Отображение таблицы
             echo html_writer::start_tag('table', ['class' => 'table table-striped table-hover', 'style' => 'width: 100%;']);
@@ -1156,54 +1312,8 @@ switch ($tab) {
             echo html_writer::end_tag('thead');
             echo html_writer::start_tag('tbody');
             
-            foreach ($programsdata as $program) {
-                echo html_writer::start_tag('tr');
-                echo html_writer::tag('td', $program->id);
-                echo html_writer::tag('td', htmlspecialchars($program->name));
-                
-                // Количество курсов - ссылка если > 0
-                $coursescell = $program->coursescount;
-                if ($program->coursescount > 0) {
-                    $coursescell = html_writer::link('#', $program->coursescount, [
-                        'class' => 'category-link',
-                        'data-category-id' => $program->id,
-                        'data-type' => 'courses',
-                        'data-category-name' => htmlspecialchars($program->name),
-                        'style' => 'color: #007bff; font-weight: bold; text-decoration: none; cursor: pointer;'
-                    ]);
-                }
-                echo html_writer::tag('td', html_writer::tag('strong', $coursescell));
-                
-                // Количество студентов - ссылка если > 0
-                $studentscell = $program->studentscount;
-                if ($program->studentscount > 0) {
-                    $studentscell = html_writer::link('#', $program->studentscount, [
-                        'class' => 'category-link',
-                        'data-category-id' => $program->id,
-                        'data-type' => 'students',
-                        'data-category-name' => htmlspecialchars($program->name),
-                        'style' => 'color: green; font-weight: bold; text-decoration: none; cursor: pointer;'
-                    ]);
-                }
-                echo html_writer::tag('td', html_writer::tag('span', $studentscell));
-                
-                // Количество преподавателей - ссылка если > 0
-                $teacherscell = $program->teacherscount;
-                if ($program->teacherscount > 0) {
-                    $teacherscell = html_writer::link('#', $program->teacherscount, [
-                        'class' => 'category-link',
-                        'data-category-id' => $program->id,
-                        'data-type' => 'teachers',
-                        'data-category-name' => htmlspecialchars($program->name),
-                        'style' => 'color: orange; font-weight: bold; text-decoration: none; cursor: pointer;'
-                    ]);
-                }
-                echo html_writer::tag('td', html_writer::tag('span', $teacherscell));
-                
-                $status = $program->visible ? html_writer::tag('span', 'Активна', ['style' => 'color: green;']) : html_writer::tag('span', 'Скрыта', ['style' => 'color: red;']);
-                echo html_writer::tag('td', $status);
-                echo html_writer::end_tag('tr');
-            }
+            // Отображаем дерево категорий, начиная с корневых (parent = 0)
+            $rendercategorytree(0, $allcategories);
             
             echo html_writer::end_tag('tbody');
             echo html_writer::end_tag('table');
@@ -1248,9 +1358,65 @@ switch ($tab) {
         echo html_writer::end_div(); // modal-dialog
         echo html_writer::end_div(); // modal
         
-        // JavaScript для загрузки данных категории
+        // JavaScript для раскрытия/сворачивания дочерних категорий и загрузки данных
         $PAGE->requires->js_init_code("
             (function() {
+                // Функция для раскрытия/сворачивания дочерних категорий
+                function toggleCategoryChildren(categoryId, rowId) {
+                    var childRows = document.querySelectorAll('.category-child-of-' + rowId);
+                    var toggleButton = document.querySelector('.category-toggle[data-category-id=\"' + categoryId + '\"]');
+                    
+                    if (!toggleButton) return;
+                    
+                    var isExpanded = toggleButton.getAttribute('data-expanded') === 'true';
+                    
+                    childRows.forEach(function(row) {
+                        if (isExpanded) {
+                            // Сворачиваем
+                            row.style.display = 'none';
+                            // Также сворачиваем все вложенные дочерние категории
+                            var nestedCategoryId = row.getAttribute('data-category-id');
+                            var nestedToggle = row.querySelector('.category-toggle');
+                            if (nestedToggle) {
+                                nestedToggle.setAttribute('data-expanded', 'false');
+                                nestedToggle.textContent = '▶';
+                                var nestedRowId = nestedToggle.getAttribute('data-row-id');
+                                if (nestedRowId) {
+                                    var nestedChildren = document.querySelectorAll('.category-child-of-' + nestedRowId);
+                                    nestedChildren.forEach(function(nestedRow) {
+                                        nestedRow.style.display = 'none';
+                                    });
+                                }
+                            }
+                        } else {
+                            // Раскрываем
+                            row.style.display = '';
+                        }
+                    });
+                    
+                    // Обновляем состояние кнопки
+                    if (isExpanded) {
+                        toggleButton.setAttribute('data-expanded', 'false');
+                        toggleButton.textContent = '▶';
+                    } else {
+                        toggleButton.setAttribute('data-expanded', 'true');
+                        toggleButton.textContent = '▼';
+                    }
+                }
+                
+                // Обработчики кликов на кнопки раскрытия/сворачивания
+                var categoryToggles = document.querySelectorAll('.category-toggle');
+                categoryToggles.forEach(function(toggle) {
+                    toggle.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        var categoryId = this.getAttribute('data-category-id');
+                        var rowId = this.getAttribute('data-row-id');
+                        toggleCategoryChildren(categoryId, rowId);
+                    });
+                });
+                
+                // Обработчики для ссылок на цифры (модальное окно)
                 var categoryLinks = document.querySelectorAll('.category-link');
                 categoryLinks.forEach(function(link) {
                     link.addEventListener('click', function(e) {

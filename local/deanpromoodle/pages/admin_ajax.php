@@ -128,16 +128,38 @@ if ($action == 'getteachercourses' && $teacherid > 0) {
         'count' => count($formattedcourses)
     ]);
 } elseif ($action == 'getcategorycourses' && $categoryid > 0) {
-    // Получение курсов категории
+    // Получение курсов категории (включая дочерние категории)
     global $DB;
     
+    // Функция для получения всех дочерних категорий рекурсивно
+    $getchildcategories = function($parentid, $allcategories) use (&$getchildcategories) {
+        $children = [];
+        foreach ($allcategories as $cat) {
+            if ($cat->parent == $parentid) {
+                $children[] = $cat->id;
+                $subchildren = $getchildcategories($cat->id, $allcategories);
+                $children = array_merge($children, $subchildren);
+            }
+        }
+        return $children;
+    };
+    
+    // Получаем все категории
+    $allcategories = $DB->get_records('course_categories');
+    
+    // Получаем все дочерние категории
+    $childids = $getchildcategories($categoryid, $allcategories);
+    $allcategoryids = array_merge([$categoryid], $childids);
+    
+    // Получаем курсы из всех категорий
+    $placeholders = implode(',', array_fill(0, count($allcategoryids), '?'));
     $courses = $DB->get_records_sql(
         "SELECT c.id, c.fullname, c.shortname, c.startdate, c.enddate
          FROM {course} c
-         WHERE c.category = ?
+         WHERE c.category IN ($placeholders)
          AND c.id > 1
          ORDER BY c.fullname",
-        [$categoryid]
+        $allcategoryids
     );
     
     $formattedcourses = [];
@@ -157,11 +179,32 @@ if ($action == 'getteachercourses' && $teacherid > 0) {
         'count' => count($formattedcourses)
     ]);
 } elseif ($action == 'getcategorystudents' && $categoryid > 0) {
-    // Получение студентов категории
+    // Получение студентов категории (включая дочерние категории)
     global $DB;
     
-    // Получаем все курсы категории
-    $categorycourses = $DB->get_records('course', ['category' => $categoryid], '', 'id');
+    // Функция для получения всех дочерних категорий рекурсивно
+    $getchildcategories = function($parentid, $allcategories) use (&$getchildcategories) {
+        $children = [];
+        foreach ($allcategories as $cat) {
+            if ($cat->parent == $parentid) {
+                $children[] = $cat->id;
+                $subchildren = $getchildcategories($cat->id, $allcategories);
+                $children = array_merge($children, $subchildren);
+            }
+        }
+        return $children;
+    };
+    
+    // Получаем все категории
+    $allcategories = $DB->get_records('course_categories');
+    
+    // Получаем все дочерние категории
+    $childids = $getchildcategories($categoryid, $allcategories);
+    $allcategoryids = array_merge([$categoryid], $childids);
+    
+    // Получаем все курсы из всех категорий
+    $placeholders = implode(',', array_fill(0, count($allcategoryids), '?'));
+    $categorycourses = $DB->get_records_select('course', "category IN ($placeholders) AND id > 1", $allcategoryids, '', 'id');
     $courseids = array_keys($categorycourses);
     
     $students = [];
@@ -219,11 +262,32 @@ if ($action == 'getteachercourses' && $teacherid > 0) {
         'count' => count($formattedstudents)
     ]);
 } elseif ($action == 'getcategoryteachers' && $categoryid > 0) {
-    // Получение преподавателей категории
+    // Получение преподавателей категории (включая дочерние категории)
     global $DB;
     
-    // Получаем все курсы категории
-    $categorycourses = $DB->get_records('course', ['category' => $categoryid], '', 'id');
+    // Функция для получения всех дочерних категорий рекурсивно
+    $getchildcategories = function($parentid, $allcategories) use (&$getchildcategories) {
+        $children = [];
+        foreach ($allcategories as $cat) {
+            if ($cat->parent == $parentid) {
+                $children[] = $cat->id;
+                $subchildren = $getchildcategories($cat->id, $allcategories);
+                $children = array_merge($children, $subchildren);
+            }
+        }
+        return $children;
+    };
+    
+    // Получаем все категории
+    $allcategories = $DB->get_records('course_categories');
+    
+    // Получаем все дочерние категории
+    $childids = $getchildcategories($categoryid, $allcategories);
+    $allcategoryids = array_merge([$categoryid], $childids);
+    
+    // Получаем все курсы из всех категорий
+    $placeholders = implode(',', array_fill(0, count($allcategoryids), '?'));
+    $categorycourses = $DB->get_records_select('course', "category IN ($placeholders) AND id > 1", $allcategoryids, '', 'id');
     $courseids = array_keys($categorycourses);
     
     $teachers = [];
