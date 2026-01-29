@@ -1243,7 +1243,9 @@ switch ($tab) {
                     } else {
                         $namecell .= html_writer::span('', ['style' => 'display: inline-block; width: 15px;']);
                     }
-                    $namecell .= htmlspecialchars($category->name);
+                    // Безопасное преобразование имени категории в строку
+                    $categoryname = is_string($category->name) ? $category->name : (is_array($category->name) ? implode(', ', $category->name) : (string)$category->name);
+                    $namecell .= htmlspecialchars($categoryname);
                     echo html_writer::tag('td', $namecell, ['style' => $indentstyle]);
                     
                     // Количество курсов - ссылка если > 0
@@ -1253,7 +1255,7 @@ switch ($tab) {
                             'class' => 'category-link',
                             'data-category-id' => $category->id,
                             'data-type' => 'courses',
-                            'data-category-name' => htmlspecialchars($category->name),
+                            'data-category-name' => htmlspecialchars($categoryname),
                             'style' => 'color: #007bff; font-weight: bold; text-decoration: none; cursor: pointer;'
                         ]);
                     }
@@ -1266,7 +1268,7 @@ switch ($tab) {
                             'class' => 'category-link',
                             'data-category-id' => $category->id,
                             'data-type' => 'students',
-                            'data-category-name' => htmlspecialchars($category->name),
+                            'data-category-name' => htmlspecialchars($categoryname),
                             'style' => 'color: green; font-weight: bold; text-decoration: none; cursor: pointer;'
                         ]);
                     }
@@ -1279,7 +1281,7 @@ switch ($tab) {
                             'class' => 'category-link',
                             'data-category-id' => $category->id,
                             'data-type' => 'teachers',
-                            'data-category-name' => htmlspecialchars($category->name),
+                            'data-category-name' => htmlspecialchars($categoryname),
                             'style' => 'color: orange; font-weight: bold; text-decoration: none; cursor: pointer;'
                         ]);
                     }
