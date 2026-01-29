@@ -1,0 +1,17 @@
+# Prevent direct access to plugin directory
+# Allow access only to specific PHP files
+
+# Deny directory listing
+Options -Indexes
+
+# Allow access to PHP files
+<FilesMatch "\.php$">
+    Order Allow,Deny
+    Allow from all
+</FilesMatch>
+
+# Deny access to other files
+<FilesMatch "^(?!.*\.php$).*$">
+    Order Deny,Allow
+    Deny from all
+</FilesMatch>
