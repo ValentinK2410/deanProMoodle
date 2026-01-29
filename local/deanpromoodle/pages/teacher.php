@@ -314,27 +314,47 @@ switch ($tab) {
         break;
         
     case 'quizzes':
-        // Получение несданных тестов (только экзамены)
+        // Получение только несданных экзаменов
+        // Показываем только тесты с названием "Экзамен" и только если они не сданы
         $failedquizzes = [];
         foreach ($teachercourses as $course) {
             $quizzes = get_all_instances_in_course('quiz', $course, false);
             
             foreach ($quizzes as $quiz) {
-                // Получаем только несданные попытки (оценка меньше максимального балла)
-                // Сданные экзамены не показываются
+                // Фильтруем только экзамены по названию (содержит "Экзамен" или "экзамен")
+                $quizname = mb_strtolower($quiz->name);
+                if (strpos($quizname, 'экзамен') === false) {
+                    continue; // Пропускаем тесты, которые не являются экзаменами
+                }
+                
+                // Получаем только несданные попытки экзаменов
+                // Исключаем тесты, у которых есть финальная оценка (сданные)
                 $attempts = $DB->get_records_sql(
                     "SELECT qa.*, u.firstname, u.lastname, u.email, u.id as userid, q.name as quizname, q.sumgrades as maxgrade
                      FROM {quiz_attempts} qa
                      JOIN {user} u ON u.id = qa.userid
                      JOIN {quiz} q ON q.id = qa.quiz
+                     LEFT JOIN {quiz_grades} qg ON qg.quiz = qa.quiz AND qg.userid = qa.userid
                      WHERE qa.quiz = ? 
                      AND qa.state = 'finished' 
                      AND qa.sumgrades < q.sumgrades
+                     AND (qg.grade IS NULL OR qg.grade < q.sumgrades)
                      ORDER BY qa.timemodified DESC",
                     [$quiz->id]
                 );
                 
                 foreach ($attempts as $attempt) {
+                    // Дополнительная проверка: если есть финальная оценка и она проходная, пропускаем
+                    $finalgrade = $DB->get_field('quiz_grades', 'grade', [
+                        'quiz' => $quiz->id,
+                        'userid' => $attempt->userid
+                    ]);
+                    
+                    // Если есть финальная оценка и она равна или больше максимального балла, пропускаем (сдан)
+                    if ($finalgrade !== false && $finalgrade >= $quiz->sumgrades) {
+                        continue;
+                    }
+                    
                     $failedquizzes[] = (object)[
                         'id' => $attempt->id,
                         'quizid' => $quiz->id,
