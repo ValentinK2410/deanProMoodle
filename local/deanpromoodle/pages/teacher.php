@@ -431,116 +431,130 @@ switch ($tab) {
         break;
         
     case 'forums':
-        // Получение сообщений форумов без ответов преподавателя
+        // Оптимизированное получение сообщений форумов без ответов преподавателя
         $unrepliedposts = [];
+        
+        // Получаем роли один раз перед циклом
+        $teacherroleids = $DB->get_fieldset_select('role', 'id', "shortname IN ('teacher', 'editingteacher', 'manager')");
+        $studentroleid = $DB->get_field('role', 'id', ['shortname' => 'student']);
+        
+        if (empty($teacherroleids) || !$studentroleid) {
+            echo html_writer::div(get_string('noforumspostsfound', 'local_deanpromoodle'), 'alert alert-info');
+            break;
+        }
+        
+        // Получаем все ID форумов из всех курсов одним запросом
+        $forumids = [];
+        $courseforums = []; // Маппинг forum_id => course_id
         foreach ($teachercourses as $course) {
             $forums = get_all_instances_in_course('forum', $course, false);
-            
             foreach ($forums as $forum) {
-                $cm = get_coursemodule_from_instance('forum', $forum->id, $course->id);
-                $forumcontext = context_module::instance($cm->id);
-                
-                // Получение ролей преподавателей
-                $teacherroleids = $DB->get_fieldset_select('role', 'id', "shortname IN ('teacher', 'editingteacher', 'manager')");
-                if (empty($teacherroleids)) {
-                    continue;
-                }
-                
-                // Получение ID пользователей с ролями преподавателей в этом контексте курса
-                $coursecontext = context_course::instance($course->id);
-                $placeholders = implode(',', array_fill(0, count($teacherroleids), '?'));
-                $teacheruserids = $DB->get_fieldset_sql(
-                    "SELECT DISTINCT ra.userid
-                     FROM {role_assignments} ra
-                     WHERE ra.contextid = ? AND ra.roleid IN ($placeholders)",
-                    array_merge([$coursecontext->id], $teacherroleids)
-                );
-                
-                // Если нет преподавателей в контексте курса, проверяем системный контекст
-                if (empty($teacheruserids)) {
-                    $systemcontext = context_system::instance();
-                    $teacheruserids = $DB->get_fieldset_sql(
-                        "SELECT DISTINCT ra.userid
-                         FROM {role_assignments} ra
-                         WHERE ra.contextid = ? AND ra.roleid IN ($placeholders)",
-                        array_merge([$systemcontext->id], $teacherroleids)
-                    );
-                }
-                
-                if (empty($teacheruserids)) {
-                    continue;
-                }
-                
-                // Получение ID пользователей с ролью студента в этом контексте курса
-                $studentroleid = $DB->get_field('role', 'id', ['shortname' => 'student']);
-                if (!$studentroleid) {
-                    continue;
-                }
-                
-                $studentuserids = $DB->get_fieldset_sql(
-                    "SELECT DISTINCT ra.userid
-                     FROM {role_assignments} ra
-                     WHERE ra.contextid = ? AND ra.roleid = ?",
-                    [$coursecontext->id, $studentroleid]
-                );
-                
-                if (empty($studentuserids)) {
-                    continue;
-                }
-                
-                $teacherplaceholders = implode(',', array_fill(0, count($teacheruserids), '?'));
-                $studentplaceholders = implode(',', array_fill(0, count($studentuserids), '?'));
-                
-                // Получение сообщений студентов, на которые не ответили преподаватели
-                // Проверяем по времени создания: если после сообщения студента нет ответа от преподавателя
-                $posts = $DB->get_records_sql(
-                    "SELECT p.*, u.firstname, u.lastname, u.email, u.id as userid, d.name as discussionname
-                     FROM {forum_posts} p
-                     JOIN {user} u ON u.id = p.userid
-                     JOIN {forum_discussions} d ON d.id = p.discussion
-                     WHERE d.forum = ? 
-                     AND p.userid IN ($studentplaceholders)
-                     AND NOT EXISTS (
-                         SELECT 1 FROM {forum_posts} p2
-                         WHERE p2.discussion = p.discussion 
-                         AND p2.created > p.created
-                         AND p2.userid IN ($teacherplaceholders)
-                     )
-                     ORDER BY p.created DESC",
-                    array_merge([$forum->id], $studentuserids, $teacheruserids)
-                );
-                
-                foreach ($posts as $post) {
-                    // Обрезаем текст сообщения для отображения (только первые 10 слов)
-                    $fullmessage = strip_tags($post->message);
-                    $words = preg_split('/\s+/', trim($fullmessage));
-                    $wordlimit = 10;
-                    
-                    if (count($words) > $wordlimit) {
-                        $message = implode(' ', array_slice($words, 0, $wordlimit)) . '...';
-                    } else {
-                        $message = $fullmessage;
-                    }
-                    
-                    $unrepliedposts[] = (object)[
-                        'id' => $post->id,
-                        'forumid' => $forum->id,
-                        'forumname' => $forum->name,
-                        'discussionid' => $post->discussion,
-                        'discussionname' => $post->discussionname,
-                        'courseid' => $course->id,
-                        'coursename' => $course->fullname,
-                        'userid' => $post->userid,
-                        'studentname' => fullname($post),
-                        'email' => $post->email,
-                        'subject' => $post->subject,
-                        'message' => $message,
-                        'fullmessage' => $fullmessage,
-                        'posted' => userdate($post->created),
-                        'created' => $post->created
-                    ];
-                }
+                $forumids[] = $forum->id;
+                $courseforums[$forum->id] = $course;
             }
+        }
+        
+        if (empty($forumids)) {
+            echo html_writer::div(get_string('noforumspostsfound', 'local_deanpromoodle'), 'alert alert-info');
+            break;
+        }
+        
+        // Получаем все контексты курсов один раз
+        $coursecontexts = [];
+        $allcourseids = array_unique(array_column($courseforums, 'id'));
+        foreach ($allcourseids as $cid) {
+            $coursecontexts[$cid] = context_course::instance($cid);
+        }
+        
+        // Получаем всех преподавателей для всех курсов одним запросом
+        $systemcontext = context_system::instance();
+        $placeholders = implode(',', array_fill(0, count($teacherroleids), '?'));
+        $allteacheruserids = $DB->get_fieldset_sql(
+            "SELECT DISTINCT ra.userid
+             FROM {role_assignments} ra
+             WHERE (ra.contextid IN (" . implode(',', array_map(function($ctx) { return $ctx->id; }, $coursecontexts)) . ")
+                    OR ra.contextid = ?)
+             AND ra.roleid IN ($placeholders)",
+            array_merge(array_map(function($ctx) { return $ctx->id; }, $coursecontexts), [$systemcontext->id], $teacherroleids)
+        );
+        
+        if (empty($allteacheruserids)) {
+            echo html_writer::div(get_string('noforumspostsfound', 'local_deanpromoodle'), 'alert alert-info');
+            break;
+        }
+        
+        // Получаем всех студентов для всех курсов одним запросом
+        $allstudentuserids = $DB->get_fieldset_sql(
+            "SELECT DISTINCT ra.userid
+             FROM {role_assignments} ra
+             WHERE ra.contextid IN (" . implode(',', array_map(function($ctx) { return $ctx->id; }, $coursecontexts)) . ")
+             AND ra.roleid = ?",
+            array_merge(array_map(function($ctx) { return $ctx->id; }, $coursecontexts), [$studentroleid])
+        );
+        
+        if (empty($allstudentuserids)) {
+            echo html_writer::div(get_string('noforumspostsfound', 'local_deanpromoodle'), 'alert alert-info');
+            break;
+        }
+        
+        // Оптимизированный запрос: получаем все сообщения одним запросом
+        $forumplaceholders = implode(',', array_fill(0, count($forumids), '?'));
+        $teacherplaceholders = implode(',', array_fill(0, count($allteacheruserids), '?'));
+        $studentplaceholders = implode(',', array_fill(0, count($allstudentuserids), '?'));
+        
+        // Используем LEFT JOIN вместо NOT EXISTS для лучшей производительности
+        $posts = $DB->get_records_sql(
+            "SELECT p.id, p.discussion, p.userid, p.subject, p.message, p.created,
+                    u.firstname, u.lastname, u.email,
+                    d.name as discussionname, d.forum,
+                    f.name as forumname, f.course as courseid
+             FROM {forum_posts} p
+             JOIN {user} u ON u.id = p.userid
+             JOIN {forum_discussions} d ON d.id = p.discussion
+             JOIN {forum} f ON f.id = d.forum
+             LEFT JOIN {forum_posts} p2 ON p2.discussion = p.discussion 
+                 AND p2.created > p.created 
+                 AND p2.userid IN ($teacherplaceholders)
+             WHERE d.forum IN ($forumplaceholders)
+             AND p.userid IN ($studentplaceholders)
+             AND p2.id IS NULL
+             ORDER BY p.created DESC
+             LIMIT 1000",
+            array_merge($forumids, $allteacheruserids, $allstudentuserids)
+        );
+        
+        // Обрабатываем результаты
+        foreach ($posts as $post) {
+            $course = $courseforums[$post->forum];
+            
+            // Обрезаем текст сообщения для отображения (только первые 10 слов)
+            $fullmessage = strip_tags($post->message);
+            $words = preg_split('/\s+/', trim($fullmessage));
+            $wordlimit = 10;
+            
+            if (count($words) > $wordlimit) {
+                $message = implode(' ', array_slice($words, 0, $wordlimit)) . '...';
+            } else {
+                $message = $fullmessage;
+            }
+            
+            $unrepliedposts[] = (object)[
+                'id' => $post->id,
+                'forumid' => $post->forum,
+                'forumname' => $post->forumname,
+                'discussionid' => $post->discussion,
+                'discussionname' => $post->discussionname,
+                'courseid' => $post->courseid,
+                'coursename' => $course->fullname,
+                'userid' => $post->userid,
+                'studentname' => fullname($post),
+                'email' => $post->email,
+                'subject' => $post->subject,
+                'message' => $message,
+                'fullmessage' => $fullmessage,
+                'posted' => userdate($post->created),
+                'created' => $post->created
+            ];
         }
         
         // Pagination
