@@ -1758,12 +1758,22 @@ switch ($tab) {
                             echo html_writer::div('Ошибка чтения файла.', 'alert alert-danger');
                         } else {
                             // Парсим JSON
-                            $subjectsdata = json_decode($jsoncontent, true);
+                            $jsondata = json_decode($jsoncontent, true);
                             if (json_last_error() !== JSON_ERROR_NONE) {
                                 echo html_writer::div('Ошибка парсинга JSON: ' . json_last_error_msg(), 'alert alert-danger');
                             } else {
-                                if (!is_array($subjectsdata)) {
-                                    echo html_writer::div('JSON файл должен содержать массив предметов.', 'alert alert-danger');
+                                // Определяем структуру: если есть ключ 'subjects', используем его, иначе весь JSON как массив
+                                if (is_array($jsondata) && isset($jsondata['subjects']) && is_array($jsondata['subjects'])) {
+                                    $subjectsdata = $jsondata['subjects'];
+                                } elseif (is_array($jsondata)) {
+                                    $subjectsdata = $jsondata;
+                                } else {
+                                    echo html_writer::div('JSON файл должен содержать массив предметов или объект с ключом "subjects".', 'alert alert-danger');
+                                    $subjectsdata = [];
+                                }
+                                
+                                if (empty($subjectsdata)) {
+                                    echo html_writer::div('Не найдено предметов для импорта.', 'alert alert-warning');
                                 } else {
                                     // Импортируем предметы
                                     $imported = 0;
@@ -1782,11 +1792,12 @@ switch ($tab) {
                                             
                                             // Проверяем, существует ли предмет с таким названием или кодом
                                             $existing = null;
-                                            if (!empty($subjectdata['code'])) {
-                                                $existing = $DB->get_record('local_deanpromoodle_subjects', ['code' => $subjectdata['code']]);
+                                            $subjectcode = !empty($subjectdata['code']) ? trim($subjectdata['code']) : '';
+                                            if ($subjectcode) {
+                                                $existing = $DB->get_record('local_deanpromoodle_subjects', ['code' => $subjectcode]);
                                             }
                                             if (!$existing) {
-                                                $existing = $DB->get_record('local_deanpromoodle_subjects', ['name' => $subjectdata['name']]);
+                                                $existing = $DB->get_record('local_deanpromoodle_subjects', ['name' => trim($subjectdata['name'])]);
                                             }
                                             
                                             if ($existing) {
@@ -1794,14 +1805,53 @@ switch ($tab) {
                                                 continue; // Пропускаем существующие предметы
                                             }
                                             
+                                            // Маппинг полей из нового формата
+                                            // name -> name
+                                            // code -> code
+                                            // short_description -> shortdescription
+                                            // description -> description (может быть null)
+                                            // order -> sortorder
+                                            // is_active (true/false) -> visible (1/0)
+                                            
                                             // Создаем новый предмет
                                             $data = new stdClass();
                                             $data->name = trim($subjectdata['name']);
-                                            $data->code = !empty($subjectdata['code']) ? trim($subjectdata['code']) : '';
-                                            $data->shortdescription = !empty($subjectdata['shortdescription']) ? $subjectdata['shortdescription'] : '';
-                                            $data->description = !empty($subjectdata['description']) ? $subjectdata['description'] : '';
-                                            $data->sortorder = isset($subjectdata['sortorder']) ? (int)$subjectdata['sortorder'] : 0;
-                                            $data->visible = isset($subjectdata['visible']) ? (int)$subjectdata['visible'] : 1;
+                                            $data->code = $subjectcode;
+                                            
+                                            // Маппинг short_description -> shortdescription
+                                            if (isset($subjectdata['short_description'])) {
+                                                $data->shortdescription = $subjectdata['short_description'] ?: '';
+                                            } elseif (isset($subjectdata['shortdescription'])) {
+                                                $data->shortdescription = $subjectdata['shortdescription'] ?: '';
+                                            } else {
+                                                $data->shortdescription = '';
+                                            }
+                                            
+                                            // Маппинг description (может быть null)
+                                            if (isset($subjectdata['description'])) {
+                                                $data->description = $subjectdata['description'] ?: '';
+                                            } else {
+                                                $data->description = '';
+                                            }
+                                            
+                                            // Маппинг order -> sortorder
+                                            if (isset($subjectdata['order'])) {
+                                                $data->sortorder = (int)$subjectdata['order'];
+                                            } elseif (isset($subjectdata['sortorder'])) {
+                                                $data->sortorder = (int)$subjectdata['sortorder'];
+                                            } else {
+                                                $data->sortorder = 0;
+                                            }
+                                            
+                                            // Маппинг is_active (true/false) -> visible (1/0)
+                                            if (isset($subjectdata['is_active'])) {
+                                                $data->visible = $subjectdata['is_active'] ? 1 : 0;
+                                            } elseif (isset($subjectdata['visible'])) {
+                                                $data->visible = (int)$subjectdata['visible'];
+                                            } else {
+                                                $data->visible = 1;
+                                            }
+                                            
                                             $data->timecreated = time();
                                             $data->timemodified = time();
                                             
@@ -2277,8 +2327,23 @@ switch ($tab) {
                 'required' => true
             ]);
             echo html_writer::start_div('form-text text-muted', ['style' => 'margin-top: 5px;']);
-            echo 'Формат JSON файла:<br>';
-            echo '<pre style="background: #f5f5f5; padding: 10px; border-radius: 4px; font-size: 12px; margin-top: 5px;">[<br>';
+            echo 'Формат JSON файла (поддерживаются оба варианта):<br>';
+            echo '<pre style="background: #f5f5f5; padding: 10px; border-radius: 4px; font-size: 11px; margin-top: 5px; max-height: 200px; overflow-y: auto;">';
+            echo 'Вариант 1 (объект с ключом "subjects"):<br>';
+            echo '{<br>';
+            echo '  "subjects": [<br>';
+            echo '    {<br>';
+            echo '      "name": "Название предмета",<br>';
+            echo '      "code": "КОД",<br>';
+            echo '      "short_description": "Краткое описание",<br>';
+            echo '      "description": "Полное описание",<br>';
+            echo '      "order": 0,<br>';
+            echo '      "is_active": true<br>';
+            echo '    }<br>';
+            echo '  ]<br>';
+            echo '}<br><br>';
+            echo 'Вариант 2 (простой массив):<br>';
+            echo '[<br>';
             echo '  {<br>';
             echo '    "name": "Название предмета",<br>';
             echo '    "code": "КОД",<br>';
