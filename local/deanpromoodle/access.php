@@ -30,6 +30,7 @@ $capabilities = [
         'contextlevel' => CONTEXT_SYSTEM,
         'archetypes' => [
             'student' => CAP_ALLOW,
+            'user' => CAP_ALLOW, // Allow all authenticated users as fallback
         ],
     ],
     'local/deanpromoodle:viewteacher' => [
@@ -39,6 +40,7 @@ $capabilities = [
             'editingteacher' => CAP_ALLOW,
             'teacher' => CAP_ALLOW,
             'manager' => CAP_ALLOW,
+            'user' => CAP_ALLOW, // Allow all authenticated users as fallback
         ],
     ],
     'local/deanpromoodle:viewadmin' => [
