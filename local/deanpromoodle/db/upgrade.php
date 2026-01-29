@@ -48,5 +48,31 @@ function xmldb_local_deanpromoodle_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026013001, 'local', 'deanpromoodle');
     }
     
+    // Создаем таблицу учебных заведений
+    if ($oldversion < 2026013002) {
+        $table = new xmldb_table('local_deanpromoodle_institutions');
+        
+        if (!$dbman->table_exists($table)) {
+            $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+            $table->add_field('name', XMLDB_TYPE_CHAR, '255', null, XMLDB_NOTNULL, null, null);
+            $table->add_field('description', XMLDB_TYPE_TEXT, null, null, null, null, null);
+            $table->add_field('address', XMLDB_TYPE_CHAR, '500', null, null, null, null);
+            $table->add_field('phone', XMLDB_TYPE_CHAR, '100', null, null, null, null);
+            $table->add_field('email', XMLDB_TYPE_CHAR, '255', null, null, null, null);
+            $table->add_field('website', XMLDB_TYPE_CHAR, '500', null, null, null, null);
+            $table->add_field('logo', XMLDB_TYPE_CHAR, '500', null, null, null, null);
+            $table->add_field('visible', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, '1');
+            $table->add_field('timemodified', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $table->add_field('timecreated', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            
+            $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+            $table->add_index('visible', XMLDB_INDEX_NOTUNIQUE, ['visible']);
+            
+            $dbman->create_table($table);
+        }
+        
+        upgrade_plugin_savepoint(true, 2026013002, 'local', 'deanpromoodle');
+    }
+    
     return true;
 }

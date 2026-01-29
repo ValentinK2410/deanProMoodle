@@ -110,5 +110,28 @@
         <INDEX NAME="programcohort" UNIQUE="true" FIELDS="programid, cohortid"/>
       </INDEXES>
     </TABLE>
+
+    <!-- Таблица учебных заведений -->
+    <TABLE NAME="local_deanpromoodle_institutions" COMMENT="Таблица учебных заведений">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="name" TYPE="char" LENGTH="255" NOTNULL="true"/>
+        <FIELD NAME="description" TYPE="text" NOTNULL="false"/>
+        <FIELD NAME="address" TYPE="char" LENGTH="500" NOTNULL="false"/>
+        <FIELD NAME="phone" TYPE="char" LENGTH="100" NOTNULL="false"/>
+        <FIELD NAME="email" TYPE="char" LENGTH="255" NOTNULL="false"/>
+        <FIELD NAME="website" TYPE="char" LENGTH="500" NOTNULL="false"/>
+        <FIELD NAME="logo" TYPE="char" LENGTH="500" NOTNULL="false"/>
+        <FIELD NAME="visible" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="1"/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="visible" UNIQUE="false" FIELDS="visible"/>
+      </INDEXES>
+    </TABLE>
   </TABLES>
 </XMLDB>

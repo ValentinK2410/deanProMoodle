@@ -130,6 +130,9 @@ $tabs[] = new tabobject('subjects',
 $tabs[] = new tabobject('programs', 
     new moodle_url('/local/deanpromoodle/pages/admin.php', ['tab' => 'programs']),
     'Программы');
+$tabs[] = new tabobject('institutions', 
+    new moodle_url('/local/deanpromoodle/pages/admin.php', ['tab' => 'institutions']),
+    'Учебные заведения');
 $tabs[] = new tabobject('categories', 
     new moodle_url('/local/deanpromoodle/pages/admin.php', ['tab' => 'categories']),
     'Категории курсов');
@@ -3361,6 +3364,401 @@ switch ($tab) {
                 })();
             ");
         }
+        
+        echo html_writer::end_div();
+        break;
+    
+    case 'institutions':
+        // Вкладка "Учебные заведения"
+        echo html_writer::start_div('local-deanpromoodle-admin-content', ['style' => 'margin-bottom: 30px;']);
+        
+        // Проверяем существование таблицы БД
+        $tablesexist = false;
+        $errormsg = '';
+        try {
+            $DB->get_records('local_deanpromoodle_institutions', null, '', '*', 0, 1);
+            $tablesexist = true;
+        } catch (\dml_exception $e) {
+            $errormsg = 'Таблица учебных заведений не найдена. Выполните обновление базы данных.';
+        } catch (\Exception $e) {
+            $errormsg = 'Ошибка при проверке таблицы: ' . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8');
+        }
+        
+        if (!$tablesexist) {
+            echo html_writer::div($errormsg, 'alert alert-danger');
+            echo html_writer::end_div();
+            break;
+        }
+        
+        // Обработка импорта из JSON
+        $importaction = optional_param('import', '', PARAM_ALPHA);
+        if ($importaction == 'json') {
+            $importsubmit = optional_param('import_submit', 0, PARAM_INT);
+            if ($importsubmit && isset($_FILES['jsonfile']) && $_FILES['jsonfile']['error'] == UPLOAD_ERR_OK) {
+                $filepath = $_FILES['jsonfile']['tmp_name'];
+                $mimetype = mime_content_type($filepath);
+                
+                if ($mimetype == 'application/json' || pathinfo($_FILES['jsonfile']['name'], PATHINFO_EXTENSION) == 'json') {
+                    $jsoncontent = file_get_contents($filepath);
+                    $jsondata = json_decode($jsoncontent, true);
+                    
+                    if (json_last_error() === JSON_ERROR_NONE) {
+                        // Определяем структуру данных
+                        $institutionsdata = [];
+                        if (isset($jsondata['institutions']) && is_array($jsondata['institutions'])) {
+                            $institutionsdata = $jsondata['institutions'];
+                        } elseif (is_array($jsondata) && isset($jsondata[0]['name'])) {
+                            $institutionsdata = $jsondata;
+                        }
+                        
+                        if (!empty($institutionsdata)) {
+                            $imported = 0;
+                            $updated = 0;
+                            $skipped = 0;
+                            $errors = [];
+                            
+                            $transaction = $DB->start_delegated_transaction();
+                            try {
+                                foreach ($institutionsdata as $index => $institutiondata) {
+                                    // Валидация данных
+                                    if (empty($institutiondata['name'])) {
+                                        $errors[] = 'Учебное заведение #' . ((int)$index + 1) . ': отсутствует название';
+                                        $skipped++;
+                                        continue;
+                                    }
+                                    
+                                    // Проверяем, существует ли учебное заведение с таким названием
+                                    $existing = $DB->get_record('local_deanpromoodle_institutions', ['name' => trim($institutiondata['name'])]);
+                                    
+                                    $institutionid = null;
+                                    if ($existing) {
+                                        // Обновляем существующее учебное заведение
+                                        $institutionid = $existing->id;
+                                        $data = new stdClass();
+                                        $data->id = $institutionid;
+                                        $data->name = trim($institutiondata['name']);
+                                        $data->description = isset($institutiondata['description']) ? ($institutiondata['description'] ?: '') : '';
+                                        $data->address = isset($institutiondata['address']) ? trim($institutiondata['address']) : '';
+                                        $data->phone = isset($institutiondata['phone']) ? trim($institutiondata['phone']) : '';
+                                        $data->email = isset($institutiondata['email']) ? trim($institutiondata['email']) : '';
+                                        $data->website = isset($institutiondata['website']) ? trim($institutiondata['website']) : '';
+                                        $data->logo = isset($institutiondata['logo']) ? trim($institutiondata['logo']) : '';
+                                        $data->visible = isset($institutiondata['is_active']) ? ($institutiondata['is_active'] ? 1 : 0) : 1;
+                                        $data->timemodified = time();
+                                        $DB->update_record('local_deanpromoodle_institutions', $data);
+                                        $updated++;
+                                    } else {
+                                        // Создаем новое учебное заведение
+                                        $data = new stdClass();
+                                        $data->name = trim($institutiondata['name']);
+                                        $data->description = isset($institutiondata['description']) ? ($institutiondata['description'] ?: '') : '';
+                                        $data->address = isset($institutiondata['address']) ? trim($institutiondata['address']) : '';
+                                        $data->phone = isset($institutiondata['phone']) ? trim($institutiondata['phone']) : '';
+                                        $data->email = isset($institutiondata['email']) ? trim($institutiondata['email']) : '';
+                                        $data->website = isset($institutiondata['website']) ? trim($institutiondata['website']) : '';
+                                        $data->logo = isset($institutiondata['logo']) ? trim($institutiondata['logo']) : '';
+                                        $data->visible = isset($institutiondata['is_active']) ? ($institutiondata['is_active'] ? 1 : 0) : 1;
+                                        $data->timecreated = time();
+                                        $data->timemodified = time();
+                                        $institutionid = $DB->insert_record('local_deanpromoodle_institutions', $data);
+                                        $imported++;
+                                    }
+                                }
+                                
+                                $transaction->allow_commit();
+                                
+                                $message = 'Импорт завершен. Импортировано: ' . $imported . ', обновлено: ' . $updated;
+                                if ($skipped > 0) {
+                                    $message .= ', пропущено: ' . $skipped;
+                                }
+                                if (!empty($errors)) {
+                                    $message .= '<br>Ошибки:<br>' . implode('<br>', array_slice($errors, 0, 10));
+                                    if (count($errors) > 10) {
+                                        $message .= '<br>... и еще ' . (count($errors) - 10) . ' ошибок';
+                                    }
+                                }
+                                echo html_writer::div($message, 'alert alert-success');
+                            } catch (\Exception $e) {
+                                $transaction->rollback($e);
+                                echo html_writer::div('Ошибка при импорте: ' . $e->getMessage(), 'alert alert-danger');
+                            }
+                        } else {
+                            echo html_writer::div('В JSON файле не найдены данные об учебных заведениях.', 'alert alert-warning');
+                        }
+                    } else {
+                        echo html_writer::div('Ошибка при разборе JSON: ' . json_last_error_msg(), 'alert alert-danger');
+                    }
+                } else {
+                    echo html_writer::div('Неверный тип файла. Ожидается JSON файл.', 'alert alert-danger');
+                }
+            }
+        }
+        
+        // Заголовок с кнопками
+        echo html_writer::start_div('', ['style' => 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;']);
+        echo html_writer::start_div('', ['style' => 'display: flex; align-items: center; gap: 10px;']);
+        echo html_writer::tag('i', '', ['class' => 'fas fa-university', 'style' => 'font-size: 24px;']);
+        echo html_writer::tag('h2', 'Учебные заведения', ['style' => 'margin: 0; font-size: 24px; font-weight: 600;']);
+        echo html_writer::end_div();
+        echo html_writer::start_div('', ['style' => 'display: flex; gap: 10px;']);
+        echo html_writer::link('#', '<i class="fas fa-file-import"></i> Импорт из JSON', [
+            'class' => 'btn btn-success',
+            'id' => 'import-institutions-json-btn',
+            'style' => 'background-color: #28a745; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-weight: 500;'
+        ]);
+        echo html_writer::end_div();
+        echo html_writer::end_div();
+        
+        // Модальное окно для импорта JSON
+        echo html_writer::start_div('modal fade', [
+            'id' => 'importInstitutionsJsonModal',
+            'tabindex' => '-1',
+            'role' => 'dialog'
+        ]);
+        echo html_writer::start_div('modal-dialog', ['role' => 'document']);
+        echo html_writer::start_div('modal-content');
+        echo html_writer::start_div('modal-header');
+        echo html_writer::tag('h5', 'Импорт учебных заведений из JSON', ['class' => 'modal-title']);
+        echo html_writer::start_tag('button', [
+            'type' => 'button',
+            'class' => 'close',
+            'data-dismiss' => 'modal',
+            'onclick' => 'jQuery(\'#importInstitutionsJsonModal\').modal(\'hide\');'
+        ]);
+        echo html_writer::tag('span', '×', ['aria-hidden' => 'true']);
+        echo html_writer::end_tag('button');
+        echo html_writer::end_div();
+        echo html_writer::start_div('modal-body');
+        echo html_writer::start_tag('form', [
+            'method' => 'post',
+            'action' => new moodle_url('/local/deanpromoodle/pages/admin.php', ['tab' => 'institutions', 'import' => 'json']),
+            'enctype' => 'multipart/form-data'
+        ]);
+        echo html_writer::start_div('form-group');
+        echo html_writer::label('Выберите JSON файл', 'jsonfile');
+        echo html_writer::empty_tag('input', [
+            'type' => 'file',
+            'name' => 'jsonfile',
+            'id' => 'jsonfile-institutions',
+            'class' => 'form-control-file',
+            'accept' => '.json,application/json',
+            'required' => true
+        ]);
+        echo html_writer::start_div('form-text text-muted', ['style' => 'margin-top: 5px;']);
+        echo 'Формат JSON файла:<br>';
+        echo '<pre style="background: #f5f5f5; padding: 10px; border-radius: 4px; font-size: 11px; margin-top: 5px; max-height: 200px; overflow-y: auto;">';
+        echo '{<br>';
+        echo '  "institutions": [<br>';
+        echo '    {<br>';
+        echo '      "name": "Название учебного заведения",<br>';
+        echo '      "description": "Описание",<br>';
+        echo '      "address": "Адрес",<br>';
+        echo '      "phone": "+7 (495) 123-45-67",<br>';
+        echo '      "email": "email@example.com",<br>';
+        echo '      "website": "https://example.com",<br>';
+        echo '      "logo": "path/to/logo.png",<br>';
+        echo '      "is_active": true<br>';
+        echo '    }<br>';
+        echo '  ]<br>';
+        echo '}</pre>';
+        echo html_writer::end_div();
+        echo html_writer::end_div();
+        echo html_writer::start_div('form-group');
+        echo html_writer::empty_tag('input', [
+            'type' => 'hidden',
+            'name' => 'import_submit',
+            'value' => '1'
+        ]);
+        echo html_writer::empty_tag('input', [
+            'type' => 'submit',
+            'value' => 'Импортировать',
+            'class' => 'btn btn-success',
+            'style' => 'margin-right: 10px;'
+        ]);
+        echo html_writer::start_tag('button', [
+            'type' => 'button',
+            'class' => 'btn btn-secondary',
+            'data-dismiss' => 'modal',
+            'onclick' => 'jQuery(\'#importInstitutionsJsonModal\').modal(\'hide\');'
+        ]);
+        echo 'Отмена';
+        echo html_writer::end_tag('button');
+        echo html_writer::end_div();
+        echo html_writer::end_tag('form');
+        echo html_writer::end_div();
+        echo html_writer::end_div();
+        echo html_writer::end_div();
+        echo html_writer::end_div();
+        
+        // Получение всех учебных заведений
+        $institutions = [];
+        try {
+            $institutions = $DB->get_records('local_deanpromoodle_institutions', null, 'name ASC');
+        } catch (\dml_exception $e) {
+            echo html_writer::div('Ошибка при получении учебных заведений из БД: ' . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8'), 'alert alert-danger');
+            echo html_writer::end_div();
+            break;
+        } catch (\Exception $e) {
+            echo html_writer::div('Ошибка при получении учебных заведений из БД: ' . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8'), 'alert alert-danger');
+            echo html_writer::end_div();
+            break;
+        }
+        
+        if (empty($institutions)) {
+            echo html_writer::div('Учебные заведения не найдены. Импортируйте данные из JSON файла.', 'alert alert-info');
+        } else {
+            // Стили для таблицы
+            echo html_writer::start_tag('style');
+            echo "
+                .institutions-table {
+                    background: white;
+                    border-radius: 8px;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                    overflow: hidden;
+                }
+                .institutions-table table {
+                    width: 100%;
+                    border-collapse: collapse;
+                }
+                .institutions-table th {
+                    background-color: #f8f9fa;
+                    padding: 12px 16px;
+                    text-align: left;
+                    font-weight: 600;
+                    color: #495057;
+                    border-bottom: 1px solid #dee2e6;
+                    font-size: 14px;
+                }
+                .institutions-table td {
+                    padding: 16px;
+                    border-bottom: 1px solid #f0f0f0;
+                    vertical-align: middle;
+                }
+                .institutions-table tr:hover {
+                    background-color: #f8f9fa;
+                }
+                .institution-logo {
+                    width: 50px;
+                    height: 50px;
+                    object-fit: contain;
+                    border-radius: 4px;
+                }
+            ";
+            echo html_writer::end_tag('style');
+            
+            // Отображение таблицы
+            echo html_writer::start_div('institutions-table');
+            echo html_writer::start_tag('table');
+            echo html_writer::start_tag('thead');
+            echo html_writer::start_tag('tr');
+            echo html_writer::tag('th', 'ID', ['style' => 'width: 60px; text-align: center;']);
+            echo html_writer::tag('th', 'Логотип', ['style' => 'width: 80px;']);
+            echo html_writer::tag('th', 'Название');
+            echo html_writer::tag('th', 'Адрес', ['style' => 'width: 200px;']);
+            echo html_writer::tag('th', 'Контакты', ['style' => 'width: 250px;']);
+            echo html_writer::tag('th', 'Сайт', ['style' => 'width: 150px;']);
+            echo html_writer::tag('th', 'Статус', ['style' => 'width: 100px;']);
+            echo html_writer::end_tag('tr');
+            echo html_writer::end_tag('thead');
+            echo html_writer::start_tag('tbody');
+            
+            foreach ($institutions as $institution) {
+                // Подсчет программ для этого учебного заведения
+                try {
+                    $programscount = $DB->count_records('local_deanpromoodle_programs', ['institution' => $institution->name]);
+                } catch (\Exception $e) {
+                    $programscount = 0;
+                }
+                
+                echo html_writer::start_tag('tr');
+                
+                // ID
+                echo html_writer::start_tag('td', ['style' => 'text-align: center;']);
+                echo htmlspecialchars((string)$institution->id, ENT_QUOTES, 'UTF-8');
+                echo html_writer::end_tag('td');
+                
+                // Логотип
+                echo html_writer::start_tag('td');
+                if (!empty($institution->logo)) {
+                    echo html_writer::empty_tag('img', [
+                        'src' => htmlspecialchars($institution->logo, ENT_QUOTES, 'UTF-8'),
+                        'alt' => htmlspecialchars($institution->name, ENT_QUOTES, 'UTF-8'),
+                        'class' => 'institution-logo'
+                    ]);
+                } else {
+                    echo '-';
+                }
+                echo html_writer::end_tag('td');
+                
+                // Название
+                echo html_writer::start_tag('td');
+                echo html_writer::tag('strong', htmlspecialchars($institution->name, ENT_QUOTES, 'UTF-8'));
+                if (!empty($institution->description)) {
+                    echo html_writer::tag('div', htmlspecialchars(mb_substr($institution->description, 0, 100), ENT_QUOTES, 'UTF-8') . (mb_strlen($institution->description) > 100 ? '...' : ''), ['style' => 'font-size: 12px; color: #6c757d; margin-top: 4px;']);
+                }
+                echo html_writer::end_tag('td');
+                
+                // Адрес
+                echo html_writer::start_tag('td');
+                echo !empty($institution->address) ? htmlspecialchars($institution->address, ENT_QUOTES, 'UTF-8') : '-';
+                echo html_writer::end_tag('td');
+                
+                // Контакты
+                echo html_writer::start_tag('td');
+                $contacts = [];
+                if (!empty($institution->phone)) {
+                    $contacts[] = '<i class="fas fa-phone"></i> ' . htmlspecialchars($institution->phone, ENT_QUOTES, 'UTF-8');
+                }
+                if (!empty($institution->email)) {
+                    $contacts[] = '<i class="fas fa-envelope"></i> ' . htmlspecialchars($institution->email, ENT_QUOTES, 'UTF-8');
+                }
+                echo !empty($contacts) ? implode('<br>', $contacts) : '-';
+                echo html_writer::end_tag('td');
+                
+                // Сайт
+                echo html_writer::start_tag('td');
+                if (!empty($institution->website)) {
+                    echo html_writer::link(
+                        htmlspecialchars($institution->website, ENT_QUOTES, 'UTF-8'),
+                        '<i class="fas fa-external-link-alt"></i> Открыть',
+                        ['target' => '_blank', 'style' => 'text-decoration: none;']
+                    );
+                } else {
+                    echo '-';
+                }
+                echo html_writer::end_tag('td');
+                
+                // Статус
+                echo html_writer::start_tag('td');
+                if ($institution->visible) {
+                    echo '<span class="badge badge-active"><i class="fas fa-check"></i> Активно</span>';
+                } else {
+                    echo '<span class="badge" style="background-color: #9e9e9e; color: white;">Скрыто</span>';
+                }
+                echo html_writer::end_tag('td');
+                
+                echo html_writer::end_tag('tr');
+            }
+            
+            echo html_writer::end_tag('tbody');
+            echo html_writer::end_tag('table');
+            echo html_writer::end_div();
+        }
+        
+        // JavaScript для модального окна
+        echo html_writer::start_tag('script');
+        echo "
+        document.addEventListener('DOMContentLoaded', function() {
+            var importBtn = document.getElementById('import-institutions-json-btn');
+            if (importBtn) {
+                importBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    jQuery('#importInstitutionsJsonModal').modal('show');
+                });
+            }
+        });
+        ";
+        echo html_writer::end_tag('script');
         
         echo html_writer::end_div();
         break;
