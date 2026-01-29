@@ -1128,10 +1128,13 @@ switch ($tab) {
             // Функция для получения всех дочерних категорий рекурсивно
             $getchildcategories = function($parentid, $categories) use (&$getchildcategories) {
                 $children = [];
+                $parentid = is_scalar($parentid) ? (int)$parentid : 0;
                 foreach ($categories as $cat) {
-                    if ($cat->parent == $parentid) {
-                        $children[] = $cat->id;
-                        $subchildren = $getchildcategories($cat->id, $categories);
+                    $catparent = is_scalar($cat->parent) ? (int)$cat->parent : 0;
+                    $catid = is_scalar($cat->id) ? (int)$cat->id : 0;
+                    if ($catparent == $parentid && $catid > 0) {
+                        $children[] = $catid;
+                        $subchildren = $getchildcategories($catid, $categories);
                         $children = array_merge($children, $subchildren);
                     }
                 }
@@ -1140,6 +1143,8 @@ switch ($tab) {
             
             // Функция для подсчета статистики категории (включая дочерние)
             $calculatecategorystats = function($categoryid, $allcategories) use ($DB, $getchildcategories) {
+                // Безопасное преобразование ID категории
+                $categoryid = is_scalar($categoryid) ? (int)$categoryid : 0;
                 // Получаем все дочерние категории
                 $childids = $getchildcategories($categoryid, $allcategories);
                 $allcategoryids = array_merge([$categoryid], $childids);
@@ -1224,18 +1229,25 @@ switch ($tab) {
                 
                 // Отображаем каждую категорию
                 foreach ($children as $category) {
-                    $stats = $calculatecategorystats($category->id, $allcategories);
+                    // Безопасное преобразование ID категории
+                    $catid = is_scalar($category->id) ? (int)$category->id : 0;
+                    $stats = $calculatecategorystats($catid, $allcategories);
                     $haschildren = false;
                     
                     // Проверяем, есть ли дочерние категории
                     foreach ($categories as $cat) {
-                        if ($cat->parent == $category->id) {
+                        $catparent = is_scalar($cat->parent) ? (int)$cat->parent : 0;
+                        $checkcatid = is_scalar($category->id) ? (int)$category->id : 0;
+                        if ($catparent == $checkcatid) {
                             $haschildren = true;
                             break;
                         }
                     }
                     
-                    $rowid = 'category-row-' . $category->id;
+                    // Безопасное преобразование ID категории в строку
+                    $categoryid = is_scalar($category->id) ? (string)$category->id : (is_array($category->id) ? implode('-', $category->id) : '0');
+                    
+                    $rowid = 'category-row-' . $categoryid;
                     $rowclass = 'category-row';
                     $rowstyle = '';
                     
@@ -1250,21 +1262,21 @@ switch ($tab) {
                     echo html_writer::start_tag('tr', [
                         'id' => $rowid,
                         'class' => $rowclass,
-                        'data-category-id' => $category->id,
-                        'data-level' => $level,
-                        'data-parent-id' => $parentrowid,
+                        'data-category-id' => $categoryid,
+                        'data-level' => (string)$level,
+                        'data-parent-id' => $parentrowid ? (string)$parentrowid : '',
                         'style' => $rowstyle
                     ]);
                     
                     // Колонка ID
-                    echo html_writer::tag('td', $category->id);
+                    echo html_writer::tag('td', $categoryid);
                     
                     // Колонка названия с кнопкой раскрытия/сворачивания
                     $namecell = '';
                     if ($haschildren) {
                         $namecell .= html_writer::link('#', '▶', [
                             'class' => 'category-toggle',
-                            'data-category-id' => $category->id,
+                            'data-category-id' => $categoryid,
                             'data-row-id' => $rowid,
                             'style' => 'text-decoration: none; color: #666; margin-right: 5px; font-size: 12px; display: inline-block; width: 15px;',
                             'title' => 'Раскрыть/свернуть'
@@ -1291,9 +1303,9 @@ switch ($tab) {
                     // Количество курсов - ссылка если > 0
                     $coursescell = $stats['coursescount'];
                     if ($stats['coursescount'] > 0) {
-                        $coursescell = html_writer::link('#', $stats['coursescount'], [
+                        $coursescell = html_writer::link('#', (string)$stats['coursescount'], [
                             'class' => 'category-link',
-                            'data-category-id' => $category->id,
+                            'data-category-id' => $categoryid,
                             'data-type' => 'courses',
                             'data-category-name' => htmlspecialchars($categoryname, ENT_QUOTES, 'UTF-8'),
                             'style' => 'color: #007bff; font-weight: bold; text-decoration: none; cursor: pointer;'
@@ -1304,9 +1316,9 @@ switch ($tab) {
                     // Количество студентов - ссылка если > 0
                     $studentscell = $stats['studentscount'];
                     if ($stats['studentscount'] > 0) {
-                        $studentscell = html_writer::link('#', $stats['studentscount'], [
+                        $studentscell = html_writer::link('#', (string)$stats['studentscount'], [
                             'class' => 'category-link',
-                            'data-category-id' => $category->id,
+                            'data-category-id' => $categoryid,
                             'data-type' => 'students',
                             'data-category-name' => htmlspecialchars($categoryname, ENT_QUOTES, 'UTF-8'),
                             'style' => 'color: green; font-weight: bold; text-decoration: none; cursor: pointer;'
@@ -1317,9 +1329,9 @@ switch ($tab) {
                     // Количество преподавателей - ссылка если > 0
                     $teacherscell = $stats['teacherscount'];
                     if ($stats['teacherscount'] > 0) {
-                        $teacherscell = html_writer::link('#', $stats['teacherscount'], [
+                        $teacherscell = html_writer::link('#', (string)$stats['teacherscount'], [
                             'class' => 'category-link',
-                            'data-category-id' => $category->id,
+                            'data-category-id' => $categoryid,
                             'data-type' => 'teachers',
                             'data-category-name' => htmlspecialchars($categoryname, ENT_QUOTES, 'UTF-8'),
                             'style' => 'color: orange; font-weight: bold; text-decoration: none; cursor: pointer;'
@@ -1327,15 +1339,25 @@ switch ($tab) {
                     }
                     echo html_writer::tag('td', html_writer::tag('span', $teacherscell));
                     
-                    // Статус
-                    $status = $category->visible ? html_writer::tag('span', 'Активна', ['style' => 'color: green;']) : html_writer::tag('span', 'Скрыта', ['style' => 'color: red;']);
+                    // Статус - безопасное преобразование visible
+                    $isvisible = false;
+                    if (is_bool($category->visible)) {
+                        $isvisible = $category->visible;
+                    } elseif (is_numeric($category->visible)) {
+                        $isvisible = (bool)$category->visible;
+                    } elseif (is_string($category->visible)) {
+                        $isvisible = ($category->visible === '1' || strtolower($category->visible) === 'true');
+                    } elseif (is_array($category->visible)) {
+                        $isvisible = !empty($category->visible);
+                    }
+                    $status = $isvisible ? html_writer::tag('span', 'Активна', ['style' => 'color: green;']) : html_writer::tag('span', 'Скрыта', ['style' => 'color: red;']);
                     echo html_writer::tag('td', $status);
                     
                     echo html_writer::end_tag('tr');
                     
                     // Рекурсивно отображаем дочерние категории
                     if ($haschildren) {
-                        $rendercategorytree($category->id, $categories, $level + 1, $rowid);
+                        $rendercategorytree((int)$categoryid, $categories, $level + 1, $rowid);
                     }
                 }
             };
