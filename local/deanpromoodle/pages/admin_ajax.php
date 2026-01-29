@@ -99,10 +99,35 @@ if ($action == 'getprogramsubjectsforstudent') {
     }
     
     header('Content-Type: application/json');
-}
-
-// Получение остальных параметров (только для админских действий)
-if ($action != 'getprogramsubjectsforstudent') {
+} else {
+    // Для остальных действий проверяем админский доступ
+    $context = context_system::instance();
+    $hasaccess = false;
+    
+    if (has_capability('local/deanpromoodle:viewadmin', $context)) {
+        $hasaccess = true;
+    } else {
+        if (has_capability('moodle/site:config', $context)) {
+            $hasaccess = true;
+        } else {
+            global $USER;
+            $roles = get_user_roles($context, $USER->id, false);
+            foreach ($roles as $role) {
+                if ($role->shortname == 'manager') {
+                    $hasaccess = true;
+                    break;
+                }
+            }
+        }
+    }
+    
+    if (!$hasaccess) {
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'error' => 'Access denied']);
+        exit;
+    }
+    
+    // Получение остальных параметров для админских действий
     $teacherid = optional_param('teacherid', 0, PARAM_INT);
     $categoryid = optional_param('categoryid', 0, PARAM_INT);
     // Параметры для предметов и программ
