@@ -577,6 +577,33 @@ if ($action == 'getteachercourses' && $teacherid > 0) {
     } else {
         echo json_encode(['success' => false, 'error' => 'Ошибка при сохранении']);
     }
+} elseif ($action == 'getprogramcohorts' && $programid > 0) {
+    // Получение списка прикрепленных когорт к программе
+    global $DB;
+    
+    $cohorts = $DB->get_records_sql(
+        "SELECT c.id, c.name, c.idnumber, c.description
+         FROM {cohort} c
+         JOIN {local_deanpromoodle_program_cohorts} pc ON pc.cohortid = c.id
+         WHERE pc.programid = ?
+         ORDER BY c.name ASC",
+        [$programid]
+    );
+    
+    $formattedcohorts = [];
+    foreach ($cohorts as $cohort) {
+        $formattedcohorts[] = [
+            'id' => $cohort->id,
+            'name' => $cohort->name,
+            'idnumber' => $cohort->idnumber ?: '-',
+            'description' => $cohort->description ?: '-'
+        ];
+    }
+    
+    echo json_encode([
+        'success' => true,
+        'cohorts' => $formattedcohorts
+    ]);
 } elseif ($action == 'detachcohortfromprogram' && $programid > 0 && $cohortid > 0) {
     // Открепление когорты от программы
     global $DB;
