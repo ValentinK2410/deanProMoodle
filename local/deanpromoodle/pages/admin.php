@@ -1296,8 +1296,8 @@ switch ($tab) {
                         ]);
                         $namecell .= is_string($linkresult) ? $linkresult : (string)$linkresult;
                     } else {
-                        $spanresult = html_writer::span('', ['style' => 'display: inline-block; width: 15px;']);
-                        $namecell .= is_string($spanresult) ? $spanresult : (string)$spanresult;
+                        // Используем обычный HTML вместо html_writer::span() для избежания проблем с типами
+                        $namecell .= '<span style="display: inline-block; width: 15px;"></span>';
                     }
                     // Безопасное преобразование имени категории в строку
                     $categoryname = 'Без названия';
