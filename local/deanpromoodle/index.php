@@ -26,17 +26,15 @@
 // This file prevents direct access to the plugin directory.
 // Users should access specific pages like student.php, teacher.php, or admin.php
 
-require_once(__DIR__ . '/../../config.php');
-require_login();
-
-// Redirect to site home or show access denied
-$context = context_system::instance();
-require_capability('moodle/site:config', $context);
-
-// If user is admin, show plugin information
-if (has_capability('moodle/site:config', $context)) {
-    redirect(new moodle_url('/'));
+// Define path to Moodle config
+$configpath = __DIR__ . '/../../config.php';
+if (!file_exists($configpath)) {
+    http_response_code(403);
+    die('Access denied. Please access specific pages: student.php, teacher.php, or admin.php');
 }
 
-// For other users, redirect to home
+require_once($configpath);
+require_login();
+
+// Redirect to site home
 redirect(new moodle_url('/'));
