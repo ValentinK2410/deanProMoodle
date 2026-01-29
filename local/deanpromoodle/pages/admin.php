@@ -23,41 +23,6 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-// ОТЛАДКА - ДО ПОДКЛЮЧЕНИЯ MOODLE - удалить после исправления ошибки
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-
-// Собственный обработчик ошибок для отображения до Moodle
-set_error_handler(function($errno, $errstr, $errfile, $errline) {
-    echo "<pre style='background:red;color:white;padding:20px;'>";
-    echo "PHP Error [$errno]: $errstr\n";
-    echo "File: $errfile\n";
-    echo "Line: $errline\n";
-    echo "</pre>";
-    return false;
-});
-
-set_exception_handler(function($e) {
-    echo "<pre style='background:red;color:white;padding:20px;'>";
-    echo "Exception: " . $e->getMessage() . "\n";
-    echo "File: " . $e->getFile() . "\n";
-    echo "Line: " . $e->getLine() . "\n";
-    echo "Trace:\n" . $e->getTraceAsString() . "\n";
-    echo "</pre>";
-});
-
-register_shutdown_function(function() {
-    $error = error_get_last();
-    if ($error !== null && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
-        echo "<pre style='background:darkred;color:white;padding:20px;'>";
-        echo "Fatal Error: " . $error['message'] . "\n";
-        echo "File: " . $error['file'] . "\n";
-        echo "Line: " . $error['line'] . "\n";
-        echo "</pre>";
-    }
-});
-
 // Define path to Moodle config
 // From pages/admin.php: ../ (to deanpromoodle) -> ../ (to local) -> ../ (to moodle root) = ../../../config.php
 $configpath = __DIR__ . '/../../../config.php';
@@ -1340,9 +1305,8 @@ switch ($tab) {
                         'visible' => $program->visible
                     ];
                 }
-            }
-            
-            // Стили для таблицы
+                
+                // Стили для таблицы
             echo html_writer::start_tag('style');
             echo "
                 .programs-table {
