@@ -1536,9 +1536,11 @@ switch ($tab) {
                         $data->institution = $institution;
                         $data->is_paid = $is_paid;
                         // Обработка цены: если программа платная и указана цена, сохраняем её, иначе null
-                        if ($is_paid && trim($price) !== '') {
-                            $data->price = (float)$price;
+                        $pricevalue = trim($price);
+                        if ($is_paid && $pricevalue !== '' && is_numeric($pricevalue)) {
+                            $data->price = (float)$pricevalue;
                         } else {
+                            // Явно устанавливаем NULL для бесплатных программ или если цена не указана
                             $data->price = null;
                         }
                         $data->visible = $visible;
@@ -1548,6 +1550,14 @@ switch ($tab) {
                             $data->id = $programid;
                             $DB->update_record('local_deanpromoodle_programs', $data);
                             $programid = $data->id;
+                            
+                            // Явно обновляем поле price отдельно, чтобы гарантировать обновление
+                            $pricevalue = trim($price);
+                            if ($is_paid && $pricevalue !== '' && is_numeric($pricevalue)) {
+                                $DB->set_field('local_deanpromoodle_programs', 'price', (float)$pricevalue, ['id' => $programid]);
+                            } else {
+                                $DB->set_field('local_deanpromoodle_programs', 'price', null, ['id' => $programid]);
+                            }
                         } else {
                             $data->timecreated = time();
                             $programid = $DB->insert_record('local_deanpromoodle_programs', $data);
