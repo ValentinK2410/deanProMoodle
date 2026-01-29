@@ -1632,38 +1632,62 @@ switch ($tab) {
                 }
                 .action-buttons {
                     display: flex;
-                    gap: 4px;
+                    gap: 6px;
                 }
                 .action-btn {
-                    width: 32px;
-                    height: 32px;
+                    width: 38px;
+                    height: 38px;
                     border: none;
-                    border-radius: 4px;
+                    border-radius: 6px;
                     cursor: pointer;
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    font-size: 14px;
-                    transition: opacity 0.2s;
+                    font-size: 18px;
+                    font-weight: 500;
+                    text-decoration: none;
+                    transition: all 0.2s;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.15);
                 }
                 .action-btn:hover {
-                    opacity: 0.8;
+                    transform: translateY(-1px);
+                    box-shadow: 0 3px 6px rgba(0,0,0,0.2);
+                    opacity: 0.9;
                 }
                 .action-btn-view {
-                    background-color: #2196f3;
+                    background-color: #1976d2;
                     color: white;
+                }
+                .action-btn-view:hover {
+                    background-color: #1565c0;
                 }
                 .action-btn-edit {
-                    background-color: #ffc107;
+                    background-color: #f57c00;
                     color: white;
+                }
+                .action-btn-edit:hover {
+                    background-color: #e65100;
                 }
                 .action-btn-copy {
-                    background-color: #9e9e9e;
+                    background-color: #616161;
                     color: white;
                 }
+                .action-btn-copy:hover {
+                    background-color: #424242;
+                }
                 .action-btn-delete {
-                    background-color: #f44336;
+                    background-color: #d32f2f;
                     color: white;
+                }
+                .action-btn-delete:hover {
+                    background-color: #c62828;
+                }
+                .action-btn-link {
+                    background-color: #7b1fa2;
+                    color: white;
+                }
+                .action-btn-link:hover {
+                    background-color: #6a1b9a;
                 }
             ";
             echo html_writer::end_tag('style');
