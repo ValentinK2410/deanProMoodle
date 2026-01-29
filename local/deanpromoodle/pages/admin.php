@@ -1898,7 +1898,7 @@ switch ($tab) {
                     );
                     echo html_writer::link(
                         new moodle_url('/local/deanpromoodle/pages/admin.php', ['tab' => 'programs', 'action' => 'copy', 'programid' => $programid]),
-                        '<span>📋</span>',
+                        '<span>🔄</span>',
                         [
                             'class' => 'action-btn action-btn-copy',
                             'title' => 'Копировать'
