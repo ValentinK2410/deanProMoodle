@@ -1639,6 +1639,13 @@ switch ($tab) {
                     border-bottom: 1px solid #f0f0f0;
                     vertical-align: middle;
                 }
+                .programs-table th:last-child,
+                .programs-table td:last-child {
+                    min-width: 180px;
+                    width: 180px;
+                    padding-left: 20px;
+                    padding-right: 20px;
+                }
                 .programs-table tr:hover {
                     background-color: #f8f9fa;
                 }
