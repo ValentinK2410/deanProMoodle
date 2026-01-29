@@ -377,7 +377,11 @@ switch ($tab) {
         
         // Отображение таблицы
         if (empty($paginated)) {
-            echo html_writer::div(get_string('noquizzesfound', 'local_deanpromoodle'), 'alert alert-info');
+            $noquizzesfoundstr = get_string('noquizzesfound', 'local_deanpromoodle');
+            if (strpos($noquizzesfoundstr, '[[') !== false) {
+                $noquizzesfoundstr = 'Несданные экзамены не найдены'; // Fallback на русский
+            }
+            echo html_writer::div($noquizzesfoundstr, 'alert alert-info');
         } else {
             echo html_writer::start_tag('table', ['class' => 'table table-striped table-hover', 'style' => 'width: 100%;']);
             echo html_writer::start_tag('thead');
