@@ -101,7 +101,7 @@ $PAGE->set_heading(get_string('teacherpagetitle', 'local_deanpromoodle'));
 $PAGE->set_pagelayout('standard');
 
 // Add CSS
-$PAGE->requires->css(new moodle_url('/local/deanpromoodle/styles.css'));
+$PAGE->requires->css('/local/deanpromoodle/styles.css');
 
 // Get all courses where user is teacher
 global $USER;
