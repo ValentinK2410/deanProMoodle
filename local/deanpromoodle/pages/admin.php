@@ -2691,6 +2691,40 @@ switch ($tab) {
                 }, $programs);
             }
             
+            // Стили для модального окна
+            echo html_writer::start_tag('style');
+            echo "
+                #attachCohortModal .modal-header {
+                    position: relative;
+                    padding: 15px 20px;
+                    border-bottom: 1px solid #dee2e6;
+                }
+                #attachCohortModal .modal-header .close {
+                    position: absolute;
+                    top: 10px;
+                    right: 15px;
+                    padding: 0;
+                    margin: 0;
+                    background: transparent;
+                    border: none;
+                    font-size: 28px;
+                    font-weight: 700;
+                    line-height: 1;
+                    color: #000;
+                    text-shadow: 0 1px 0 #fff;
+                    opacity: 0.5;
+                    cursor: pointer;
+                    z-index: 10;
+                }
+                #attachCohortModal .modal-header .close:hover {
+                    opacity: 0.75;
+                }
+                #attachCohortModal .modal-header .close span {
+                    display: block;
+                }
+            ";
+            echo html_writer::end_tag('style');
+            
             echo html_writer::start_div('modal fade', [
                 'id' => 'attachCohortModal',
                 'tabindex' => '-1',
@@ -2704,6 +2738,7 @@ switch ($tab) {
                 'type' => 'button',
                 'class' => 'close',
                 'data-dismiss' => 'modal',
+                'aria-label' => 'Закрыть',
                 'onclick' => 'jQuery(\'#attachCohortModal\').modal(\'hide\');'
             ]);
             echo html_writer::tag('span', '×', ['aria-hidden' => 'true']);
@@ -2733,8 +2768,8 @@ switch ($tab) {
                 'placeholder' => 'Введите название когорты...'
             ]);
             echo html_writer::end_div();
-            echo html_writer::start_div('', ['id' => 'cohorts-list', 'style' => 'max-height: 400px; overflow-y: auto;']);
-            echo html_writer::div('Выберите программу и введите текст для поиска когорт...', 'text-muted');
+            echo html_writer::start_div('', ['id' => 'cohorts-list', 'style' => 'max-height: 400px; overflow-y: auto; border: 1px solid #ced4da; border-radius: 4px; padding: 10px; background: #f8f9fa;']);
+            echo html_writer::div('Загрузка списка когорт...', 'text-muted');
             echo html_writer::end_div();
             echo html_writer::end_div();
             echo html_writer::start_div('modal-footer');
@@ -2808,9 +2843,15 @@ switch ($tab) {
                             document.getElementById('program-select').value = programId;
                             document.getElementById('selected-program-name').textContent = programName;
                             
-                            // Очищаем поиск и список
+                            // Очищаем поиск
                             document.getElementById('cohort-search').value = '';
-                            document.getElementById('cohorts-list').innerHTML = '<div class=\"text-muted\">Введите текст для поиска когорт...</div>';
+                            
+                            // Загружаем все когорты при открытии модального окна
+                            var cohortsList = document.getElementById('cohorts-list');
+                            cohortsList.innerHTML = '<div class=\"text-muted\">Загрузка списка когорт...</div>';
+                            
+                            // Загружаем все когорты
+                            loadCohortsList('', programId);
                             
                             // Показываем модальное окно
                             if (typeof jQuery !== 'undefined' && jQuery.fn.modal) {
@@ -2822,6 +2863,83 @@ switch ($tab) {
                         });
                     });
                     
+                    // Функция загрузки списка когорт
+                    function loadCohortsList(search, programId) {
+                        var cohortsList = document.getElementById('cohorts-list');
+                        if (!cohortsList) return;
+                        
+                        var url = '/local/deanpromoodle/pages/admin_ajax.php?action=getcohorts&programid=' + programId;
+                        if (search && search.trim().length >= 2) {
+                            url += '&search=' + encodeURIComponent(search.trim());
+                        }
+                        
+                        var xhr = new XMLHttpRequest();
+                        xhr.open('GET', url, true);
+                        xhr.onreadystatechange = function() {
+                            if (xhr.readyState === 4 && xhr.status === 200) {
+                                try {
+                                    var response = JSON.parse(xhr.responseText);
+                                    if (response.success && response.cohorts) {
+                                        if (response.cohorts.length > 0) {
+                                            var html = '<table class=\"table table-striped table-hover\" style=\"margin: 0; background: white;\"><thead><tr><th style=\"width: 60px;\">ID</th><th>Название</th><th style=\"width: 150px;\">ID Number</th><th style=\"width: 120px;\">Действие</th></tr></thead><tbody>';
+                                            response.cohorts.forEach(function(cohort) {
+                                                html += '<tr>';
+                                                html += '<td>' + cohort.id + '</td>';
+                                                html += '<td>' + escapeHtml(cohort.name) + '</td>';
+                                                html += '<td>' + (cohort.idnumber ? escapeHtml(cohort.idnumber) : '-') + '</td>';
+                                                html += '<td><button class=\"btn btn-sm btn-primary attach-cohort-btn\" data-cohort-id=\"' + cohort.id + '\" style=\"padding: 4px 8px; font-size: 12px;\"><i class=\"fas fa-link\"></i> Прикрепить</button></td>';
+                                                html += '</tr>';
+                                            });
+                                            html += '</tbody></table>';
+                                            cohortsList.innerHTML = html;
+                                            
+                                            // Обработчики кнопок прикрепления
+                                            document.querySelectorAll('.attach-cohort-btn').forEach(function(btn) {
+                                                btn.addEventListener('click', function() {
+                                                    var cohortId = this.getAttribute('data-cohort-id');
+                                                    var btn = this;
+                                                    btn.disabled = true;
+                                                    btn.innerHTML = '<i class=\"fas fa-spinner fa-spin\"></i> Прикрепление...';
+                                                    
+                                                    var xhr2 = new XMLHttpRequest();
+                                                    xhr2.open('POST', '/local/deanpromoodle/pages/admin_ajax.php', true);
+                                                    xhr2.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                                                    xhr2.onreadystatechange = function() {
+                                                        if (xhr2.readyState === 4 && xhr2.status === 200) {
+                                                            var response2 = JSON.parse(xhr2.responseText);
+                                                            if (response2.success) {
+                                                                alert('Группа успешно прикреплена к программе');
+                                                                location.reload();
+                                                            } else {
+                                                                alert('Ошибка: ' + (response2.error || 'Неизвестная ошибка'));
+                                                                btn.disabled = false;
+                                                                btn.innerHTML = '<i class=\"fas fa-link\"></i> Прикрепить';
+                                                            }
+                                                        }
+                                                    };
+                                                    xhr2.send('action=attachcohorttoprogram&programid=' + programId + '&cohortid=' + cohortId);
+                                                });
+                                            });
+                                        } else {
+                                            cohortsList.innerHTML = '<div class=\"alert alert-info\" style=\"margin: 0;\">Когорты не найдены или все уже прикреплены</div>';
+                                        }
+                                    } else {
+                                        cohortsList.innerHTML = '<div class=\"alert alert-danger\" style=\"margin: 0;\">Ошибка: ' + (response.error || 'Неизвестная ошибка') + '</div>';
+                                    }
+                                } catch (e) {
+                                    cohortsList.innerHTML = '<div class=\"alert alert-danger\" style=\"margin: 0;\">Ошибка при обработке ответа</div>';
+                                }
+                            }
+                        };
+                        xhr.send();
+                    }
+                    
+                    function escapeHtml(text) {
+                        var div = document.createElement('div');
+                        div.textContent = text;
+                        return div.innerHTML;
+                    }
+                    
                     // Поиск когорт
                     var cohortSearchInput = document.getElementById('cohort-search');
                     var cohortsList = document.getElementById('cohorts-list');
@@ -2830,64 +2948,16 @@ switch ($tab) {
                     if (cohortSearchInput) {
                         cohortSearchInput.addEventListener('input', function() {
                             if (!currentProgramId) {
-                                cohortsList.innerHTML = '<div class=\"alert alert-warning\">Программа не выбрана</div>';
+                                cohortsList.innerHTML = '<div class=\"alert alert-warning\" style=\"margin: 0;\">Программа не выбрана</div>';
                                 return;
                             }
                             
                             clearTimeout(cohortSearchTimeout);
                             var query = this.value.trim();
                             
-                            if (query.length < 2) {
-                                cohortsList.innerHTML = '<div class=\"text-muted\">Введите минимум 2 символа для поиска...</div>';
-                                return;
-                            }
-                            
                             cohortSearchTimeout = setTimeout(function() {
-                                var xhr = new XMLHttpRequest();
-                                xhr.open('GET', '/local/deanpromoodle/pages/admin_ajax.php?action=getcohorts&search=' + encodeURIComponent(query) + '&programid=' + currentProgramId, true);
-                                xhr.onreadystatechange = function() {
-                                    if (xhr.readyState === 4 && xhr.status === 200) {
-                                        try {
-                                            var response = JSON.parse(xhr.responseText);
-                                            if (response.success && response.cohorts) {
-                                                var html = '<table class=\"table table-striped\"><thead><tr><th>ID</th><th>Название</th><th>ID Number</th><th>Действие</th></tr></thead><tbody>';
-                                                response.cohorts.forEach(function(cohort) {
-                                                    html += '<tr><td>' + cohort.id + '</td><td>' + cohort.name + '</td><td>' + (cohort.idnumber || '-') + '</td><td><button class=\"btn btn-sm btn-primary attach-cohort-btn\" data-cohort-id=\"' + cohort.id + '\">Прикрепить группу</button></td></tr>';
-                                                });
-                                                html += '</tbody></table>';
-                                                cohortsList.innerHTML = html;
-                                                
-                                                // Обработчики кнопок прикрепления
-                                                document.querySelectorAll('.attach-cohort-btn').forEach(function(btn) {
-                                                    btn.addEventListener('click', function() {
-                                                        var cohortId = this.getAttribute('data-cohort-id');
-                                                        var xhr2 = new XMLHttpRequest();
-                                                        xhr2.open('POST', '/local/deanpromoodle/pages/admin_ajax.php', true);
-                                                        xhr2.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-                                                        xhr2.onreadystatechange = function() {
-                                                            if (xhr2.readyState === 4 && xhr2.status === 200) {
-                                                                var response2 = JSON.parse(xhr2.responseText);
-                                                                if (response2.success) {
-                                                                    alert('Группа успешно прикреплена к программе');
-                                                                    location.reload();
-                                                                } else {
-                                                                    alert('Ошибка: ' + (response2.error || 'Неизвестная ошибка'));
-                                                                }
-                                                            }
-                                                        };
-                                                        xhr2.send('action=attachcohorttoprogram&programid=' + currentProgramId + '&cohortid=' + cohortId);
-                                                    });
-                                                });
-                                            } else {
-                                                cohortsList.innerHTML = '<div class=\"alert alert-info\">Когорты не найдены</div>';
-                                            }
-                                        } catch (e) {
-                                            cohortsList.innerHTML = '<div class=\"alert alert-danger\">Ошибка при обработке ответа</div>';
-                                        }
-                                    }
-                                };
-                                xhr.send();
-                            }, 500);
+                                loadCohortsList(query, currentProgramId);
+                            }, 300);
                         });
                     }
                     

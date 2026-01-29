@@ -494,6 +494,7 @@ if ($action == 'getteachercourses' && $teacherid > 0) {
     
     $cohorts = [];
     if (!empty($search) && strlen($search) >= 2) {
+        // Поиск по названию или ID number
         $searchpattern = '%' . $DB->sql_like_escape($search) . '%';
         $cohorts = $DB->get_records_sql(
             "SELECT c.id, c.name, c.idnumber, c.description
@@ -502,6 +503,15 @@ if ($action == 'getteachercourses' && $teacherid > 0) {
              ORDER BY c.name ASC
              LIMIT 50",
             [$searchpattern, $searchpattern]
+        );
+    } else {
+        // Если поиск пустой, возвращаем все когорты (ограничение 100)
+        $cohorts = $DB->get_records_sql(
+            "SELECT c.id, c.name, c.idnumber, c.description
+             FROM {cohort} c
+             ORDER BY c.name ASC
+             LIMIT 100",
+            []
         );
     }
     
