@@ -1217,9 +1217,9 @@ switch ($tab) {
                 
                 // ID
                 echo html_writer::start_tag('td');
-                // Используем явное преобразование прямо перед использованием
+                // Используем обычный HTML вместо html_writer::span() для избежания проблем с типами
                 $idtext = (string)$programidstr;
-                echo html_writer::span($idtext, ['class' => 'program-id-badge']);
+                echo '<span class="program-id-badge">' . htmlspecialchars($idtext, ENT_QUOTES, 'UTF-8') . '</span>';
                 echo html_writer::end_tag('td');
                 
                 // Название курса
