@@ -1651,12 +1651,12 @@ switch ($tab) {
                     box-shadow: 0 3px 10px rgba(0,0,0,0.15);
                     position: relative;
                     overflow: hidden;
-                    color: white;
-                    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+                    color: black;
+                    text-shadow: 0 1px 2px rgba(255,255,255,0.5);
                     -webkit-font-smoothing: antialiased;
                 }
                 .action-btn span {
-                    filter: brightness(0) invert(1);
+                    filter: brightness(0);
                     display: inline-block;
                 }
                 .action-btn::after {
