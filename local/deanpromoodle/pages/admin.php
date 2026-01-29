@@ -22,11 +22,22 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-require_once(__DIR__ . '/../../../../config.php');
-require_once($CFG->libdir . '/adminlib.php');
+// Define path to Moodle config
+$configpath = __DIR__ . '/../../../../config.php';
+if (!file_exists($configpath)) {
+    die('Error: Moodle config.php not found at: ' . $configpath);
+}
+
+require_once($configpath);
 
 // Check access
 require_login();
+
+// Check if plugin is installed
+if (!file_exists($CFG->dirroot . '/local/deanpromoodle/version.php')) {
+    die('Error: Plugin not found. Please install the plugin through Moodle admin interface.');
+}
+
 require_capability('local/deanpromoodle:viewadmin', context_system::instance());
 
 // Set up page
