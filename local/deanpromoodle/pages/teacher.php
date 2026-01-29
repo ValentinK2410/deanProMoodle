@@ -317,6 +317,7 @@ switch ($tab) {
     case 'quizzes':
         // Получение только несданных экзаменов
         // Показываем только тесты с названием "Экзамен" и только если они не сданы
+        // Условие: если есть оценка И дата оценки - не показывать такой тест
         $failedquizzes = [];
         foreach ($teachercourses as $course) {
             $quizzes = get_all_instances_in_course('quiz', $course, false);
@@ -328,32 +329,40 @@ switch ($tab) {
                     continue; // Пропускаем тесты, которые не являются экзаменами
                 }
                 
-                // Получаем только несданные попытки экзаменов
-                // Исключаем тесты, у которых есть финальная оценка (сданные)
+                // Получаем попытки экзаменов
+                // Исключаем тесты, у которых есть оценка И дата завершения
                 $attempts = $DB->get_records_sql(
                     "SELECT qa.*, u.firstname, u.lastname, u.email, u.id as userid, q.name as quizname, q.sumgrades as maxgrade
                      FROM {quiz_attempts} qa
                      JOIN {user} u ON u.id = qa.userid
                      JOIN {quiz} q ON q.id = qa.quiz
-                     LEFT JOIN {quiz_grades} qg ON qg.quiz = qa.quiz AND qg.userid = qa.userid
                      WHERE qa.quiz = ? 
-                     AND qa.state = 'finished' 
-                     AND qa.sumgrades < q.sumgrades
-                     AND (qg.grade IS NULL OR qg.grade < q.sumgrades)
+                     AND qa.state = 'finished'
+                     AND (
+                         qa.sumgrades IS NULL 
+                         OR qa.sumgrades = 0 
+                         OR qa.timemodified = 0 
+                         OR qa.timemodified IS NULL
+                         OR (qa.sumgrades IS NOT NULL AND qa.sumgrades > 0 AND (qa.timemodified = 0 OR qa.timemodified IS NULL))
+                     )
                      ORDER BY qa.timemodified DESC",
                     [$quiz->id]
                 );
                 
                 foreach ($attempts as $attempt) {
-                    // Дополнительная проверка: если есть финальная оценка и она проходная, пропускаем
+                    // Проверка: если есть оценка (sumgrades > 0) И есть дата завершения (timemodified > 0) - пропускаем
+                    if (isset($attempt->sumgrades) && $attempt->sumgrades > 0 && isset($attempt->timemodified) && $attempt->timemodified > 0) {
+                        continue; // Не показываем тесты с оценкой и датой
+                    }
+                    
+                    // Дополнительная проверка: если есть финальная оценка в quiz_grades, пропускаем
                     $finalgrade = $DB->get_field('quiz_grades', 'grade', [
                         'quiz' => $quiz->id,
                         'userid' => $attempt->userid
                     ]);
                     
-                    // Если есть финальная оценка и она равна или больше максимального балла, пропускаем (сдан)
-                    if ($finalgrade !== false && $finalgrade >= $quiz->sumgrades) {
-                        continue;
+                    if ($finalgrade !== false) {
+                        continue; // Если есть финальная оценка, пропускаем
                     }
                     
                     $failedquizzes[] = (object)[
@@ -365,8 +374,8 @@ switch ($tab) {
                         'userid' => $attempt->userid,
                         'studentname' => fullname($attempt),
                         'email' => $attempt->email,
-                        'grade' => $attempt->sumgrades . ' / ' . $quiz->sumgrades,
-                        'attempted' => userdate($attempt->timemodified),
+                        'grade' => ($attempt->sumgrades ?? 0) . ' / ' . $quiz->sumgrades,
+                        'attempted' => $attempt->timemodified > 0 ? userdate($attempt->timemodified) : 'Не завершено',
                         'timemodified' => $attempt->timemodified
                     ];
                 }
