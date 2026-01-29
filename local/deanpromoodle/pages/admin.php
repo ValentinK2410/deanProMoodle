@@ -2887,7 +2887,7 @@ switch ($tab) {
                                                 html += '<td>' + cohort.id + '</td>';
                                                 html += '<td>' + escapeHtml(cohort.name) + '</td>';
                                                 html += '<td>' + (cohort.idnumber ? escapeHtml(cohort.idnumber) : '-') + '</td>';
-                                                html += '<td><button class=\"btn btn-sm btn-primary attach-cohort-btn\" data-cohort-id=\"' + cohort.id + '\" style=\"padding: 4px 8px; font-size: 12px;\"><i class=\"fas fa-link\"></i> Прикрепить</button></td>';
+                                                html += '<td><button class=\"btn btn-sm btn-primary attach-cohort-btn\" data-cohort-id=\"' + cohort.id + '\" title=\"Прикрепить группу\" style=\"padding: 4px 8px; font-size: 12px;\"><i class=\"fas fa-link\"></i></button></td>';
                                                 html += '</tr>';
                                             });
                                             html += '</tbody></table>';
@@ -2899,7 +2899,8 @@ switch ($tab) {
                                                     var cohortId = this.getAttribute('data-cohort-id');
                                                     var btn = this;
                                                     btn.disabled = true;
-                                                    btn.innerHTML = '<i class=\"fas fa-spinner fa-spin\"></i> Прикрепление...';
+                                                    btn.innerHTML = '<i class=\"fas fa-spinner fa-spin\"></i>';
+                                                    btn.title = 'Прикрепление...';
                                                     
                                                     var xhr2 = new XMLHttpRequest();
                                                     xhr2.open('POST', '/local/deanpromoodle/pages/admin_ajax.php', true);
@@ -2913,7 +2914,8 @@ switch ($tab) {
                                                             } else {
                                                                 alert('Ошибка: ' + (response2.error || 'Неизвестная ошибка'));
                                                                 btn.disabled = false;
-                                                                btn.innerHTML = '<i class=\"fas fa-link\"></i> Прикрепить';
+                                                                btn.innerHTML = '<i class=\"fas fa-link\"></i>';
+                                                                btn.title = 'Прикрепить группу';
                                                             }
                                                         }
                                                     };
