@@ -469,13 +469,15 @@ switch ($tab) {
         // Получаем всех преподавателей для всех курсов одним запросом
         $systemcontext = context_system::instance();
         $placeholders = implode(',', array_fill(0, count($teacherroleids), '?'));
+        $coursecontextids = array_map(function($ctx) { return $ctx->id; }, $coursecontexts);
+        $coursecontextplaceholders = implode(',', array_fill(0, count($coursecontextids), '?'));
+        
         $allteacheruserids = $DB->get_fieldset_sql(
             "SELECT DISTINCT ra.userid
              FROM {role_assignments} ra
-             WHERE (ra.contextid IN (" . implode(',', array_map(function($ctx) { return $ctx->id; }, $coursecontexts)) . ")
-                    OR ra.contextid = ?)
+             WHERE (ra.contextid IN ($coursecontextplaceholders) OR ra.contextid = ?)
              AND ra.roleid IN ($placeholders)",
-            array_merge(array_map(function($ctx) { return $ctx->id; }, $coursecontexts), [$systemcontext->id], $teacherroleids)
+            array_merge($coursecontextids, [$systemcontext->id], $teacherroleids)
         );
         
         if (empty($allteacheruserids)) {
@@ -487,9 +489,9 @@ switch ($tab) {
         $allstudentuserids = $DB->get_fieldset_sql(
             "SELECT DISTINCT ra.userid
              FROM {role_assignments} ra
-             WHERE ra.contextid IN (" . implode(',', array_map(function($ctx) { return $ctx->id; }, $coursecontexts)) . ")
+             WHERE ra.contextid IN ($coursecontextplaceholders)
              AND ra.roleid = ?",
-            array_merge(array_map(function($ctx) { return $ctx->id; }, $coursecontexts), [$studentroleid])
+            array_merge($coursecontextids, [$studentroleid])
         );
         
         if (empty($allstudentuserids)) {
