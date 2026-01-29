@@ -1535,7 +1535,12 @@ switch ($tab) {
                         $data->description = $description;
                         $data->institution = $institution;
                         $data->is_paid = $is_paid;
-                        $data->price = !empty($price) ? (float)$price : null;
+                        // Обработка цены: если программа платная и указана цена, сохраняем её, иначе null
+                        if ($is_paid && trim($price) !== '') {
+                            $data->price = (float)$price;
+                        } else {
+                            $data->price = null;
+                        }
                         $data->visible = $visible;
                         $data->timemodified = time();
                         
@@ -1777,12 +1782,16 @@ switch ($tab) {
             // Цена
             echo html_writer::start_div('form-group', ['style' => 'margin-bottom: 15px;']);
             echo html_writer::label('Цена', 'price');
+            $pricevalue = '';
+            if ($program && isset($program->price) && $program->price !== null && $program->price > 0) {
+                $pricevalue = number_format((float)$program->price, 2, '.', '');
+            }
             echo html_writer::empty_tag('input', [
                 'type' => 'number',
                 'name' => 'price',
                 'id' => 'price',
                 'class' => 'form-control',
-                'value' => $program && isset($program->price) ? number_format((float)$program->price, 2, '.', '') : '',
+                'value' => $pricevalue,
                 'step' => '0.01',
                 'min' => '0',
                 'placeholder' => '0.00'
