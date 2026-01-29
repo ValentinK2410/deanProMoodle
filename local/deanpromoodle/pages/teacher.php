@@ -512,6 +512,8 @@ switch ($tab) {
             echo html_writer::tag('th', $fullnamestr); // Студент
             $subjectstr = 'Тема';
             echo html_writer::tag('th', $subjectstr);
+            $messagestr = 'Сообщение студента';
+            echo html_writer::tag('th', $messagestr);
             $postedstr = 'Опубликовано';
             echo html_writer::tag('th', $postedstr);
             echo html_writer::tag('th', $actionsstr); // Действия
@@ -525,6 +527,7 @@ switch ($tab) {
                 echo html_writer::tag('td', htmlspecialchars($item->discussionname));
                 echo html_writer::tag('td', htmlspecialchars($item->studentname));
                 echo html_writer::tag('td', htmlspecialchars($item->subject));
+                echo html_writer::tag('td', htmlspecialchars($item->message), ['style' => 'max-width: 300px; word-wrap: break-word;']);
                 echo html_writer::tag('td', $item->posted);
                 $posturl = new moodle_url('/mod/forum/discuss.php', ['d' => $item->discussionid]);
                 $replystr = 'Ответить';
