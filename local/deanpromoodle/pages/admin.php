@@ -34,11 +34,11 @@ require_once($configpath);
 require_once($CFG->libdir . '/tablelib.php');
 
 // Временная отладка для диагностики ошибки 500 - удалить после исправления
-if (isset($_GET['tab']) && $_GET['tab'] == 'programs') {
-    error_reporting(E_ALL);
-    ini_set('display_errors', 1);
-    ini_set('display_startup_errors', 1);
-}
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+ini_set('log_errors', 1);
+ini_set('error_log', '/tmp/php_errors.log');
 
 // Check access
 require_login();
