@@ -74,11 +74,11 @@ $PAGE->set_title(get_string('adminpagetitle', 'local_deanpromoodle'));
 $PAGE->set_heading(get_string('adminpagetitle', 'local_deanpromoodle'));
 $PAGE->set_pagelayout('admin');
 
-// Output page
+// Вывод страницы
 echo $OUTPUT->header();
-echo $OUTPUT->heading(get_string('adminpagetitle', 'local_deanpromoodle'));
+// Заголовок уже выводится через set_heading(), не нужно дублировать
 
-// Page content
+// Содержимое страницы
 echo html_writer::start_div('local-deanpromoodle-admin-content');
 echo html_writer::tag('p', get_string('adminpagecontent', 'local_deanpromoodle'));
 echo html_writer::end_div();

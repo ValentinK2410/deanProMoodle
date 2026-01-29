@@ -134,7 +134,7 @@ if ($courseid == 0) {
 
 // Вывод страницы
 echo $OUTPUT->header();
-echo $OUTPUT->heading(get_string('teacherpagetitle', 'local_deanpromoodle'));
+// Заголовок уже выводится через set_heading(), не нужно дублировать
 
 // Вкладки
 $tabs = [];

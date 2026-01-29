@@ -87,11 +87,11 @@ $PAGE->set_title(get_string('studentpagetitle', 'local_deanpromoodle'));
 $PAGE->set_heading(get_string('studentpagetitle', 'local_deanpromoodle'));
 $PAGE->set_pagelayout('standard');
 
-// Output page
+// Вывод страницы
 echo $OUTPUT->header();
-echo $OUTPUT->heading(get_string('studentpagetitle', 'local_deanpromoodle'));
+// Заголовок уже выводится через set_heading(), не нужно дублировать
 
-// Page content
+// Содержимое страницы
 echo html_writer::start_div('local-deanpromoodle-student-content');
 echo html_writer::tag('p', get_string('studentpagecontent', 'local_deanpromoodle'));
 echo html_writer::end_div();
