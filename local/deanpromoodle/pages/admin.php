@@ -990,6 +990,157 @@ switch ($tab) {
             break;
         }
         
+        // Обработка импорта JSON
+        $importaction = optional_param('import', '', PARAM_ALPHA);
+        if ($importaction == 'json') {
+            $importsubmitted = optional_param('import_submit', 0, PARAM_INT);
+            if ($importsubmitted) {
+                // Проверяем загруженный файл
+                $file = $_FILES['jsonfile'] ?? null;
+                if (!$file || $file['error'] !== UPLOAD_ERR_OK) {
+                    echo html_writer::div('Ошибка загрузки файла. Убедитесь, что файл выбран и не превышает максимальный размер.', 'alert alert-danger');
+                } else {
+                    // Проверяем тип файла
+                    $filetype = mime_content_type($file['tmp_name']);
+                    $fileext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+                    if ($fileext !== 'json' && strpos($filetype, 'json') === false && strpos($filetype, 'text') === false) {
+                        echo html_writer::div('Неверный тип файла. Загрузите файл в формате JSON.', 'alert alert-danger');
+                    } else {
+                        // Читаем содержимое файла
+                        $jsoncontent = file_get_contents($file['tmp_name']);
+                        if ($jsoncontent === false) {
+                            echo html_writer::div('Ошибка чтения файла.', 'alert alert-danger');
+                        } else {
+                            // Парсим JSON
+                            $jsondata = json_decode($jsoncontent, true);
+                            if (json_last_error() !== JSON_ERROR_NONE) {
+                                echo html_writer::div('Ошибка парсинга JSON: ' . json_last_error_msg(), 'alert alert-danger');
+                            } else {
+                                // Определяем структуру: если есть ключ 'programs', используем его, иначе весь JSON как массив
+                                if (is_array($jsondata) && isset($jsondata['programs']) && is_array($jsondata['programs'])) {
+                                    $programsdata = $jsondata['programs'];
+                                } elseif (is_array($jsondata)) {
+                                    $programsdata = $jsondata;
+                                } else {
+                                    echo html_writer::div('JSON файл должен содержать массив программ или объект с ключом "programs".', 'alert alert-danger');
+                                    $programsdata = [];
+                                }
+                                
+                                if (empty($programsdata)) {
+                                    echo html_writer::div('Не найдено программ для импорта.', 'alert alert-warning');
+                                } else {
+                                    // Импортируем программы
+                                    $imported = 0;
+                                    $skipped = 0;
+                                    $errors = [];
+                                    
+                                    $transaction = $DB->start_delegated_transaction();
+                                    try {
+                                        foreach ($programsdata as $index => $programdata) {
+                                            // Валидация данных
+                                            if (empty($programdata['name'])) {
+                                                $errors[] = 'Программа #' . ((int)$index + 1) . ': отсутствует название';
+                                                $skipped++;
+                                                continue;
+                                            }
+                                            
+                                            // Проверяем, существует ли программа с таким названием или кодом
+                                            $existing = null;
+                                            $programcode = !empty($programdata['code']) ? trim($programdata['code']) : '';
+                                            if ($programcode) {
+                                                $existing = $DB->get_record('local_deanpromoodle_programs', ['code' => $programcode]);
+                                            }
+                                            if (!$existing) {
+                                                $existing = $DB->get_record('local_deanpromoodle_programs', ['name' => trim($programdata['name'])]);
+                                            }
+                                            
+                                            $programid = null;
+                                            if ($existing) {
+                                                // Обновляем существующую программу
+                                                $programid = $existing->id;
+                                                $data = new stdClass();
+                                                $data->id = $programid;
+                                                $data->name = trim($programdata['name']);
+                                                $data->code = $programcode;
+                                                $data->description = isset($programdata['description']) ? ($programdata['description'] ?: '') : '';
+                                                $data->visible = isset($programdata['is_active']) ? ($programdata['is_active'] ? 1 : 0) : 1;
+                                                $data->timemodified = time();
+                                                $DB->update_record('local_deanpromoodle_programs', $data);
+                                                
+                                                // Удаляем старые связи с предметами
+                                                $DB->delete_records('local_deanpromoodle_program_subjects', ['programid' => $programid]);
+                                            } else {
+                                                // Создаем новую программу
+                                                $data = new stdClass();
+                                                $data->name = trim($programdata['name']);
+                                                $data->code = $programcode;
+                                                $data->description = isset($programdata['description']) ? ($programdata['description'] ?: '') : '';
+                                                $data->visible = isset($programdata['is_active']) ? ($programdata['is_active'] ? 1 : 0) : 1;
+                                                $data->timecreated = time();
+                                                $data->timemodified = time();
+                                                $programid = $DB->insert_record('local_deanpromoodle_programs', $data);
+                                                $imported++;
+                                            }
+                                            
+                                            // Обрабатываем предметы программы
+                                            if (!empty($programdata['subjects']) && is_array($programdata['subjects']) && $programid) {
+                                                $sortorder = 0;
+                                                foreach ($programdata['subjects'] as $subjectdata) {
+                                                    // Ищем предмет по коду или названию
+                                                    $subject = null;
+                                                    if (!empty($subjectdata['code'])) {
+                                                        $subject = $DB->get_record('local_deanpromoodle_subjects', ['code' => trim($subjectdata['code'])]);
+                                                    }
+                                                    if (!$subject && !empty($subjectdata['name'])) {
+                                                        $subject = $DB->get_record('local_deanpromoodle_subjects', ['name' => trim($subjectdata['name'])]);
+                                                    }
+                                                    
+                                                    if ($subject) {
+                                                        // Используем order из JSON или порядок по умолчанию
+                                                        $subjectorder = isset($subjectdata['order']) ? (int)$subjectdata['order'] : $sortorder;
+                                                        
+                                                        $psdata = new stdClass();
+                                                        $psdata->programid = $programid;
+                                                        $psdata->subjectid = $subject->id;
+                                                        $psdata->sortorder = $subjectorder;
+                                                        $psdata->timecreated = time();
+                                                        $psdata->timemodified = time();
+                                                        $DB->insert_record('local_deanpromoodle_program_subjects', $psdata);
+                                                        $sortorder++;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        
+                                        $transaction->allow_commit();
+                                        
+                                        // Сообщение об успехе
+                                        $message = 'Импорт завершен. Импортировано программ: ' . $imported;
+                                        if ($skipped > 0) {
+                                            $message .= ', обновлено (уже существуют): ' . $skipped;
+                                        }
+                                        if (!empty($errors)) {
+                                            $message .= '. Ошибки: ' . implode('; ', array_slice($errors, 0, 5));
+                                            if (count($errors) > 5) {
+                                                $message .= ' и еще ' . (count($errors) - 5) . ' ошибок';
+                                            }
+                                        }
+                                        echo html_writer::div($message, 'alert alert-success');
+                                        
+                                        // Редирект на список программ
+                                        redirect(new moodle_url('/local/deanpromoodle/pages/admin.php', ['tab' => 'programs']), $message, null, \core\output\notification::NOTIFY_SUCCESS);
+                                    } catch (\Exception $e) {
+                                        $transaction->rollback($e);
+                                        echo html_writer::div('Ошибка при импорте: ' . $e->getMessage(), 'alert alert-danger');
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
         // Обработка действий
         if ($action == 'create' || ($action == 'edit' && $programid > 0)) {
             // Создание или редактирование программы
@@ -1223,11 +1374,100 @@ switch ($tab) {
                     'style' => 'background-color: #007bff; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-weight: 500;'
                 ]
             );
+            echo html_writer::link('#', '📥 Импорт из JSON', [
+                'class' => 'btn btn-success',
+                'id' => 'import-programs-json-btn',
+                'style' => 'background-color: #28a745; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-weight: 500;'
+            ]);
             echo html_writer::link('#', '🔗 Прикрепить глобальную группу', [
                 'class' => 'btn btn-secondary',
                 'id' => 'attach-cohort-btn',
                 'style' => 'background-color: #6c757d; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-weight: 500;'
             ]);
+            echo html_writer::end_div();
+            echo html_writer::end_div();
+            
+            // Модальное окно для импорта JSON
+            echo html_writer::start_div('modal fade', [
+                'id' => 'importProgramsJsonModal',
+                'tabindex' => '-1',
+                'role' => 'dialog'
+            ]);
+            echo html_writer::start_div('modal-dialog', ['role' => 'document']);
+            echo html_writer::start_div('modal-content');
+            echo html_writer::start_div('modal-header');
+            echo html_writer::tag('h5', 'Импорт программ из JSON', ['class' => 'modal-title']);
+            echo html_writer::start_tag('button', [
+                'type' => 'button',
+                'class' => 'close',
+                'data-dismiss' => 'modal',
+                'onclick' => 'jQuery(\'#importProgramsJsonModal\').modal(\'hide\');'
+            ]);
+            echo html_writer::tag('span', '×', ['aria-hidden' => 'true']);
+            echo html_writer::end_tag('button');
+            echo html_writer::end_div();
+            echo html_writer::start_div('modal-body');
+            echo html_writer::start_tag('form', [
+                'method' => 'post',
+                'action' => new moodle_url('/local/deanpromoodle/pages/admin.php', ['tab' => 'programs', 'import' => 'json']),
+                'enctype' => 'multipart/form-data'
+            ]);
+            echo html_writer::start_div('form-group');
+            echo html_writer::label('Выберите JSON файл', 'jsonfile');
+            echo html_writer::empty_tag('input', [
+                'type' => 'file',
+                'name' => 'jsonfile',
+                'id' => 'jsonfile-programs',
+                'class' => 'form-control-file',
+                'accept' => '.json,application/json',
+                'required' => true
+            ]);
+            echo html_writer::start_div('form-text text-muted', ['style' => 'margin-top: 5px;']);
+            echo 'Формат JSON файла:<br>';
+            echo '<pre style="background: #f5f5f5; padding: 10px; border-radius: 4px; font-size: 11px; margin-top: 5px; max-height: 200px; overflow-y: auto;">';
+            echo '{<br>';
+            echo '  "programs": [<br>';
+            echo '    {<br>';
+            echo '      "name": "Название программы",<br>';
+            echo '      "code": "КОД",<br>';
+            echo '      "description": "Описание",<br>';
+            echo '      "is_active": true,<br>';
+            echo '      "subjects": [<br>';
+            echo '        {<br>';
+            echo '          "name": "Название предмета",<br>';
+            echo '          "code": "КОД",<br>';
+            echo '          "order": 0<br>';
+            echo '        }<br>';
+            echo '      ]<br>';
+            echo '    }<br>';
+            echo '  ]<br>';
+            echo '}</pre>';
+            echo html_writer::end_div();
+            echo html_writer::end_div();
+            echo html_writer::start_div('form-group');
+            echo html_writer::empty_tag('input', [
+                'type' => 'hidden',
+                'name' => 'import_submit',
+                'value' => '1'
+            ]);
+            echo html_writer::empty_tag('input', [
+                'type' => 'submit',
+                'value' => 'Импортировать',
+                'class' => 'btn btn-success',
+                'style' => 'margin-right: 10px;'
+            ]);
+            echo html_writer::start_tag('button', [
+                'type' => 'button',
+                'class' => 'btn btn-secondary',
+                'data-dismiss' => 'modal',
+                'onclick' => 'jQuery(\'#importProgramsJsonModal\').modal(\'hide\');'
+            ]);
+            echo 'Отмена';
+            echo html_writer::end_tag('button');
+            echo html_writer::end_div();
+            echo html_writer::end_tag('form');
+            echo html_writer::end_div();
+            echo html_writer::end_div();
             echo html_writer::end_div();
             echo html_writer::end_div();
             
@@ -1725,6 +1965,28 @@ switch ($tab) {
                             xhr.send('action=deleteprogram&programid=' + programId);
                         });
                     });
+                    
+                    // Обработчик кнопки импорта JSON
+                    var importBtn = document.getElementById('import-programs-json-btn');
+                    if (importBtn) {
+                        importBtn.addEventListener('click', function(e) {
+                            e.preventDefault();
+                            if (typeof jQuery !== 'undefined' && jQuery.fn.modal) {
+                                jQuery('#importProgramsJsonModal').modal('show');
+                            } else if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                                var modal = new bootstrap.Modal(document.getElementById('importProgramsJsonModal'));
+                                modal.show();
+                            } else {
+                                // Fallback: просто показываем модальное окно через CSS
+                                var modal = document.getElementById('importProgramsJsonModal');
+                                if (modal) {
+                                    modal.style.display = 'block';
+                                    modal.classList.add('show');
+                                    document.body.classList.add('modal-open');
+                                }
+                            }
+                        });
+                    }
                 })();
             ");
         }
