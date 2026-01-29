@@ -1646,6 +1646,18 @@ switch ($tab) {
                     padding-left: 20px;
                     padding-right: 20px;
                 }
+                .programs-table th:nth-child(3),
+                .programs-table td:nth-child(3) {
+                    width: auto;
+                    max-width: 160px;
+                }
+                .programs-table td:nth-child(3) .badge-institution {
+                    max-width: 100%;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                    display: inline-block;
+                }
                 .programs-table tr:hover {
                     background-color: #f8f9fa;
                 }
