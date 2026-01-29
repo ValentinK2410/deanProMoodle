@@ -1239,6 +1239,8 @@ switch ($tab) {
             
             if (empty($programs)) {
                 echo html_writer::div('Программы не найдены. Создайте первую программу.', 'alert alert-info');
+                // Устанавливаем пустой массив для JavaScript
+                $programsjson = '[]';
             } else {
                 // Получаем название сайта как учебное заведение
                 $sitename = $CFG->fullname ?: 'Московская богословская семинария';
@@ -1532,72 +1534,75 @@ switch ($tab) {
                 echo html_writer::end_div();
             }
             
-            // Модальное окно для прикрепления когорт к программе (только если таблица существует)
-            if (isset($programs)) {
-                echo html_writer::start_div('modal fade', [
-                    'id' => 'attachCohortModal',
-                    'tabindex' => '-1',
-                    'role' => 'dialog'
-                ]);
-                echo html_writer::start_div('modal-dialog modal-lg', ['role' => 'document']);
-                echo html_writer::start_div('modal-content');
-                echo html_writer::start_div('modal-header');
-                echo html_writer::tag('h5', 'Прикрепить глобальную группу к программе', ['class' => 'modal-title']);
-                echo html_writer::start_tag('button', [
-                    'type' => 'button',
-                    'class' => 'close',
-                    'data-dismiss' => 'modal',
-                    'onclick' => 'jQuery(\'#attachCohortModal\').modal(\'hide\');'
-                ]);
-                echo html_writer::tag('span', '×', ['aria-hidden' => 'true']);
-                echo html_writer::end_tag('button');
-                echo html_writer::end_div();
-                echo html_writer::start_div('modal-body');
-                echo html_writer::start_div('form-group');
-                echo html_writer::label('Выберите программу', 'program-select');
-                $programsoptions = empty($programs) ? [] : array_map(function($p) { return htmlspecialchars($p->name, ENT_QUOTES, 'UTF-8'); }, $programs);
-                echo html_writer::select(
-                    $programsoptions,
-                    'program-select',
-                    '',
-                    ['' => 'Выберите программу...'],
-                    ['id' => 'program-select', 'class' => 'form-control']
-                );
-                echo html_writer::end_div();
-                echo html_writer::start_div('form-group');
-                echo html_writer::label('Поиск когорты', 'cohort-search');
-                echo html_writer::empty_tag('input', [
-                    'type' => 'text',
-                    'id' => 'cohort-search',
-                    'class' => 'form-control',
-                    'placeholder' => 'Введите название когорты...'
-                ]);
-                echo html_writer::end_div();
-                echo html_writer::start_div('', ['id' => 'cohorts-list', 'style' => 'max-height: 400px; overflow-y: auto;']);
-                echo html_writer::div('Выберите программу и введите текст для поиска когорт...', 'text-muted');
-                echo html_writer::end_div();
-                echo html_writer::end_div();
-                echo html_writer::start_div('modal-footer');
-                echo html_writer::start_tag('button', [
-                    'type' => 'button',
-                    'class' => 'btn btn-secondary',
-                    'data-dismiss' => 'modal',
-                    'onclick' => 'jQuery(\'#attachCohortModal\').modal(\'hide\');'
-                ]);
-                echo 'Закрыть';
-                echo html_writer::end_tag('button');
-                echo html_writer::end_div();
-                echo html_writer::end_div();
-                echo html_writer::end_div();
-                echo html_writer::end_div();
-                
-                // JavaScript для модального окна прикрепления когорт
+            // Модальное окно для прикрепления когорт к программе
+            // Инициализируем $programsjson всегда
+            if (!isset($programs) || empty($programs)) {
+                $programsjson = '[]';
+                $programsoptions = [];
+            } else {
                 $programsjson = json_encode(array_map(function($p) {
                     return ['id' => $p->id, 'name' => $p->name];
-                }, empty($programs) ? [] : $programs));
-            } else {
-                $programsjson = '[]';
+                }, $programs));
+                $programsoptions = array_map(function($p) { 
+                    return htmlspecialchars($p->name, ENT_QUOTES, 'UTF-8'); 
+                }, $programs);
             }
+            
+            echo html_writer::start_div('modal fade', [
+                'id' => 'attachCohortModal',
+                'tabindex' => '-1',
+                'role' => 'dialog'
+            ]);
+            echo html_writer::start_div('modal-dialog modal-lg', ['role' => 'document']);
+            echo html_writer::start_div('modal-content');
+            echo html_writer::start_div('modal-header');
+            echo html_writer::tag('h5', 'Прикрепить глобальную группу к программе', ['class' => 'modal-title']);
+            echo html_writer::start_tag('button', [
+                'type' => 'button',
+                'class' => 'close',
+                'data-dismiss' => 'modal',
+                'onclick' => 'jQuery(\'#attachCohortModal\').modal(\'hide\');'
+            ]);
+            echo html_writer::tag('span', '×', ['aria-hidden' => 'true']);
+            echo html_writer::end_tag('button');
+            echo html_writer::end_div();
+            echo html_writer::start_div('modal-body');
+            echo html_writer::start_div('form-group');
+            echo html_writer::label('Выберите программу', 'program-select');
+            echo html_writer::select(
+                $programsoptions,
+                'program-select',
+                '',
+                ['' => 'Выберите программу...'],
+                ['id' => 'program-select', 'class' => 'form-control']
+            );
+            echo html_writer::end_div();
+            echo html_writer::start_div('form-group');
+            echo html_writer::label('Поиск когорты', 'cohort-search');
+            echo html_writer::empty_tag('input', [
+                'type' => 'text',
+                'id' => 'cohort-search',
+                'class' => 'form-control',
+                'placeholder' => 'Введите название когорты...'
+            ]);
+            echo html_writer::end_div();
+            echo html_writer::start_div('', ['id' => 'cohorts-list', 'style' => 'max-height: 400px; overflow-y: auto;']);
+            echo html_writer::div('Выберите программу и введите текст для поиска когорт...', 'text-muted');
+            echo html_writer::end_div();
+            echo html_writer::end_div();
+            echo html_writer::start_div('modal-footer');
+            echo html_writer::start_tag('button', [
+                'type' => 'button',
+                'class' => 'btn btn-secondary',
+                'data-dismiss' => 'modal',
+                'onclick' => 'jQuery(\'#attachCohortModal\').modal(\'hide\');'
+            ]);
+            echo 'Закрыть';
+            echo html_writer::end_tag('button');
+            echo html_writer::end_div();
+            echo html_writer::end_div();
+            echo html_writer::end_div();
+            echo html_writer::end_div();
             $PAGE->requires->js_init_code("
                 (function() {
                     var programs = " . $programsjson . ";
