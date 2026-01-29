@@ -1287,15 +1287,17 @@ switch ($tab) {
                     // Колонка названия с кнопкой раскрытия/сворачивания
                     $namecell = '';
                     if ($haschildren) {
-                        $namecell .= html_writer::link('#', '▶', [
+                        $linkresult = html_writer::link('#', '▶', [
                             'class' => 'category-toggle',
                             'data-category-id' => (string)$categoryid,
                             'data-row-id' => (string)$rowid,
                             'style' => 'text-decoration: none; color: #666; margin-right: 5px; font-size: 12px; display: inline-block; width: 15px;',
                             'title' => 'Раскрыть/свернуть'
                         ]);
+                        $namecell .= is_string($linkresult) ? $linkresult : (string)$linkresult;
                     } else {
-                        $namecell .= html_writer::span('', ['style' => 'display: inline-block; width: 15px;']);
+                        $spanresult = html_writer::span('', ['style' => 'display: inline-block; width: 15px;']);
+                        $namecell .= is_string($spanresult) ? $spanresult : (string)$spanresult;
                     }
                     // Безопасное преобразование имени категории в строку
                     $categoryname = '';
@@ -1317,13 +1319,14 @@ switch ($tab) {
                     $coursescountval = is_scalar($stats['coursescount']) ? (int)$stats['coursescount'] : 0;
                     $coursescell = (string)$coursescountval;
                     if ($coursescountval > 0) {
-                        $coursescell = html_writer::link('#', (string)$coursescountval, [
+                        $linkresult = html_writer::link('#', (string)$coursescountval, [
                             'class' => 'category-link',
                             'data-category-id' => (string)$categoryid,
                             'data-type' => 'courses',
                             'data-category-name' => htmlspecialchars($categoryname, ENT_QUOTES, 'UTF-8'),
                             'style' => 'color: #007bff; font-weight: bold; text-decoration: none; cursor: pointer;'
                         ]);
+                        $coursescell = is_string($linkresult) ? $linkresult : (string)$linkresult;
                     }
                     echo html_writer::tag('td', html_writer::tag('strong', $coursescell));
                     
@@ -1331,13 +1334,14 @@ switch ($tab) {
                     $studentscountval = is_scalar($stats['studentscount']) ? (int)$stats['studentscount'] : 0;
                     $studentscell = (string)$studentscountval;
                     if ($studentscountval > 0) {
-                        $studentscell = html_writer::link('#', (string)$studentscountval, [
+                        $linkresult = html_writer::link('#', (string)$studentscountval, [
                             'class' => 'category-link',
                             'data-category-id' => (string)$categoryid,
                             'data-type' => 'students',
                             'data-category-name' => htmlspecialchars($categoryname, ENT_QUOTES, 'UTF-8'),
                             'style' => 'color: green; font-weight: bold; text-decoration: none; cursor: pointer;'
                         ]);
+                        $studentscell = is_string($linkresult) ? $linkresult : (string)$linkresult;
                     }
                     echo html_writer::tag('td', html_writer::tag('span', $studentscell));
                     
@@ -1345,13 +1349,14 @@ switch ($tab) {
                     $teacherscountval = is_scalar($stats['teacherscount']) ? (int)$stats['teacherscount'] : 0;
                     $teacherscell = (string)$teacherscountval;
                     if ($teacherscountval > 0) {
-                        $teacherscell = html_writer::link('#', (string)$teacherscountval, [
+                        $linkresult = html_writer::link('#', (string)$teacherscountval, [
                             'class' => 'category-link',
                             'data-category-id' => (string)$categoryid,
                             'data-type' => 'teachers',
                             'data-category-name' => htmlspecialchars($categoryname, ENT_QUOTES, 'UTF-8'),
                             'style' => 'color: orange; font-weight: bold; text-decoration: none; cursor: pointer;'
                         ]);
+                        $teacherscell = is_string($linkresult) ? $linkresult : (string)$linkresult;
                     }
                     echo html_writer::tag('td', html_writer::tag('span', $teacherscell));
                     
