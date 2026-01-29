@@ -1300,19 +1300,42 @@ switch ($tab) {
                         $namecell .= is_string($spanresult) ? $spanresult : (string)$spanresult;
                     }
                     // Безопасное преобразование имени категории в строку
-                    $categoryname = '';
-                    if (is_string($category->name)) {
-                        $categoryname = $category->name;
-                    } elseif (is_array($category->name)) {
-                        $categoryname = implode(', ', array_filter($category->name, 'is_string'));
-                    } elseif (is_object($category->name) && method_exists($category->name, '__toString')) {
-                        $categoryname = (string)$category->name;
-                    } elseif (isset($category->name)) {
-                        $categoryname = (string)$category->name;
-                    } else {
+                    $categoryname = 'Без названия';
+                    try {
+                        if (isset($category->name)) {
+                            if (is_string($category->name)) {
+                                $categoryname = $category->name;
+                            } elseif (is_array($category->name)) {
+                                $categoryname = implode(', ', array_filter($category->name, function($v) { return is_string($v) || is_numeric($v); }));
+                                if (empty($categoryname)) {
+                                    $categoryname = 'Без названия';
+                                }
+                            } elseif (is_object($category->name)) {
+                                // Попробуем использовать __toString если доступен
+                                if (method_exists($category->name, '__toString')) {
+                                    $categoryname = (string)$category->name;
+                                } elseif (method_exists($category->name, 'out')) {
+                                    // Для lang_string объектов Moodle
+                                    $categoryname = $category->name->out();
+                                } else {
+                                    $categoryname = 'Без названия';
+                                }
+                            } elseif (is_scalar($category->name)) {
+                                $categoryname = (string)$category->name;
+                            }
+                        }
+                    } catch (Exception $e) {
+                        $categoryname = 'Без названия';
+                    }
+                    // Финальная проверка - убеждаемся, что это строка
+                    if (!is_string($categoryname)) {
                         $categoryname = 'Без названия';
                     }
                     $namecell .= htmlspecialchars($categoryname, ENT_QUOTES, 'UTF-8');
+                    // Убеждаемся, что namecell - строка перед использованием
+                    $namecell = is_string($namecell) ? $namecell : (string)$namecell;
+                    // Убеждаемся, что indentstyle - строка
+                    $indentstyle = is_string($indentstyle) ? $indentstyle : (string)$indentstyle;
                     echo html_writer::tag('td', $namecell, ['style' => $indentstyle]);
                     
                     // Количество курсов - ссылка если > 0
@@ -1328,7 +1351,11 @@ switch ($tab) {
                         ]);
                         $coursescell = is_string($linkresult) ? $linkresult : (string)$linkresult;
                     }
-                    echo html_writer::tag('td', html_writer::tag('strong', $coursescell));
+                    // Убеждаемся, что coursescell - строка
+                    $coursescell = is_string($coursescell) ? $coursescell : (string)$coursescell;
+                    $strongcontent = html_writer::tag('strong', $coursescell);
+                    $strongcontent = is_string($strongcontent) ? $strongcontent : (string)$strongcontent;
+                    echo html_writer::tag('td', $strongcontent);
                     
                     // Количество студентов - ссылка если > 0
                     $studentscountval = is_scalar($stats['studentscount']) ? (int)$stats['studentscount'] : 0;
@@ -1343,7 +1370,11 @@ switch ($tab) {
                         ]);
                         $studentscell = is_string($linkresult) ? $linkresult : (string)$linkresult;
                     }
-                    echo html_writer::tag('td', html_writer::tag('span', $studentscell));
+                    // Убеждаемся, что studentscell - строка
+                    $studentscell = is_string($studentscell) ? $studentscell : (string)$studentscell;
+                    $spancontent = html_writer::tag('span', $studentscell);
+                    $spancontent = is_string($spancontent) ? $spancontent : (string)$spancontent;
+                    echo html_writer::tag('td', $spancontent);
                     
                     // Количество преподавателей - ссылка если > 0
                     $teacherscountval = is_scalar($stats['teacherscount']) ? (int)$stats['teacherscount'] : 0;
@@ -1358,7 +1389,11 @@ switch ($tab) {
                         ]);
                         $teacherscell = is_string($linkresult) ? $linkresult : (string)$linkresult;
                     }
-                    echo html_writer::tag('td', html_writer::tag('span', $teacherscell));
+                    // Убеждаемся, что teacherscell - строка
+                    $teacherscell = is_string($teacherscell) ? $teacherscell : (string)$teacherscell;
+                    $spancontent2 = html_writer::tag('span', $teacherscell);
+                    $spancontent2 = is_string($spancontent2) ? $spancontent2 : (string)$spancontent2;
+                    echo html_writer::tag('td', $spancontent2);
                     
                     // Статус - безопасное преобразование visible
                     $isvisible = false;
