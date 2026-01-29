@@ -803,6 +803,54 @@ if ($action == 'getteachercourses' && $teacherid > 0) {
         $transaction->rollback($e);
         echo json_encode(['success' => false, 'error' => 'Ошибка при удалении: ' . $e->getMessage()]);
     }
+} elseif ($action == 'changesubjectorder') {
+    // Изменение порядка предметов в программе
+    global $DB;
+    
+    $relationid = optional_param('relation_id', 0, PARAM_INT);
+    $siblingrelationid = optional_param('sibling_relation_id', 0, PARAM_INT);
+    $direction = optional_param('direction', '', PARAM_ALPHA); // 'up' или 'down'
+    
+    if ($relationid <= 0 || $siblingrelationid <= 0 || !in_array($direction, ['up', 'down'])) {
+        echo json_encode(['success' => false, 'error' => 'Неверные параметры']);
+        exit;
+    }
+    
+    // Получаем обе записи
+    $relation = $DB->get_record('local_deanpromoodle_program_subjects', ['id' => $relationid]);
+    $siblingrelation = $DB->get_record('local_deanpromoodle_program_subjects', ['id' => $siblingrelationid]);
+    
+    if (!$relation || !$siblingrelation) {
+        echo json_encode(['success' => false, 'error' => 'Связь не найдена']);
+        exit;
+    }
+    
+    // Проверяем, что обе связи относятся к одной программе
+    if ($relation->programid != $siblingrelation->programid) {
+        echo json_encode(['success' => false, 'error' => 'Предметы относятся к разным программам']);
+        exit;
+    }
+    
+    $transaction = $DB->start_delegated_transaction();
+    try {
+        // Меняем порядок местами
+        $temporder = $relation->sortorder;
+        $relation->sortorder = $siblingrelation->sortorder;
+        $siblingrelation->sortorder = $temporder;
+        
+        $relation->timemodified = time();
+        $siblingrelation->timemodified = time();
+        
+        $DB->update_record('local_deanpromoodle_program_subjects', $relation);
+        $DB->update_record('local_deanpromoodle_program_subjects', $siblingrelation);
+        
+        $transaction->allow_commit();
+        
+        echo json_encode(['success' => true]);
+    } catch (Exception $e) {
+        $transaction->rollback($e);
+        echo json_encode(['success' => false, 'error' => 'Ошибка при изменении порядка: ' . $e->getMessage()]);
+    }
 } else {
     echo json_encode(['success' => false, 'error' => 'Invalid action or parameters']);
 }

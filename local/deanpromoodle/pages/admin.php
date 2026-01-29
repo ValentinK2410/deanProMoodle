@@ -1210,8 +1210,238 @@ switch ($tab) {
             }
         }
         
-        // Обработка действий
-        if ($action == 'create' || ($action == 'edit' && $programid > 0)) {
+        // Обработка просмотра программы
+        if ($action == 'view' && $programid > 0) {
+            try {
+                $program = $DB->get_record('local_deanpromoodle_programs', ['id' => $programid]);
+                if (!$program) {
+                    echo html_writer::div('Программа не найдена.', 'alert alert-danger');
+                } else {
+                    // Получаем все предметы программы
+                    $subjects = $DB->get_records_sql(
+                        "SELECT s.id, s.name, s.code, s.shortdescription, ps.sortorder, ps.id as relation_id
+                         FROM {local_deanpromoodle_program_subjects} ps
+                         JOIN {local_deanpromoodle_subjects} s ON s.id = ps.subjectid
+                         WHERE ps.programid = ?
+                         ORDER BY ps.sortorder ASC",
+                        [$programid]
+                    );
+                    
+                    // Заголовок страницы
+                    echo html_writer::start_div('', ['style' => 'margin-bottom: 30px;']);
+                    echo html_writer::start_div('', ['style' => 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;']);
+                    echo html_writer::start_div('', ['style' => 'display: flex; align-items: center; gap: 15px;']);
+                    echo html_writer::link(
+                        new moodle_url('/local/deanpromoodle/pages/admin.php', ['tab' => 'programs']),
+                        '<i class="fas fa-arrow-left"></i> Назад к списку',
+                        ['class' => 'btn btn-secondary', 'style' => 'text-decoration: none;']
+                    );
+                    echo html_writer::tag('h2', 'Просмотр программы: ' . htmlspecialchars($program->name, ENT_QUOTES, 'UTF-8'), ['style' => 'margin: 0;']);
+                    echo html_writer::end_div();
+                    echo html_writer::link(
+                        new moodle_url('/local/deanpromoodle/pages/admin.php', ['tab' => 'programs', 'action' => 'edit', 'programid' => $programid]),
+                        '<i class="fas fa-edit"></i> Редактировать',
+                        ['class' => 'btn btn-primary', 'style' => 'text-decoration: none;']
+                    );
+                    echo html_writer::end_div();
+                    
+                    // Информация о программе
+                    echo html_writer::start_div('card', ['style' => 'margin-bottom: 20px; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);']);
+                    echo html_writer::tag('h3', 'Информация о программе', ['style' => 'margin-top: 0; margin-bottom: 15px;']);
+                    echo html_writer::start_div('', ['style' => 'display: grid; grid-template-columns: 200px 1fr; gap: 10px; margin-bottom: 10px;']);
+                    echo html_writer::tag('strong', 'Название:');
+                    echo html_writer::tag('div', htmlspecialchars($program->name, ENT_QUOTES, 'UTF-8'));
+                    echo html_writer::end_div();
+                    if ($program->code) {
+                        echo html_writer::start_div('', ['style' => 'display: grid; grid-template-columns: 200px 1fr; gap: 10px; margin-bottom: 10px;']);
+                        echo html_writer::tag('strong', 'Код:');
+                        echo html_writer::tag('div', htmlspecialchars($program->code, ENT_QUOTES, 'UTF-8'));
+                        echo html_writer::end_div();
+                    }
+                    if ($program->institution) {
+                        echo html_writer::start_div('', ['style' => 'display: grid; grid-template-columns: 200px 1fr; gap: 10px; margin-bottom: 10px;']);
+                        echo html_writer::tag('strong', 'Учебное заведение:');
+                        echo html_writer::tag('div', htmlspecialchars($program->institution, ENT_QUOTES, 'UTF-8'));
+                        echo html_writer::end_div();
+                    }
+                    if ($program->description) {
+                        echo html_writer::start_div('', ['style' => 'margin-top: 10px;']);
+                        echo html_writer::tag('strong', 'Описание:');
+                        echo html_writer::tag('div', format_text($program->description, FORMAT_HTML), ['style' => 'margin-top: 5px;']);
+                        echo html_writer::end_div();
+                    }
+                    echo html_writer::end_div();
+                    
+                    // Список предметов
+                    echo html_writer::tag('h3', 'Предметы программы', ['style' => 'margin-bottom: 15px;']);
+                    
+                    // Стили для таблицы предметов
+                    echo html_writer::start_tag('style');
+                    echo "
+                    .subjects-list table {
+                        border-collapse: collapse;
+                        width: 100%;
+                    }
+                    .subjects-list thead th {
+                        background-color: #f8f9fa;
+                        padding: 12px 16px;
+                        text-align: left;
+                        font-weight: 600;
+                        color: #495057;
+                        border-bottom: 2px solid #dee2e6;
+                        font-size: 14px;
+                    }
+                    .subjects-list tbody tr {
+                        border-bottom: 1px solid #f0f0f0;
+                        transition: background-color 0.2s;
+                    }
+                    .subjects-list tbody tr:hover {
+                        background-color: #f8f9fa;
+                    }
+                    .subjects-list tbody td {
+                        padding: 12px 16px;
+                        vertical-align: middle;
+                    }
+                    .subjects-list .btn-sm {
+                        min-width: 36px;
+                    }
+                    ";
+                    echo html_writer::end_tag('style');
+                    
+                    if (empty($subjects)) {
+                        echo html_writer::div('В программе пока нет предметов.', 'alert alert-info');
+                    } else {
+                        echo html_writer::start_div('subjects-list', ['id' => 'subjects-list', 'style' => 'background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); overflow: hidden;']);
+                        echo html_writer::start_tag('table', ['class' => 'table', 'style' => 'margin: 0; width: 100%;']);
+                        echo html_writer::start_tag('thead');
+                        echo html_writer::start_tag('tr');
+                        echo html_writer::tag('th', 'Порядок', ['style' => 'width: 80px; text-align: center;']);
+                        echo html_writer::tag('th', 'Название');
+                        echo html_writer::tag('th', 'Код', ['style' => 'width: 150px;']);
+                        echo html_writer::tag('th', 'Краткое описание', ['style' => 'width: 200px;']);
+                        echo html_writer::tag('th', 'Действия', ['style' => 'width: 120px; text-align: center;']);
+                        echo html_writer::end_tag('tr');
+                        echo html_writer::end_tag('thead');
+                        echo html_writer::start_tag('tbody', ['id' => 'subjects-tbody']);
+                        
+                        foreach ($subjects as $subject) {
+                            $subjectname = is_string($subject->name) ? $subject->name : (string)$subject->name;
+                            $subjectcode = is_string($subject->code) ? $subject->code : '';
+                            $subjectshortdesc = is_string($subject->shortdescription) ? $subject->shortdescription : '';
+                            $sortorder = (int)$subject->sortorder;
+                            $relationid = (int)$subject->relation_id;
+                            
+                            echo html_writer::start_tag('tr', [
+                                'data-subject-id' => $subject->id,
+                                'data-relation-id' => $relationid,
+                                'data-sortorder' => $sortorder,
+                                'style' => 'cursor: move;'
+                            ]);
+                            
+                            // Порядок
+                            echo html_writer::start_tag('td', ['style' => 'text-align: center; vertical-align: middle;']);
+                            echo html_writer::tag('span', $sortorder + 1, ['class' => 'badge', 'style' => 'background-color: #6c757d; color: white; font-size: 14px; padding: 6px 12px;']);
+                            echo html_writer::end_tag('td');
+                            
+                            // Название
+                            echo html_writer::start_tag('td');
+                            echo htmlspecialchars($subjectname, ENT_QUOTES, 'UTF-8');
+                            echo html_writer::end_tag('td');
+                            
+                            // Код
+                            echo html_writer::start_tag('td');
+                            echo $subjectcode ? htmlspecialchars($subjectcode, ENT_QUOTES, 'UTF-8') : '-';
+                            echo html_writer::end_tag('td');
+                            
+                            // Краткое описание
+                            echo html_writer::start_tag('td');
+                            echo $subjectshortdesc ? htmlspecialchars(mb_substr($subjectshortdesc, 0, 50), ENT_QUOTES, 'UTF-8') . (mb_strlen($subjectshortdesc) > 50 ? '...' : '') : '-';
+                            echo html_writer::end_tag('td');
+                            
+                            // Действия
+                            echo html_writer::start_tag('td', ['style' => 'text-align: center;']);
+                            echo html_writer::start_div('', ['style' => 'display: flex; gap: 5px; justify-content: center;']);
+                            echo html_writer::link('#', '<i class="fas fa-arrow-up"></i>', [
+                                'class' => 'btn btn-sm btn-outline-primary move-subject-up',
+                                'title' => 'Вверх',
+                                'data-relation-id' => $relationid,
+                                'style' => 'padding: 4px 8px;'
+                            ]);
+                            echo html_writer::link('#', '<i class="fas fa-arrow-down"></i>', [
+                                'class' => 'btn btn-sm btn-outline-primary move-subject-down',
+                                'title' => 'Вниз',
+                                'data-relation-id' => $relationid,
+                                'style' => 'padding: 4px 8px;'
+                            ]);
+                            echo html_writer::end_div();
+                            echo html_writer::end_tag('td');
+                            
+                            echo html_writer::end_tag('tr');
+                        }
+                        
+                        echo html_writer::end_tag('tbody');
+                        echo html_writer::end_tag('table');
+                        echo html_writer::end_div();
+                    }
+                    
+                    echo html_writer::end_div();
+                    
+                    // JavaScript для изменения порядка
+                    echo html_writer::start_tag('script');
+                    echo "
+                    document.addEventListener('DOMContentLoaded', function() {
+                        var subjectsTbody = document.getElementById('subjects-tbody');
+                        if (!subjectsTbody) return;
+                        
+                        // Обработчики для кнопок вверх/вниз
+                        subjectsTbody.addEventListener('click', function(e) {
+                            var target = e.target.closest('.move-subject-up, .move-subject-down');
+                            if (!target) return;
+                            
+                            e.preventDefault();
+                            var row = target.closest('tr');
+                            var relationId = row.getAttribute('data-relation-id');
+                            var isUp = target.classList.contains('move-subject-up');
+                            
+                            // Находим соседнюю строку
+                            var siblingRow = isUp ? row.previousElementSibling : row.nextElementSibling;
+                            if (!siblingRow) return;
+                            
+                            var siblingRelationId = siblingRow.getAttribute('data-relation-id');
+                            
+                            // Меняем порядок через AJAX
+                            var xhr = new XMLHttpRequest();
+                            xhr.open('POST', '/local/deanpromoodle/pages/admin_ajax.php', true);
+                            xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                            xhr.onreadystatechange = function() {
+                                if (xhr.readyState === 4) {
+                                    if (xhr.status === 200) {
+                                        try {
+                                            var response = JSON.parse(xhr.responseText);
+                                            if (response.success) {
+                                                // Перезагружаем страницу для обновления порядка
+                                                window.location.reload();
+                                            } else {
+                                                alert('Ошибка: ' + (response.error || 'Неизвестная ошибка'));
+                                            }
+                                        } catch (e) {
+                                            alert('Ошибка при обработке ответа сервера');
+                                        }
+                                    } else {
+                                        alert('Ошибка при отправке запроса');
+                                    }
+                                }
+                            };
+                            xhr.send('action=changesubjectorder&relation_id=' + relationId + '&direction=' + (isUp ? 'up' : 'down') + '&sibling_relation_id=' + siblingRelationId);
+                        });
+                    });
+                    ";
+                    echo html_writer::end_tag('script');
+                }
+            } catch (\Exception $e) {
+                echo html_writer::div('Ошибка: ' . $e->getMessage(), 'alert alert-danger');
+            }
+        } else if ($action == 'create' || ($action == 'edit' && $programid > 0)) {
             // Создание или редактирование программы
             $program = null;
             $isedit = ($action == 'edit' && $programid > 0);
@@ -1952,6 +2182,14 @@ switch ($tab) {
                     // Действия
                     echo html_writer::start_tag('td');
                     echo html_writer::start_div('action-buttons');
+                    echo html_writer::link(
+                        new moodle_url('/local/deanpromoodle/pages/admin.php', ['tab' => 'programs', 'action' => 'view', 'programid' => $programid]),
+                        '<i class="fas fa-eye"></i>',
+                        [
+                            'class' => 'action-btn action-btn-view',
+                            'title' => 'Просмотр'
+                        ]
+                    );
                     echo html_writer::link(
                         new moodle_url('/local/deanpromoodle/pages/admin.php', ['tab' => 'programs', 'action' => 'edit', 'programid' => $programid]),
                         '<i class="fas fa-edit"></i>',
