@@ -1232,9 +1232,8 @@ switch ($tab) {
                     $fullnametext = (string)$fullnametext;
                 }
                 $fullnametext = htmlspecialchars($fullnametext, ENT_QUOTES, 'UTF-8');
-                // Финальная проверка перед использованием в html_writer::div
-                $fullnametext = is_string($fullnametext) ? $fullnametext : 'Без названия';
-                echo html_writer::div($fullnametext, ['class' => 'course-name-full']);
+                // Используем обычный HTML вместо html_writer::div() для избежания проблем с типами
+                echo '<div class="course-name-full">' . $fullnametext . '</div>';
                 if ($programshortname) {
                     $shortnametext = is_string($programshortname) ? $programshortname : (is_scalar($programshortname) ? (string)$programshortname : '');
                     if ($shortnametext) {
@@ -1243,10 +1242,9 @@ switch ($tab) {
                             $shortnametext = (string)$shortnametext;
                         }
                         $shortnametext = htmlspecialchars($shortnametext, ENT_QUOTES, 'UTF-8');
-                        // Финальная проверка перед использованием в html_writer::div
-                        $shortnametext = is_string($shortnametext) ? $shortnametext : '';
+                        // Используем обычный HTML вместо html_writer::div() для избежания проблем с типами
                         if ($shortnametext) {
-                            echo html_writer::div($shortnametext, ['class' => 'course-name-short']);
+                            echo '<div class="course-name-short">' . $shortnametext . '</div>';
                         }
                     }
                 }
