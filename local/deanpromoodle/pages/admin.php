@@ -969,6 +969,10 @@ switch ($tab) {
         // Проверяем существование таблиц БД
         try {
             $DB->get_records('local_deanpromoodle_programs', [], '', 'id', 0, 1);
+        } catch (dml_exception $e) {
+            echo html_writer::div('Таблицы программ еще не созданы. Пожалуйста, обновите плагин через админ-панель Moodle (Настройки сайта → Уведомления → Обновить).', 'alert alert-warning');
+            echo html_writer::end_div();
+            break;
         } catch (Exception $e) {
             echo html_writer::div('Таблицы программ еще не созданы. Пожалуйста, обновите плагин через админ-панель Moodle (Настройки сайта → Уведомления → Обновить).', 'alert alert-warning');
             echo html_writer::end_div();
@@ -1221,6 +1225,11 @@ switch ($tab) {
             $programs = [];
             try {
                 $programs = $DB->get_records('local_deanpromoodle_programs', null, 'name ASC');
+            } catch (dml_exception $e) {
+                // Таблица еще не создана - нужно обновить плагин
+                echo html_writer::div('Таблица программ еще не создана. Пожалуйста, обновите плагин через админ-панель Moodle (Настройки сайта → Уведомления → Обновить).', 'alert alert-warning');
+                echo html_writer::end_div();
+                break;
             } catch (Exception $e) {
                 // Таблица еще не создана - нужно обновить плагин
                 echo html_writer::div('Таблица программ еще не создана. Пожалуйста, обновите плагин через админ-панель Moodle (Настройки сайта → Уведомления → Обновить).', 'alert alert-warning');
