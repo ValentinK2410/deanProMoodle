@@ -1326,12 +1326,23 @@ switch ($tab) {
                         }
                     } catch (Exception $e) {
                         $categoryname = 'Без названия';
+                    } catch (Throwable $e) {
+                        $categoryname = 'Без названия';
                     }
                     // Финальная проверка - убеждаемся, что это строка
                     if (!is_string($categoryname)) {
-                        $categoryname = 'Без названия';
+                        if (is_array($categoryname)) {
+                            $categoryname = json_encode($categoryname, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                        } else {
+                            $categoryname = 'Без названия';
+                        }
                     }
-                    $namecell .= htmlspecialchars($categoryname, ENT_QUOTES, 'UTF-8');
+                    // Дополнительная проверка перед htmlspecialchars
+                    if (is_string($categoryname)) {
+                        $namecell .= htmlspecialchars($categoryname, ENT_QUOTES, 'UTF-8');
+                    } else {
+                        $namecell .= 'Без названия';
+                    }
                     // Убеждаемся, что namecell - строка перед использованием
                     $namecell = is_string($namecell) ? $namecell : (string)$namecell;
                     // Убеждаемся, что indentstyle - строка
