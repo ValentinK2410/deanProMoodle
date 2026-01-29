@@ -101,8 +101,13 @@ echo $OUTPUT->header();
 
 global $DB, $USER;
 
-// Получение списка преподавателей
+// Получение ID ролей преподавателей
 $teacherroleids = $DB->get_fieldset_select('role', 'id', "shortname IN ('teacher', 'editingteacher', 'manager')");
+if (empty($teacherroleids)) {
+    $teacherroleids = [];
+}
+
+// Получение списка преподавателей
 $teachers = [];
 if (!empty($teacherroleids)) {
     $systemcontext = context_system::instance();
