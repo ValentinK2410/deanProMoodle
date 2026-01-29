@@ -1276,11 +1276,13 @@ switch ($tab) {
                 if ($programgroupscount > 0 || $programstudentscount > 0) {
                     if ($programgroupscount > 0) {
                         $groupstext = '👥 ' . (string)$programgroupscount . ' группа' . ($programgroupscount > 1 ? 'ы' : '');
-                        echo html_writer::span($groupstext, ['class' => 'badge badge-group']);
+                        $groupstext = htmlspecialchars($groupstext, ENT_QUOTES, 'UTF-8');
+                        echo '<span class="badge badge-group">' . $groupstext . '</span>';
                     }
                     if ($programstudentscount > 0) {
                         $studentstext = '👤 ' . (string)$programstudentscount . ' студент' . ($programstudentscount > 1 ? 'ов' : '');
-                        echo html_writer::span($studentstext, ['class' => 'badge badge-student']);
+                        $studentstext = htmlspecialchars($studentstext, ENT_QUOTES, 'UTF-8');
+                        echo '<span class="badge badge-student">' . $studentstext . '</span>';
                     }
                 } else {
                     echo '-';
@@ -1289,7 +1291,7 @@ switch ($tab) {
                 
                 // Тип оплаты
                 echo html_writer::start_tag('td');
-                echo html_writer::span('🎁 Бесплатный', ['class' => 'badge badge-free']);
+                echo '<span class="badge badge-free">🎁 Бесплатный</span>';
                 echo html_writer::end_tag('td');
                 
                 // Цена
@@ -1300,9 +1302,9 @@ switch ($tab) {
                 // Статус
                 echo html_writer::start_tag('td');
                 if ($programvisible) {
-                    echo html_writer::span('✓ Активный', ['class' => 'badge badge-active']);
+                    echo '<span class="badge badge-active">✓ Активный</span>';
                 } else {
-                    echo html_writer::span('Скрыт', ['class' => 'badge', 'style' => 'background-color: #9e9e9e; color: white;']);
+                    echo '<span class="badge" style="background-color: #9e9e9e; color: white;">Скрыт</span>';
                 }
                 echo html_writer::end_tag('td');
                 
