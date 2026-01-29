@@ -967,14 +967,24 @@ switch ($tab) {
         echo html_writer::start_div('local-deanpromoodle-admin-content', ['style' => 'margin-bottom: 30px;']);
         
         // Проверяем существование таблиц БД
+        $tablesexist = false;
         try {
-            $DB->get_records('local_deanpromoodle_programs', [], '', 'id', 0, 1);
+            // Проверяем существование таблицы через простой запрос
+            $test = $DB->get_records('local_deanpromoodle_programs', [], '', 'id', 0, 1);
+            $tablesexist = true;
         } catch (dml_exception $e) {
-            echo html_writer::div('Таблицы программ еще не созданы. Пожалуйста, обновите плагин через админ-панель Moodle (Настройки сайта → Уведомления → Обновить).', 'alert alert-warning');
-            echo html_writer::end_div();
-            break;
+            $tablesexist = false;
+            $errormsg = $e->getMessage();
         } catch (Exception $e) {
+            $tablesexist = false;
+            $errormsg = $e->getMessage();
+        }
+        
+        if (!$tablesexist) {
             echo html_writer::div('Таблицы программ еще не созданы. Пожалуйста, обновите плагин через админ-панель Moodle (Настройки сайта → Уведомления → Обновить).', 'alert alert-warning');
+            if (isset($errormsg) && debugging('', DEBUG_DEVELOPER)) {
+                echo html_writer::div('Ошибка: ' . htmlspecialchars($errormsg, ENT_QUOTES, 'UTF-8'), 'alert alert-info', ['style' => 'font-size: 12px; margin-top: 10px;']);
+            }
             echo html_writer::end_div();
             break;
         }
@@ -1221,18 +1231,15 @@ switch ($tab) {
             echo html_writer::end_div();
             
             // Получение всех программ из таблицы local_deanpromoodle_programs
-            // Проверяем существование таблицы перед запросом
             $programs = [];
             try {
                 $programs = $DB->get_records('local_deanpromoodle_programs', null, 'name ASC');
             } catch (dml_exception $e) {
-                // Таблица еще не создана - нужно обновить плагин
-                echo html_writer::div('Таблица программ еще не создана. Пожалуйста, обновите плагин через админ-панель Moodle (Настройки сайта → Уведомления → Обновить).', 'alert alert-warning');
+                echo html_writer::div('Ошибка при получении программ из БД: ' . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8'), 'alert alert-danger');
                 echo html_writer::end_div();
                 break;
             } catch (Exception $e) {
-                // Таблица еще не создана - нужно обновить плагин
-                echo html_writer::div('Таблица программ еще не создана. Пожалуйста, обновите плагин через админ-панель Moodle (Настройки сайта → Уведомления → Обновить).', 'alert alert-warning');
+                echo html_writer::div('Ошибка при получении программ из БД: ' . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8'), 'alert alert-danger');
                 echo html_writer::end_div();
                 break;
             }
