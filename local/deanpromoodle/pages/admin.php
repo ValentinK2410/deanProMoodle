@@ -1253,8 +1253,22 @@ switch ($tab) {
                 
                 // Учебное заведение
                 echo html_writer::start_tag('td');
-                $categorynametext = is_string($programcategoryname) ? htmlspecialchars($programcategoryname, ENT_QUOTES, 'UTF-8') : 'Не указано';
-                echo html_writer::span($categorynametext, ['class' => 'badge badge-institution']);
+                // Безопасное преобразование названия категории
+                $categorynametext = '';
+                if (is_string($programcategoryname)) {
+                    $categorynametext = htmlspecialchars($programcategoryname, ENT_QUOTES, 'UTF-8');
+                } elseif (is_array($programcategoryname)) {
+                    $categorynametext = htmlspecialchars(implode(', ', array_filter($programcategoryname, 'is_string')), ENT_QUOTES, 'UTF-8');
+                    if (empty($categorynametext)) {
+                        $categorynametext = 'Не указано';
+                    }
+                } elseif (is_scalar($programcategoryname)) {
+                    $categorynametext = htmlspecialchars((string)$programcategoryname, ENT_QUOTES, 'UTF-8');
+                } else {
+                    $categorynametext = 'Не указано';
+                }
+                // Используем обычный HTML вместо html_writer::span() для избежания проблем с типами
+                echo '<span class="badge badge-institution">' . $categorynametext . '</span>';
                 echo html_writer::end_tag('td');
                 
                 // Связи
