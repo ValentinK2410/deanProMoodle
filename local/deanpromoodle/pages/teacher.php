@@ -320,14 +320,16 @@ switch ($tab) {
             $quizzes = get_all_instances_in_course('quiz', $course, false);
             
             foreach ($quizzes as $quiz) {
-                // Проверка, является ли это экзаменом (может потребоваться корректировка логики)
-                // Пока получаем все несданные попытки
+                // Получаем только несданные попытки (оценка меньше максимального балла)
+                // Сданные экзамены не показываются
                 $attempts = $DB->get_records_sql(
-                    "SELECT qa.*, u.firstname, u.lastname, u.email, u.id as userid, q.name as quizname
+                    "SELECT qa.*, u.firstname, u.lastname, u.email, u.id as userid, q.name as quizname, q.sumgrades as maxgrade
                      FROM {quiz_attempts} qa
                      JOIN {user} u ON u.id = qa.userid
                      JOIN {quiz} q ON q.id = qa.quiz
-                     WHERE qa.quiz = ? AND qa.state = 'finished' AND qa.sumgrades < q.sumgrades
+                     WHERE qa.quiz = ? 
+                     AND qa.state = 'finished' 
+                     AND qa.sumgrades < q.sumgrades
                      ORDER BY qa.timemodified DESC",
                     [$quiz->id]
                 );
@@ -391,15 +393,16 @@ switch ($tab) {
             echo html_writer::end_tag('thead');
             echo html_writer::start_tag('tbody');
             foreach ($paginated as $item) {
-                echo html_writer::start_tag('tr');
+                // Все записи в этой таблице - несданные экзамены, выделяем красным
+                echo html_writer::start_tag('tr', ['style' => 'background-color: #ffebee; color: #c62828;']);
                 echo html_writer::tag('td', htmlspecialchars($item->coursename));
                 echo html_writer::tag('td', htmlspecialchars($item->quizname));
                 echo html_writer::tag('td', htmlspecialchars($item->studentname));
-                echo html_writer::tag('td', $item->grade);
+                echo html_writer::tag('td', html_writer::tag('strong', $item->grade));
                 echo html_writer::tag('td', $item->attempted);
                 $reviewurl = new moodle_url('/mod/quiz/review.php', ['attempt' => $item->id]);
                 $reviewstr = 'Просмотр';
-                $actions = html_writer::link($reviewurl, $reviewstr, ['class' => 'btn btn-sm btn-primary', 'target' => '_blank']);
+                $actions = html_writer::link($reviewurl, $reviewstr, ['class' => 'btn btn-sm btn-danger', 'target' => '_blank']);
                 echo html_writer::tag('td', $actions);
                 echo html_writer::end_tag('tr');
             }
