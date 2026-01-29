@@ -1317,7 +1317,7 @@ switch ($tab) {
             }
         }
         
-        // Обработка просмотра программы
+        // Обработка просмотра программы (только просмотр, без изменения порядка)
         if ($action == 'view' && $programid > 0) {
             try {
                 $program = $DB->get_record('local_deanpromoodle_programs', ['id' => $programid]);
@@ -1426,7 +1426,6 @@ switch ($tab) {
                         echo html_writer::tag('th', 'Название');
                         echo html_writer::tag('th', 'Код', ['style' => 'width: 150px;']);
                         echo html_writer::tag('th', 'Краткое описание', ['style' => 'width: 200px;']);
-                        echo html_writer::tag('th', 'Действия', ['style' => 'width: 120px; text-align: center;']);
                         echo html_writer::end_tag('tr');
                         echo html_writer::end_tag('thead');
                         echo html_writer::start_tag('tbody', ['id' => 'subjects-tbody']);
@@ -1441,8 +1440,7 @@ switch ($tab) {
                             echo html_writer::start_tag('tr', [
                                 'data-subject-id' => $subject->id,
                                 'data-relation-id' => $relationid,
-                                'data-sortorder' => $sortorder,
-                                'style' => 'cursor: move;'
+                                'data-sortorder' => $sortorder
                             ]);
                             
                             // Порядок
@@ -1492,58 +1490,6 @@ switch ($tab) {
                     }
                     
                     echo html_writer::end_div();
-                    
-                    // JavaScript для изменения порядка
-                    echo html_writer::start_tag('script');
-                    echo "
-                    document.addEventListener('DOMContentLoaded', function() {
-                        var subjectsTbody = document.getElementById('subjects-tbody');
-                        if (!subjectsTbody) return;
-                        
-                        // Обработчики для кнопок вверх/вниз
-                        subjectsTbody.addEventListener('click', function(e) {
-                            var target = e.target.closest('.move-subject-up, .move-subject-down');
-                            if (!target) return;
-                            
-                            e.preventDefault();
-                            var row = target.closest('tr');
-                            var relationId = row.getAttribute('data-relation-id');
-                            var isUp = target.classList.contains('move-subject-up');
-                            
-                            // Находим соседнюю строку
-                            var siblingRow = isUp ? row.previousElementSibling : row.nextElementSibling;
-                            if (!siblingRow) return;
-                            
-                            var siblingRelationId = siblingRow.getAttribute('data-relation-id');
-                            
-                            // Меняем порядок через AJAX
-                            var xhr = new XMLHttpRequest();
-                            xhr.open('POST', '/local/deanpromoodle/pages/admin_ajax.php', true);
-                            xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-                            xhr.onreadystatechange = function() {
-                                if (xhr.readyState === 4) {
-                                    if (xhr.status === 200) {
-                                        try {
-                                            var response = JSON.parse(xhr.responseText);
-                                            if (response.success) {
-                                                // Перезагружаем страницу для обновления порядка
-                                                window.location.reload();
-                                            } else {
-                                                alert('Ошибка: ' + (response.error || 'Неизвестная ошибка'));
-                                            }
-                                        } catch (e) {
-                                            alert('Ошибка при обработке ответа сервера');
-                                        }
-                                    } else {
-                                        alert('Ошибка при отправке запроса');
-                                    }
-                                }
-                            };
-                            xhr.send('action=changesubjectorder&relation_id=' + relationId + '&direction=' + (isUp ? 'up' : 'down') + '&sibling_relation_id=' + siblingRelationId);
-                        });
-                    });
-                    ";
-                    echo html_writer::end_tag('script');
                 }
             } catch (\Exception $e) {
                 echo html_writer::div('Ошибка: ' . $e->getMessage(), 'alert alert-danger');
@@ -1574,7 +1520,7 @@ switch ($tab) {
                 $description = optional_param('description', '', PARAM_RAW);
                 $institution = optional_param('institution', '', PARAM_TEXT);
                 $visible = optional_param('visible', 1, PARAM_INT);
-                $selectedsubjects = optional_param_array('subjects', [], PARAM_INT);
+                $subjectsorder = optional_param('subjects_order', '', PARAM_TEXT);
                 
                 if (empty($name)) {
                     echo html_writer::div('Название программы обязательно для заполнения.', 'alert alert-danger');
@@ -1593,26 +1539,89 @@ switch ($tab) {
                             $data->id = $programid;
                             $DB->update_record('local_deanpromoodle_programs', $data);
                             $programid = $data->id;
-                            
-                            // Удаляем старые связи с предметами
-                            $DB->delete_records('local_deanpromoodle_program_subjects', ['programid' => $programid]);
                         } else {
                             $data->timecreated = time();
                             $programid = $DB->insert_record('local_deanpromoodle_programs', $data);
                         }
                         
-                        // Добавляем связи с предметами
-                        if (!empty($selectedsubjects)) {
+                        // Обрабатываем предметы из скрытого поля (формат: "relation_id:subject_id,relation_id:subject_id")
+                        // relation_id может быть числом (существующая связь) или строкой вида "new_123" (новая связь)
+                        if ($isedit) {
+                            // Получаем текущие связи
+                            $currentrelations = $DB->get_records('local_deanpromoodle_program_subjects', ['programid' => $programid]);
+                            $currentrelationids = array_keys($currentrelations);
+                            
+                            // Парсим строку с порядком предметов
+                            $subjectsarray = [];
+                            if (!empty($subjectsorder)) {
+                                $parts = explode(',', $subjectsorder);
+                                foreach ($parts as $part) {
+                                    $part = trim($part);
+                                    if (empty($part)) continue;
+                                    $subparts = explode(':', $part);
+                                    if (count($subparts) == 2) {
+                                        $subjectsarray[] = [
+                                            'relation_id' => $subparts[0], // Может быть числом или строкой "new_XXX"
+                                            'subject_id' => (int)$subparts[1]
+                                        ];
+                                    }
+                                }
+                            }
+                            
+                            // Обновляем порядок существующих связей и добавляем новые
                             $sortorder = 0;
-                            foreach ($selectedsubjects as $subjectid) {
-                                if ($subjectid > 0) {
+                            $usedrelationids = [];
+                            foreach ($subjectsarray as $item) {
+                                $relationidstr = $item['relation_id'];
+                                
+                                // Проверяем, является ли это новой связью (начинается с "new_")
+                                if (strpos($relationidstr, 'new_') === 0) {
+                                    // Создаем новую связь
                                     $psdata = new stdClass();
                                     $psdata->programid = $programid;
-                                    $psdata->subjectid = $subjectid;
+                                    $psdata->subjectid = $item['subject_id'];
                                     $psdata->sortorder = $sortorder++;
                                     $psdata->timecreated = time();
                                     $psdata->timemodified = time();
                                     $DB->insert_record('local_deanpromoodle_program_subjects', $psdata);
+                                } else {
+                                    // Обновляем существующую связь
+                                    $relationid = (int)$relationidstr;
+                                    if ($relationid > 0 && in_array($relationid, $currentrelationids)) {
+                                        $psdata = new stdClass();
+                                        $psdata->id = $relationid;
+                                        $psdata->sortorder = $sortorder++;
+                                        $psdata->timemodified = time();
+                                        $DB->update_record('local_deanpromoodle_program_subjects', $psdata);
+                                        $usedrelationids[] = $relationid;
+                                    }
+                                }
+                            }
+                            
+                            // Удаляем связи, которых нет в новом списке
+                            $todelete = array_diff($currentrelationids, $usedrelationids);
+                            if (!empty($todelete)) {
+                                list($sql, $params) = $DB->get_in_or_equal($todelete);
+                                $DB->delete_records_select('local_deanpromoodle_program_subjects', "id $sql", $params);
+                            }
+                        } else {
+                            // При создании новой программы добавляем предметы
+                            if (!empty($subjectsorder)) {
+                                $parts = explode(',', $subjectsorder);
+                                $sortorder = 0;
+                                foreach ($parts as $part) {
+                                    $part = trim($part);
+                                    if (empty($part)) continue;
+                                    $subparts = explode(':', $part);
+                                    if (count($subparts) == 2 && (int)$subparts[1] > 0) {
+                                        $psdata = new stdClass();
+                                        $psdata->programid = $programid;
+                                        $psdata->subjectid = (int)$subparts[1];
+                                        $psdata->sortorder = $sortorder++;
+                                        $psdata->timecreated = time();
+                                        $psdata->timemodified = time();
+                                        $DB->insert_record('local_deanpromoodle_program_subjects', $psdata);
+                                    }
                                 }
                             }
                         }
@@ -1628,23 +1637,20 @@ switch ($tab) {
                 }
             }
             
-            // Получаем все предметы для выбора
-            try {
-                $allsubjects = $DB->get_records('local_deanpromoodle_subjects', ['visible' => 1], 'sortorder ASC, name ASC');
-            } catch (\Exception $e) {
-                $allsubjects = [];
-            }
-            $selectedsubjectids = [];
+            // Получаем предметы программы с порядком
+            $programsubjects = [];
             if ($isedit && $program) {
                 try {
-                    $selectedsubjectids = $DB->get_fieldset_select(
-                        'local_deanpromoodle_program_subjects',
-                        'subjectid',
-                        'programid = ?',
+                    $programsubjects = $DB->get_records_sql(
+                        "SELECT s.id, s.name, s.code, s.shortdescription, ps.sortorder, ps.id as relation_id
+                         FROM {local_deanpromoodle_program_subjects} ps
+                         JOIN {local_deanpromoodle_subjects} s ON s.id = ps.subjectid
+                         WHERE ps.programid = ?
+                         ORDER BY ps.sortorder ASC",
                         [$programid]
                     );
                 } catch (\Exception $e) {
-                    $selectedsubjectids = [];
+                    $programsubjects = [];
                 }
             }
             
@@ -1739,33 +1745,104 @@ switch ($tab) {
             );
             echo html_writer::end_div();
             
-            // Выбор предметов
+            // Предметы программы
             echo html_writer::start_div('form-group', ['style' => 'margin-bottom: 15px;']);
-            echo html_writer::label('Предметы программы', 'subjects');
-            echo html_writer::start_div('', ['style' => 'max-height: 300px; overflow-y: auto; border: 1px solid #ced4da; border-radius: 4px; padding: 10px;']);
-            if (empty($allsubjects)) {
-                echo html_writer::div('Предметы не найдены. Сначала создайте предметы на вкладке "Предметы".', 'text-muted');
+            echo html_writer::start_div('', ['style' => 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;']);
+            echo html_writer::label('Предметы программы', 'subjects', ['style' => 'margin: 0;']);
+            echo html_writer::link('#', '<i class="fas fa-plus"></i> Добавить предмет', [
+                'class' => 'btn btn-sm btn-success',
+                'id' => 'add-subject-to-program-btn',
+                'style' => 'text-decoration: none;'
+            ]);
+            echo html_writer::end_div();
+            
+            // Скрытое поле для хранения ID предметов в правильном порядке
+            echo html_writer::empty_tag('input', [
+                'type' => 'hidden',
+                'name' => 'subjects_order',
+                'id' => 'subjects-order',
+                'value' => ''
+            ]);
+            
+            // Список предметов программы
+            echo html_writer::start_div('program-subjects-list', [
+                'id' => 'program-subjects-list',
+                'style' => 'min-height: 100px; border: 1px solid #ced4da; border-radius: 4px; padding: 10px; background: #f8f9fa;'
+            ]);
+            
+            if (empty($programsubjects)) {
+                echo html_writer::div('Предметы не добавлены. Нажмите "Добавить предмет" для добавления.', 'text-muted', ['style' => 'padding: 20px; text-align: center;']);
             } else {
-                foreach ($allsubjects as $subject) {
-                    $checked = in_array($subject->id, $selectedsubjectids) ? 'checked' : '';
-                    echo html_writer::start_div('form-check', ['style' => 'margin-bottom: 8px;']);
-                    echo html_writer::empty_tag('input', [
-                        'type' => 'checkbox',
-                        'name' => 'subjects[]',
-                        'id' => 'subject-' . $subject->id,
-                        'value' => $subject->id,
-                        'class' => 'form-check-input',
-                        'checked' => $checked
+                echo html_writer::start_tag('table', ['class' => 'table table-sm', 'style' => 'margin: 0; background: white;']);
+                echo html_writer::start_tag('thead');
+                echo html_writer::start_tag('tr');
+                echo html_writer::tag('th', 'Порядок', ['style' => 'width: 80px; text-align: center;']);
+                echo html_writer::tag('th', 'Название');
+                echo html_writer::tag('th', 'Код', ['style' => 'width: 150px;']);
+                echo html_writer::tag('th', 'Действия', ['style' => 'width: 150px; text-align: center;']);
+                echo html_writer::end_tag('tr');
+                echo html_writer::end_tag('thead');
+                echo html_writer::start_tag('tbody', ['id' => 'program-subjects-tbody']);
+                
+                foreach ($programsubjects as $subject) {
+                    $subjectname = is_string($subject->name) ? $subject->name : (string)$subject->name;
+                    $subjectcode = is_string($subject->code) ? $subject->code : '';
+                    $sortorder = (int)$subject->sortorder;
+                    $relationid = (int)$subject->relation_id;
+                    
+                    echo html_writer::start_tag('tr', [
+                        'data-subject-id' => $subject->id,
+                        'data-relation-id' => $relationid,
+                        'data-sortorder' => $sortorder
                     ]);
-                    echo html_writer::label(
-                        htmlspecialchars($subject->name, ENT_QUOTES, 'UTF-8') . 
-                        ($subject->code ? ' (' . htmlspecialchars($subject->code, ENT_QUOTES, 'UTF-8') . ')' : ''),
-                        'subject-' . $subject->id,
-                        ['class' => 'form-check-label']
-                    );
+                    
+                    // Порядок
+                    echo html_writer::start_tag('td', ['style' => 'text-align: center; vertical-align: middle;']);
+                    echo html_writer::tag('span', $sortorder + 1, ['class' => 'badge', 'style' => 'background-color: #6c757d; color: white;']);
+                    echo html_writer::end_tag('td');
+                    
+                    // Название
+                    echo html_writer::start_tag('td');
+                    echo htmlspecialchars($subjectname, ENT_QUOTES, 'UTF-8');
+                    echo html_writer::end_tag('td');
+                    
+                    // Код
+                    echo html_writer::start_tag('td');
+                    echo $subjectcode ? htmlspecialchars($subjectcode, ENT_QUOTES, 'UTF-8') : '-';
+                    echo html_writer::end_tag('td');
+                    
+                    // Действия
+                    echo html_writer::start_tag('td', ['style' => 'text-align: center;']);
+                    echo html_writer::start_div('', ['style' => 'display: flex; gap: 5px; justify-content: center;']);
+                    echo html_writer::link('#', '<i class="fas fa-arrow-up"></i>', [
+                        'class' => 'btn btn-sm btn-outline-primary move-subject-up',
+                        'title' => 'Вверх',
+                        'data-relation-id' => $relationid,
+                        'style' => 'padding: 4px 8px;'
+                    ]);
+                    echo html_writer::link('#', '<i class="fas fa-arrow-down"></i>', [
+                        'class' => 'btn btn-sm btn-outline-primary move-subject-down',
+                        'title' => 'Вниз',
+                        'data-relation-id' => $relationid,
+                        'style' => 'padding: 4px 8px;'
+                    ]);
+                    echo html_writer::link('#', '<i class="fas fa-times"></i>', [
+                        'class' => 'btn btn-sm btn-outline-danger remove-subject',
+                        'title' => 'Удалить',
+                        'data-subject-id' => $subject->id,
+                        'data-relation-id' => $relationid,
+                        'style' => 'padding: 4px 8px;'
+                    ]);
                     echo html_writer::end_div();
+                    echo html_writer::end_tag('td');
+                    
+                    echo html_writer::end_tag('tr');
                 }
+                
+                echo html_writer::end_tag('tbody');
+                echo html_writer::end_tag('table');
             }
+            
             echo html_writer::end_div();
             echo html_writer::end_div();
             
@@ -1803,6 +1880,357 @@ switch ($tab) {
             echo html_writer::end_div();
             
             echo html_writer::end_tag('form');
+            
+            // Модальное окно для добавления предметов
+            echo html_writer::start_div('modal', [
+                'id' => 'add-subject-modal',
+                'style' => 'display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5);'
+            ]);
+            echo html_writer::start_div('modal-content', [
+                'style' => 'background-color: #fefefe; margin: 5% auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 600px; border-radius: 8px;'
+            ]);
+            echo html_writer::start_div('', ['style' => 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;']);
+            echo html_writer::tag('h3', 'Добавить предмет', ['style' => 'margin: 0;']);
+            echo html_writer::link('#', '<i class="fas fa-times"></i>', [
+                'class' => 'close-modal',
+                'style' => 'font-size: 28px; font-weight: bold; color: #aaa; text-decoration: none; cursor: pointer;'
+            ]);
+            echo html_writer::end_div();
+            
+            // Поиск предметов
+            echo html_writer::start_div('form-group');
+            echo html_writer::label('Поиск предмета', 'subject-search');
+            echo html_writer::empty_tag('input', [
+                'type' => 'text',
+                'id' => 'subject-search',
+                'class' => 'form-control',
+                'placeholder' => 'Введите название или код предмета...',
+                'style' => 'margin-bottom: 15px;'
+            ]);
+            echo html_writer::end_div();
+            
+            // Список предметов
+            echo html_writer::start_div('', [
+                'id' => 'subjects-list-modal',
+                'style' => 'max-height: 400px; overflow-y: auto; border: 1px solid #ced4da; border-radius: 4px; padding: 10px;'
+            ]);
+            echo html_writer::div('Загрузка предметов...', 'text-muted', ['style' => 'padding: 20px; text-align: center;']);
+            echo html_writer::end_div();
+            
+            echo html_writer::end_div();
+            echo html_writer::end_div();
+            
+            // JavaScript для работы с предметами
+            echo html_writer::start_tag('script');
+            echo "
+            (function() {
+                var programId = " . ($isedit ? $programid : 0) . ";
+                var isEdit = " . ($isedit ? 'true' : 'false') . ";
+                var nextRelationId = " . ($isedit && !empty($programsubjects) ? (max(array_map(function($s) { return $s->relation_id; }, $programsubjects)) + 1) : 1) . ";
+                
+                // Функция обновления скрытого поля с порядком предметов
+                function updateSubjectsOrder() {
+                    var tbody = document.getElementById('program-subjects-tbody');
+                    if (!tbody) {
+                        document.getElementById('subjects-order').value = '';
+                        return;
+                    }
+                    
+                    var rows = tbody.querySelectorAll('tr');
+                    var order = [];
+                    rows.forEach(function(row, index) {
+                        var relationId = row.getAttribute('data-relation-id');
+                        var subjectId = row.getAttribute('data-subject-id');
+                        if (relationId && subjectId) {
+                            order.push(relationId + ':' + subjectId);
+                        }
+                    });
+                    document.getElementById('subjects-order').value = order.join(',');
+                }
+                
+                // Функция обновления номеров порядка в таблице
+                function updateOrderNumbers() {
+                    var tbody = document.getElementById('program-subjects-tbody');
+                    if (!tbody) return;
+                    
+                    var rows = tbody.querySelectorAll('tr');
+                    rows.forEach(function(row, index) {
+                        var badge = row.querySelector('.badge');
+                        if (badge) {
+                            badge.textContent = index + 1;
+                        }
+                        row.setAttribute('data-sortorder', index);
+                    });
+                    updateSubjectsOrder();
+                }
+                
+                // Функция добавления предмета в таблицу
+                function addSubjectToTable(subject) {
+                    var tbody = document.getElementById('program-subjects-tbody');
+                    var listDiv = document.getElementById('program-subjects-list');
+                    
+                    // Если таблицы нет, создаем её
+                    if (!tbody) {
+                        listDiv.innerHTML = '';
+                        var table = document.createElement('table');
+                        table.className = 'table table-sm';
+                        table.style.margin = '0';
+                        table.style.background = 'white';
+                        
+                        var thead = document.createElement('thead');
+                        var headerRow = document.createElement('tr');
+                        ['Порядок', 'Название', 'Код', 'Действия'].forEach(function(text) {
+                            var th = document.createElement('th');
+                            th.textContent = text;
+                            if (text === 'Порядок' || text === 'Действия') {
+                                th.style.textAlign = 'center';
+                                th.style.width = text === 'Порядок' ? '80px' : '150px';
+                            } else if (text === 'Код') {
+                                th.style.width = '150px';
+                            }
+                            headerRow.appendChild(th);
+                        });
+                        thead.appendChild(headerRow);
+                        table.appendChild(thead);
+                        
+                        tbody = document.createElement('tbody');
+                        tbody.id = 'program-subjects-tbody';
+                        table.appendChild(tbody);
+                        listDiv.appendChild(table);
+                    }
+                    
+                    // Проверяем, не добавлен ли уже этот предмет
+                    var existingRow = tbody.querySelector('tr[data-subject-id=\"' + subject.id + '\"]');
+                    if (existingRow) {
+                        alert('Этот предмет уже добавлен в программу');
+                        return;
+                    }
+                    
+                    // Создаем новую строку
+                    var row = document.createElement('tr');
+                    var relationId = isEdit && subject.relation_id ? subject.relation_id : ('new_' + (nextRelationId++));
+                    row.setAttribute('data-subject-id', subject.id);
+                    row.setAttribute('data-relation-id', relationId);
+                    row.setAttribute('data-sortorder', tbody.querySelectorAll('tr').length);
+                    
+                    // Порядок
+                    var tdOrder = document.createElement('td');
+                    tdOrder.style.textAlign = 'center';
+                    tdOrder.style.verticalAlign = 'middle';
+                    var badge = document.createElement('span');
+                    badge.className = 'badge';
+                    badge.style.cssText = 'background-color: #6c757d; color: white;';
+                    badge.textContent = tbody.querySelectorAll('tr').length + 1;
+                    tdOrder.appendChild(badge);
+                    row.appendChild(tdOrder);
+                    
+                    // Название
+                    var tdName = document.createElement('td');
+                    tdName.textContent = subject.name;
+                    row.appendChild(tdName);
+                    
+                    // Код
+                    var tdCode = document.createElement('td');
+                    tdCode.textContent = subject.code || '-';
+                    row.appendChild(tdCode);
+                    
+                    // Действия
+                    var tdActions = document.createElement('td');
+                    tdActions.style.textAlign = 'center';
+                    var actionsDiv = document.createElement('div');
+                    actionsDiv.style.cssText = 'display: flex; gap: 5px; justify-content: center;';
+                    
+                    var btnUp = document.createElement('a');
+                    btnUp.href = '#';
+                    btnUp.className = 'btn btn-sm btn-outline-primary move-subject-up';
+                    btnUp.title = 'Вверх';
+                    btnUp.setAttribute('data-relation-id', relationId);
+                    btnUp.style.padding = '4px 8px';
+                    btnUp.innerHTML = '<i class=\"fas fa-arrow-up\"></i>';
+                    actionsDiv.appendChild(btnUp);
+                    
+                    var btnDown = document.createElement('a');
+                    btnDown.href = '#';
+                    btnDown.className = 'btn btn-sm btn-outline-primary move-subject-down';
+                    btnDown.title = 'Вниз';
+                    btnDown.setAttribute('data-relation-id', relationId);
+                    btnDown.style.padding = '4px 8px';
+                    btnDown.innerHTML = '<i class=\"fas fa-arrow-down\"></i>';
+                    actionsDiv.appendChild(btnDown);
+                    
+                    var btnRemove = document.createElement('a');
+                    btnRemove.href = '#';
+                    btnRemove.className = 'btn btn-sm btn-outline-danger remove-subject';
+                    btnRemove.title = 'Удалить';
+                    btnRemove.setAttribute('data-subject-id', subject.id);
+                    btnRemove.setAttribute('data-relation-id', relationId);
+                    btnRemove.style.padding = '4px 8px';
+                    btnRemove.innerHTML = '<i class=\"fas fa-times\"></i>';
+                    actionsDiv.appendChild(btnRemove);
+                    
+                    tdActions.appendChild(actionsDiv);
+                    row.appendChild(tdActions);
+                    
+                    tbody.appendChild(row);
+                    updateOrderNumbers();
+                }
+                
+                // Обработчик кнопки "Добавить предмет"
+                var addSubjectBtn = document.getElementById('add-subject-to-program-btn');
+                if (addSubjectBtn) {
+                    addSubjectBtn.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        document.getElementById('add-subject-modal').style.display = 'block';
+                        loadSubjectsList();
+                    });
+                }
+                
+                // Закрытие модального окна
+                var modal = document.getElementById('add-subject-modal');
+                var closeBtn = modal.querySelector('.close-modal');
+                if (closeBtn) {
+                    closeBtn.addEventListener('click', function() {
+                        modal.style.display = 'none';
+                    });
+                }
+                window.addEventListener('click', function(e) {
+                    if (e.target === modal) {
+                        modal.style.display = 'none';
+                    }
+                });
+                
+                // Загрузка списка предметов
+                function loadSubjectsList(search) {
+                    var xhr = new XMLHttpRequest();
+                    xhr.open('POST', '/local/deanpromoodle/pages/admin_ajax.php', true);
+                    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                    xhr.onreadystatechange = function() {
+                        if (xhr.readyState === 4 && xhr.status === 200) {
+                            try {
+                                var response = JSON.parse(xhr.responseText);
+                                if (response.success) {
+                                    displaySubjectsList(response.subjects || []);
+                                } else {
+                                    document.getElementById('subjects-list-modal').innerHTML = '<div class=\"text-muted\" style=\"padding: 20px; text-align: center;\">Ошибка: ' + (response.error || 'Неизвестная ошибка') + '</div>';
+                                }
+                            } catch (e) {
+                                document.getElementById('subjects-list-modal').innerHTML = '<div class=\"text-muted\" style=\"padding: 20px; text-align: center;\">Ошибка при обработке ответа</div>';
+                            }
+                        }
+                    };
+                    var params = 'action=getsubjects';
+                    if (programId > 0) {
+                        params += '&programid=' + programId;
+                    }
+                    if (search) {
+                        params += '&search=' + encodeURIComponent(search);
+                    }
+                    xhr.send(params);
+                }
+                
+                // Отображение списка предметов в модальном окне
+                function displaySubjectsList(subjects) {
+                    var container = document.getElementById('subjects-list-modal');
+                    if (!subjects || subjects.length === 0) {
+                        container.innerHTML = '<div class=\"text-muted\" style=\"padding: 20px; text-align: center;\">Предметы не найдены</div>';
+                        return;
+                    }
+                    
+                    // Получаем уже добавленные предметы
+                    var tbody = document.getElementById('program-subjects-tbody');
+                    var addedSubjectIds = [];
+                    if (tbody) {
+                        var rows = tbody.querySelectorAll('tr');
+                        rows.forEach(function(row) {
+                            addedSubjectIds.push(parseInt(row.getAttribute('data-subject-id')));
+                        });
+                    }
+                    
+                    var html = '';
+                    subjects.forEach(function(subject) {
+                        var isAdded = addedSubjectIds.indexOf(parseInt(subject.id)) !== -1;
+                        html += '<div class=\"subject-item\" style=\"padding: 10px; border-bottom: 1px solid #eee; cursor: pointer; ' + (isAdded ? 'opacity: 0.5;' : '') + '\" data-subject-id=\"' + subject.id + '\">';
+                        html += '<strong>' + escapeHtml(subject.name) + '</strong>';
+                        if (subject.code) {
+                            html += ' <span style=\"color: #666;\">(' + escapeHtml(subject.code) + ')</span>';
+                        }
+                        if (isAdded) {
+                            html += ' <span style=\"color: #28a745;\">(уже добавлен)</span>';
+                        }
+                        html += '</div>';
+                    });
+                    container.innerHTML = html;
+                    
+                    // Обработчики клика на предметы
+                    container.querySelectorAll('.subject-item').forEach(function(item) {
+                        if (item.style.opacity !== '0.5') {
+                            item.addEventListener('click', function() {
+                                var subjectId = parseInt(this.getAttribute('data-subject-id'));
+                                var subject = subjects.find(function(s) { return parseInt(s.id) === subjectId; });
+                                if (subject) {
+                                    addSubjectToTable(subject);
+                                    modal.style.display = 'none';
+                                }
+                            });
+                        }
+                    });
+                }
+                
+                // Поиск предметов
+                var searchInput = document.getElementById('subject-search');
+                if (searchInput) {
+                    var searchTimeout;
+                    searchInput.addEventListener('input', function() {
+                        clearTimeout(searchTimeout);
+                        var search = this.value.trim();
+                        searchTimeout = setTimeout(function() {
+                            loadSubjectsList(search);
+                        }, 300);
+                    });
+                }
+                
+                // Обработчики изменения порядка и удаления
+                var tbody = document.getElementById('program-subjects-tbody');
+                if (tbody) {
+                    tbody.addEventListener('click', function(e) {
+                        var target = e.target.closest('.move-subject-up, .move-subject-down, .remove-subject');
+                        if (!target) return;
+                        
+                        e.preventDefault();
+                        var row = target.closest('tr');
+                        if (!row) return;
+                        
+                        if (target.classList.contains('remove-subject')) {
+                            // Удаление предмета
+                            row.remove();
+                            updateOrderNumbers();
+                        } else {
+                            // Изменение порядка
+                            var isUp = target.classList.contains('move-subject-up');
+                            var siblingRow = isUp ? row.previousElementSibling : row.nextElementSibling;
+                            if (!siblingRow) return;
+                            
+                            if (isUp) {
+                                tbody.insertBefore(row, siblingRow);
+                            } else {
+                                tbody.insertBefore(siblingRow, row.nextSibling);
+                            }
+                            updateOrderNumbers();
+                        }
+                    });
+                }
+                
+                // Инициализация порядка при загрузке страницы
+                updateSubjectsOrder();
+                
+                function escapeHtml(text) {
+                    var div = document.createElement('div');
+                    div.textContent = text;
+                    return div.innerHTML;
+                }
+            })();
+            ";
+            echo html_writer::end_tag('script');
             
         } else {
             // Список программ

@@ -621,19 +621,9 @@ if ($action == 'getteachercourses' && $teacherid > 0) {
     }
     
     // Исключаем предметы, уже прикрепленные к программе, если указан programid
-    if ($programid > 0 && !empty($subjects)) {
-        $attachedsubjectids = $DB->get_fieldset_select(
-            'local_deanpromoodle_program_subjects',
-            'subjectid',
-            'programid = ?',
-            [$programid]
-        );
-        if (!empty($attachedsubjectids)) {
-            $subjects = array_filter($subjects, function($subject) use ($attachedsubjectids) {
-                return !in_array($subject->id, $attachedsubjectids);
-            });
-        }
-    }
+    // Примечание: при редактировании программы мы не исключаем уже добавленные предметы,
+    // так как пользователь может видеть их в модальном окне (они будут помечены как "уже добавлен")
+    // Это позволяет видеть полный список предметов для выбора
     
     $formattedsubjects = [];
     foreach ($subjects as $subject) {
