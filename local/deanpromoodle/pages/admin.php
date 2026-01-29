@@ -139,6 +139,110 @@ $tabs[] = new tabobject('categories',
 
 echo $OUTPUT->tabtree($tabs, $tab);
 
+// Глобальные стили для кнопок действий во всех таблицах
+echo html_writer::start_tag('style');
+echo "
+    .action-buttons {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+    }
+    .action-btn {
+        width: 44px;
+        height: 44px;
+        border: 2px solid transparent;
+        border-radius: 10px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.25s ease;
+        box-shadow: 0 3px 10px rgba(0,0,0,0.15);
+        position: relative;
+        overflow: hidden;
+        color: black;
+        text-shadow: 0 1px 2px rgba(255,255,255,0.5);
+        -webkit-font-smoothing: antialiased;
+    }
+    .action-btn span {
+        filter: brightness(0);
+        display: inline-block;
+    }
+    .action-btn i.fas,
+    .action-btn i.far,
+    .action-btn i.fab {
+        filter: none;
+        color: white;
+        font-size: 18px;
+    }
+    .action-btn::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+        transition: left 0.5s;
+    }
+    .action-btn:hover::after {
+        left: 100%;
+    }
+    .action-btn:hover {
+        transform: translateY(-3px) scale(1.08);
+        box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+        border-color: rgba(255,255,255,0.5);
+    }
+    .action-btn:active {
+        transform: translateY(-1px) scale(1.02);
+        box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+    }
+    .action-btn-view {
+        background: #3b82f6;
+        color: white;
+    }
+    .action-btn-view:hover {
+        background: #2563eb;
+        border-color: rgba(255,255,255,0.3);
+    }
+    .action-btn-edit {
+        background: #f59e0b;
+        color: white;
+    }
+    .action-btn-edit:hover {
+        background: #d97706;
+        border-color: rgba(255,255,255,0.3);
+    }
+    .action-btn-copy {
+        background: #8b5cf6;
+        color: white;
+    }
+    .action-btn-copy:hover {
+        background: #7c3aed;
+        border-color: rgba(255,255,255,0.3);
+    }
+    .action-btn-delete {
+        background: #ef4444;
+        color: white;
+    }
+    .action-btn-delete:hover {
+        background: #dc2626;
+        border-color: rgba(255,255,255,0.3);
+    }
+    .action-btn-link {
+        background: #10b981;
+        color: white;
+    }
+    .action-btn-link:hover {
+        background: #059669;
+        border-color: rgba(255,255,255,0.3);
+    }
+";
+echo html_writer::end_tag('style');
+
 // Получение ID ролей преподавателей
 $teacherroleids = $DB->get_fieldset_select('role', 'id', "shortname IN ('teacher', 'editingteacher', 'manager')");
 if (empty($teacherroleids)) {
@@ -2002,42 +2106,6 @@ switch ($tab) {
                     background-color: #4caf50;
                     color: white;
                 }
-                .action-buttons {
-                    display: flex;
-                    gap: 8px;
-                    align-items: center;
-                }
-                .action-btn {
-                    width: 44px;
-                    height: 44px;
-                    border: 2px solid transparent;
-                    border-radius: 10px;
-                    cursor: pointer;
-                    display: inline-flex;
-                    align-items: center;
-                    justify-content: center;
-                    font-size: 20px;
-                    font-weight: 600;
-                    text-decoration: none;
-                    transition: all 0.25s ease;
-                    box-shadow: 0 3px 10px rgba(0,0,0,0.15);
-                    position: relative;
-                    overflow: hidden;
-                    color: black;
-                    text-shadow: 0 1px 2px rgba(255,255,255,0.5);
-                    -webkit-font-smoothing: antialiased;
-                }
-                .action-btn span {
-                    filter: brightness(0);
-                    display: inline-block;
-                }
-                .action-btn i.fas,
-                .action-btn i.far,
-                .action-btn i.fab {
-                    filter: none;
-                    color: white;
-                    font-size: 18px;
-                }
                 .badge i.fas,
                 .badge i.far,
                 .badge i.fab {
@@ -2047,68 +2115,6 @@ switch ($tab) {
                 .btn i.far,
                 .btn i.fab {
                     margin-right: 6px;
-                }
-                .action-btn::after {
-                    content: '';
-                    position: absolute;
-                    top: 0;
-                    left: -100%;
-                    width: 100%;
-                    height: 100%;
-                    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
-                    transition: left 0.5s;
-                }
-                .action-btn:hover::after {
-                    left: 100%;
-                }
-                .action-btn:hover {
-                    transform: translateY(-3px) scale(1.08);
-                    box-shadow: 0 6px 20px rgba(0,0,0,0.25);
-                    border-color: rgba(255,255,255,0.5);
-                }
-                .action-btn:active {
-                    transform: translateY(-1px) scale(1.02);
-                    box-shadow: 0 3px 10px rgba(0,0,0,0.2);
-                }
-                .action-btn-view {
-                    background: #3b82f6;
-                    color: white;
-                }
-                .action-btn-view:hover {
-                    background: #2563eb;
-                    border-color: rgba(255,255,255,0.3);
-                }
-                .action-btn-edit {
-                    background: #f59e0b;
-                    color: white;
-                }
-                .action-btn-edit:hover {
-                    background: #d97706;
-                    border-color: rgba(255,255,255,0.3);
-                }
-                .action-btn-copy {
-                    background: #8b5cf6;
-                    color: white;
-                }
-                .action-btn-copy:hover {
-                    background: #7c3aed;
-                    border-color: rgba(255,255,255,0.3);
-                }
-                .action-btn-delete {
-                    background: #ef4444;
-                    color: white;
-                }
-                .action-btn-delete:hover {
-                    background: #dc2626;
-                    border-color: rgba(255,255,255,0.3);
-                }
-                .action-btn-link {
-                    background: #10b981;
-                    color: white;
-                }
-                .action-btn-link:hover {
-                    background: #059669;
-                    border-color: rgba(255,255,255,0.3);
                 }
             ";
             echo html_writer::end_tag('style');
