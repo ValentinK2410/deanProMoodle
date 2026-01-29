@@ -1463,24 +1463,6 @@ switch ($tab) {
                             echo $subjectshortdesc ? htmlspecialchars(mb_substr($subjectshortdesc, 0, 50), ENT_QUOTES, 'UTF-8') . (mb_strlen($subjectshortdesc) > 50 ? '...' : '') : '-';
                             echo html_writer::end_tag('td');
                             
-                            // Действия
-                            echo html_writer::start_tag('td', ['style' => 'text-align: center;']);
-                            echo html_writer::start_div('', ['style' => 'display: flex; gap: 5px; justify-content: center;']);
-                            echo html_writer::link('#', '<i class="fas fa-arrow-up"></i>', [
-                                'class' => 'btn btn-sm btn-outline-primary move-subject-up',
-                                'title' => 'Вверх',
-                                'data-relation-id' => $relationid,
-                                'style' => 'padding: 4px 8px;'
-                            ]);
-                            echo html_writer::link('#', '<i class="fas fa-arrow-down"></i>', [
-                                'class' => 'btn btn-sm btn-outline-primary move-subject-down',
-                                'title' => 'Вниз',
-                                'data-relation-id' => $relationid,
-                                'style' => 'padding: 4px 8px;'
-                            ]);
-                            echo html_writer::end_div();
-                            echo html_writer::end_tag('td');
-                            
                             echo html_writer::end_tag('tr');
                         }
                         
