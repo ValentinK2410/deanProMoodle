@@ -588,7 +588,9 @@ switch ($tab) {
                 echo html_writer::tag('td', htmlspecialchars($item->subject));
                 echo html_writer::tag('td', htmlspecialchars($item->message), ['style' => 'max-width: 300px; word-wrap: break-word;']);
                 echo html_writer::tag('td', $item->posted);
+                // Создаем URL с якорем для перехода к конкретному сообщению
                 $posturl = new moodle_url('/mod/forum/discuss.php', ['d' => $item->discussionid]);
+                $posturl->set_anchor('p' . $item->id); // Добавляем якорь для прокрутки к сообщению
                 $replystr = 'Ответить';
                 $actions = html_writer::link($posturl, $replystr, ['class' => 'btn btn-sm btn-primary', 'target' => '_blank']);
                 echo html_writer::tag('td', $actions);
