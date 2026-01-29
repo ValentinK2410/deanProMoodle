@@ -581,12 +581,18 @@ switch ($tab) {
         }
         
         // Модальное окно для отображения курсов преподавателя
-        echo html_writer::start_div('modal fade', ['id' => 'teacherCoursesModal', 'tabindex' => '-1', 'role' => 'dialog']);
+        echo html_writer::start_div('modal fade', ['id' => 'teacherCoursesModal', 'tabindex' => '-1', 'role' => 'dialog', 'aria-labelledby' => 'modalTeacherName', 'aria-hidden' => 'true']);
         echo html_writer::start_div('modal-dialog modal-lg', ['role' => 'document']);
         echo html_writer::start_div('modal-content');
         echo html_writer::start_div('modal-header');
         echo html_writer::tag('h5', 'Курсы преподавателя', ['class' => 'modal-title', 'id' => 'modalTeacherName']);
-        echo html_writer::start_tag('button', ['type' => 'button', 'class' => 'close', 'data-dismiss' => 'modal', 'aria-label' => 'Close']);
+        echo html_writer::start_tag('button', [
+            'type' => 'button', 
+            'class' => 'close', 
+            'data-dismiss' => 'modal', 
+            'aria-label' => 'Close',
+            'onclick' => 'jQuery(\'#teacherCoursesModal\').modal(\'hide\');'
+        ]);
         echo html_writer::tag('span', '×', ['aria-hidden' => 'true']);
         echo html_writer::end_tag('button');
         echo html_writer::end_div(); // modal-header
@@ -594,7 +600,12 @@ switch ($tab) {
         echo html_writer::div('Загрузка...', 'text-center');
         echo html_writer::end_div(); // modal-body
         echo html_writer::start_div('modal-footer');
-        echo html_writer::start_tag('button', ['type' => 'button', 'class' => 'btn btn-secondary', 'data-dismiss' => 'modal']);
+        echo html_writer::start_tag('button', [
+            'type' => 'button', 
+            'class' => 'btn btn-secondary', 
+            'data-dismiss' => 'modal',
+            'onclick' => 'jQuery(\'#teacherCoursesModal\').modal(\'hide\');'
+        ]);
         echo 'Закрыть';
         echo html_writer::end_tag('button');
         echo html_writer::end_div(); // modal-footer
@@ -649,10 +660,41 @@ switch ($tab) {
                         };
                         xhr.send();
                         
-                        // Показываем модальное окно (Bootstrap)
-                        jQuery(modal).modal('show');
+                        // Показываем модальное окно (Bootstrap/jQuery)
+                        if (typeof jQuery !== 'undefined' && jQuery.fn.modal) {
+                            jQuery(modal).modal('show');
+                        } else if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                            var bsModal = new bootstrap.Modal(modal);
+                            bsModal.show();
+                        } else {
+                            // Fallback: просто показываем модальное окно через CSS
+                            modal.style.display = 'block';
+                            modal.classList.add('show');
+                            document.body.classList.add('modal-open');
+                        }
                     });
                 });
+                
+                // Обработчик закрытия модального окна при клике вне его
+                var modalElement = document.getElementById('teacherCoursesModal');
+                if (modalElement) {
+                    modalElement.addEventListener('click', function(e) {
+                        if (e.target === modalElement) {
+                            if (typeof jQuery !== 'undefined' && jQuery.fn.modal) {
+                                jQuery(modalElement).modal('hide');
+                            } else if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                                var bsModal = bootstrap.Modal.getInstance(modalElement);
+                                if (bsModal) {
+                                    bsModal.hide();
+                                }
+                            } else {
+                                modalElement.style.display = 'none';
+                                modalElement.classList.remove('show');
+                                document.body.classList.remove('modal-open');
+                            }
+                        }
+                    });
+                }
             })();
         ");
         
