@@ -229,36 +229,28 @@ if ($teacherid > 0 || $teacherid == 0) {
         [$startdate, $enddate]
     );
     
-    // Получение проверенных тестов (quiz_grades обновляется автоматически, но мы можем отследить по курсам)
+    // Получение проверенных тестов
     // Для тестов определяем преподавателя по курсу, где он имеет роль преподавателя
     $quizzeshistory = [];
     if (!empty($teacherroleids)) {
         $placeholders = implode(',', array_fill(0, count($teacherroleids), '?'));
-        $teacherfilter_quiz = $teacherid > 0 ? "AND EXISTS (
-            SELECT 1 FROM {role_assignments} ra2 
-            WHERE ra2.userid = $teacherid 
-            AND ra2.contextid = cctx.id 
-            AND ra2.roleid IN ($placeholders)
-        )" : "";
         
-        $quizzeshistory = $DB->get_records_sql(
+        // Получаем все проверенные тесты
+        $allquizzes = $DB->get_records_sql(
             "SELECT qg.id, qg.timemodified, qg.grade,
                     q.name as quizname, c.fullname as coursename, c.id as courseid,
-                    u.firstname, u.lastname, u.id as studentid,
-                    cctx.id as coursecontextid
+                    u.firstname, u.lastname, u.id as studentid
              FROM {quiz_grades} qg
              JOIN {quiz} q ON q.id = qg.quiz
              JOIN {course} c ON c.id = q.course
-             JOIN {context} cctx ON cctx.instanceid = c.id AND cctx.contextlevel = 50
              JOIN {user} u ON u.id = qg.userid
              WHERE qg.timemodified >= ? AND qg.timemodified <= ?
-             $teacherfilter_quiz
              ORDER BY qg.timemodified DESC",
-            array_merge([$startdate, $enddate], $teacherroleids)
+            [$startdate, $enddate]
         );
         
-        // Определяем преподавателя для каждого теста
-        foreach ($quizzeshistory as $key => $item) {
+        // Определяем преподавателя для каждого теста по курсу
+        foreach ($allquizzes as $item) {
             $coursecontext = context_course::instance($item->courseid);
             $teachers_in_course = $DB->get_fieldset_sql(
                 "SELECT DISTINCT ra.userid
@@ -270,14 +262,18 @@ if ($teacherid > 0 || $teacherid == 0) {
             // Если выбран конкретный преподаватель, проверяем его наличие в курсе
             if ($teacherid > 0) {
                 if (!in_array($teacherid, $teachers_in_course)) {
-                    unset($quizzeshistory[$key]);
                     continue;
                 }
                 $item->grader = $teacherid;
             } else {
-                // Берем первого преподавателя из курса (или можно использовать создателя курса)
-                $item->grader = !empty($teachers_in_course) ? $teachers_in_course[0] : 0;
+                // Берем первого преподавателя из курса
+                if (empty($teachers_in_course)) {
+                    continue;
+                }
+                $item->grader = $teachers_in_course[0];
             }
+            
+            $quizzeshistory[] = $item;
         }
     }
     
@@ -300,10 +296,9 @@ if ($teacherid > 0 || $teacherid == 0) {
              $teacherfilter_forum
              AND EXISTS (
                  SELECT 1 FROM {role_assignments} ra 
-                 JOIN {role} r ON r.id = ra.roleid 
                  WHERE ra.userid = p.userid
                  AND ra.contextid = cctx.id
-                 AND r.shortname IN ('teacher', 'editingteacher', 'manager')
+                 AND ra.roleid IN ($placeholders_forum)
              )
              ORDER BY p.created DESC",
             array_merge([$startdate, $enddate], $teacherroleids)
