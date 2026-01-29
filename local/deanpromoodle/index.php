@@ -26,7 +26,7 @@
 // This file prevents direct access to the plugin directory.
 // Users should access specific pages like student.php, teacher.php, or admin.php
 
-require_once(__DIR__ . '/../../../../config.php');
+require_once(__DIR__ . '/../../config.php');
 require_login();
 
 // Redirect to site home or show access denied

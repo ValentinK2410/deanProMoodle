@@ -23,7 +23,8 @@
  */
 
 // Define path to Moodle config
-$configpath = __DIR__ . '/../../../../config.php';
+// From pages/teacher.php: ../ (to deanpromoodle) -> ../ (to local) -> ../ (to moodle root) = ../../../config.php
+$configpath = __DIR__ . '/../../../config.php';
 if (!file_exists($configpath)) {
     die('Error: Moodle config.php not found at: ' . $configpath);
 }
