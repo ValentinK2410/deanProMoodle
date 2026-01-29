@@ -15,18 +15,18 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Teacher page for local_deanpromoodle plugin.
- * Tabs: Assignments, Quizzes, Forums
+ * Страница преподавателя для плагина local_deanpromoodle.
+ * Вкладки: Задания, Тесты, Форумы
  *
  * @package    local_deanpromoodle
  * @copyright  2026
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-// Define path to Moodle config
+// Определение пути к конфигурационному файлу Moodle
 $configpath = __DIR__ . '/../../../config.php';
 if (!file_exists($configpath)) {
-    die('Error: Moodle config.php not found at: ' . $configpath);
+    die('Ошибка: Файл config.php Moodle не найден по адресу: ' . $configpath);
 }
 
 require_once($configpath);
@@ -36,23 +36,23 @@ require_once($CFG->dirroot . '/mod/assign/locallib.php');
 require_once($CFG->dirroot . '/mod/quiz/locallib.php');
 require_once($CFG->dirroot . '/mod/forum/lib.php');
 
-// Check access
+// Проверка доступа
 require_login();
 
-// Check if plugin is installed
+// Проверка установки плагина
 if (!file_exists($CFG->dirroot . '/local/deanpromoodle/version.php')) {
-    die('Error: Plugin not found. Please install the plugin through Moodle admin interface.');
+    die('Ошибка: Плагин не найден. Пожалуйста, установите плагин через интерфейс администратора Moodle.');
 }
 
-// Check access - try capability first, then check user roles
+// Проверка доступа - сначала проверяем capability, затем роли пользователя
 $context = context_system::instance();
 $hasaccess = false;
 
-// Check capability
+// Проверка capability
 if (has_capability('local/deanpromoodle:viewteacher', $context)) {
     $hasaccess = true;
 } else {
-    // Fallback: check if user has teacher/editingteacher/manager role
+    // Резервный вариант: проверка ролей преподавателя/редактора/менеджера
     global $USER;
     $roles = get_user_roles($context, $USER->id, false);
     $teacherroles = ['teacher', 'editingteacher', 'manager', 'coursecreator'];
@@ -63,7 +63,7 @@ if (has_capability('local/deanpromoodle:viewteacher', $context)) {
         }
     }
     
-    // Also check system roles
+    // Также проверяем системные роли
     if (!$hasaccess) {
         $systemcontext = context_system::instance();
         $systemroles = get_user_roles($systemcontext, $USER->id, false);
@@ -75,9 +75,9 @@ if (has_capability('local/deanpromoodle:viewteacher', $context)) {
         }
     }
     
-    // Allow access for all logged-in users if capability is not set (for testing)
+    // Временно разрешаем доступ всем залогиненным пользователям, если capability не установлен (для тестирования)
     if (!$hasaccess && !isguestuser()) {
-        $hasaccess = true; // Temporary: allow all logged-in users
+        $hasaccess = true; // Временно: разрешаем всем залогиненным пользователям
     }
 }
 
@@ -85,13 +85,13 @@ if (!$hasaccess) {
     require_capability('local/deanpromoodle:viewteacher', $context);
 }
 
-// Get parameters
+// Получение параметров
 $tab = optional_param('tab', 'assignments', PARAM_ALPHA); // assignments, quizzes, forums
 $courseid = optional_param('courseid', 0, PARAM_INT);
 $page = optional_param('page', 0, PARAM_INT);
 $perpage = optional_param('perpage', 25, PARAM_INT);
 
-// Set up page
+// Настройка страницы
 $PAGE->set_url(new moodle_url('/local/deanpromoodle/pages/teacher.php', [
     'tab' => $tab,
     'courseid' => $courseid,
@@ -103,14 +103,14 @@ $PAGE->set_title(get_string('teacherpagetitle', 'local_deanpromoodle'));
 $PAGE->set_heading(get_string('teacherpagetitle', 'local_deanpromoodle'));
 $PAGE->set_pagelayout('standard');
 
-// Add CSS
+// Подключение CSS
 $PAGE->requires->css('/local/deanpromoodle/styles.css');
 
-// Get courses where user is teacher
+// Получение курсов, где пользователь является преподавателем
 global $USER, $DB;
 $teachercourses = [];
 if ($courseid == 0) {
-    // Get all courses where user is teacher
+    // Получаем все курсы, где пользователь является преподавателем
     $courses = enrol_get_my_courses();
     foreach ($courses as $course) {
         if ($course->id > 1) {
@@ -132,23 +132,23 @@ if ($courseid == 0) {
     }
 }
 
-// Output page
+// Вывод страницы
 echo $OUTPUT->header();
 echo $OUTPUT->heading(get_string('teacherpagetitle', 'local_deanpromoodle'));
 
-// Tabs
+// Вкладки
 $tabs = [];
 $assignmentsstr = get_string('assignments', 'local_deanpromoodle');
 if (strpos($assignmentsstr, '[[') !== false) {
-    $assignmentsstr = 'Assignments';
+    $assignmentsstr = 'Задания'; // Резервное значение
 }
 $quizzesstr = get_string('quizzes', 'local_deanpromoodle');
 if (strpos($quizzesstr, '[[') !== false) {
-    $quizzesstr = 'Quizzes';
+    $quizzesstr = 'Тесты'; // Резервное значение
 }
 $forumsstr = get_string('forums', 'local_deanpromoodle');
 if (strpos($forumsstr, '[[') !== false) {
-    $forumsstr = 'Forums';
+    $forumsstr = 'Форумы'; // Резервное значение
 }
 $tabs[] = new tabobject('assignments', 
     new moodle_url('/local/deanpromoodle/pages/teacher.php', ['tab' => 'assignments', 'courseid' => $courseid]),
@@ -162,7 +162,7 @@ $tabs[] = new tabobject('forums',
 
 echo $OUTPUT->tabtree($tabs, $tab);
 
-// Course filter
+// Фильтр по курсам
 if (count($teachercourses) > 1) {
     echo html_writer::start_div('local-deanpromoodle-teacher-filters', ['style' => 'margin-bottom: 20px; margin-top: 20px;']);
     echo html_writer::start_tag('form', [
@@ -173,23 +173,27 @@ if (count($teachercourses) > 1) {
     echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'tab', 'value' => $tab]);
     $allcoursesstr = get_string('allcourses', 'local_deanpromoodle');
     if (strpos($allcoursesstr, '[[') !== false) {
-        $allcoursesstr = 'All courses';
+        $allcoursesstr = 'Все курсы'; // Резервное значение
     }
     $courseoptions = [0 => $allcoursesstr];
     foreach ($teachercourses as $cid => $c) {
         $courseoptions[$cid] = $c->fullname;
     }
-    echo html_writer::label('Course: ', 'courseid');
+    echo html_writer::label('Курс: ', 'courseid');
     echo html_writer::select($courseoptions, 'courseid', $courseid, false, ['class' => 'form-control', 'style' => 'display: inline-block; margin-left: 5px;']);
-    echo html_writer::empty_tag('input', ['type' => 'submit', 'value' => 'Filter', 'class' => 'btn btn-primary', 'style' => 'margin-left: 10px;']);
+    $filterstr = get_string('filterbycourse', 'local_deanpromoodle');
+    if (strpos($filterstr, '[[') !== false) {
+        $filterstr = 'Фильтр'; // Резервное значение
+    }
+    echo html_writer::empty_tag('input', ['type' => 'submit', 'value' => $filterstr, 'class' => 'btn btn-primary', 'style' => 'margin-left: 10px;']);
     echo html_writer::end_tag('form');
     echo html_writer::end_div();
 }
 
-// Content based on selected tab
+// Содержимое в зависимости от выбранной вкладки
 switch ($tab) {
     case 'assignments':
-        // Get ungraded assignments
+        // Получение неоцененных заданий
         $ungradedassignments = [];
         foreach ($teachercourses as $course) {
             $coursecontext = context_course::instance($course->id);
@@ -287,14 +291,14 @@ switch ($tab) {
         break;
         
     case 'quizzes':
-        // Get failed quiz attempts (exams only)
+        // Получение несданных тестов (только экзамены)
         $failedquizzes = [];
         foreach ($teachercourses as $course) {
             $quizzes = get_all_instances_in_course('quiz', $course, false);
             
             foreach ($quizzes as $quiz) {
-                // Check if it's an exam (you may need to adjust this logic)
-                // For now, we'll get all failed attempts
+                // Проверка, является ли это экзаменом (может потребоваться корректировка логики)
+                // Пока получаем все несданные попытки
                 $attempts = $DB->get_records_sql(
                     "SELECT qa.*, u.firstname, u.lastname, u.email, u.id as userid, q.name as quizname
                      FROM {quiz_attempts} qa
@@ -323,25 +327,27 @@ switch ($tab) {
             }
         }
         
-        // Pagination
+        // Пагинация
         $total = count($failedquizzes);
         $totalpages = $total > 0 ? ceil($total / $perpage) : 0;
         $offset = $page * $perpage;
         $paginated = array_slice($failedquizzes, $offset, $perpage);
         
-        // Display table
+        // Отображение таблицы
         if (empty($paginated)) {
             echo html_writer::div(get_string('noquizzesfound', 'local_deanpromoodle'), 'alert alert-info');
         } else {
             echo html_writer::start_tag('table', ['class' => 'table table-striped table-hover', 'style' => 'width: 100%;']);
             echo html_writer::start_tag('thead');
             echo html_writer::start_tag('tr');
-            echo html_writer::tag('th', 'Course');
-            echo html_writer::tag('th', 'Quiz');
-            echo html_writer::tag('th', 'Student');
-            echo html_writer::tag('th', 'Grade');
-            echo html_writer::tag('th', 'Attempted');
-            echo html_writer::tag('th', 'Actions');
+            echo html_writer::tag('th', get_string('courses', 'local_deanpromoodle')); // Курс
+            echo html_writer::tag('th', get_string('quizzes', 'local_deanpromoodle')); // Тест
+            echo html_writer::tag('th', get_string('fullname', 'local_deanpromoodle')); // Студент
+            $gradestr = 'Оценка';
+            echo html_writer::tag('th', $gradestr);
+            $attemptedstr = 'Попытка';
+            echo html_writer::tag('th', $attemptedstr);
+            echo html_writer::tag('th', get_string('actions', 'local_deanpromoodle')); // Действия
             echo html_writer::end_tag('tr');
             echo html_writer::end_tag('thead');
             echo html_writer::start_tag('tbody');
@@ -353,27 +359,32 @@ switch ($tab) {
                 echo html_writer::tag('td', $item->grade);
                 echo html_writer::tag('td', $item->attempted);
                 $reviewurl = new moodle_url('/mod/quiz/review.php', ['attempt' => $item->id]);
-                $actions = html_writer::link($reviewurl, 'Review', ['class' => 'btn btn-sm btn-primary']);
+                $reviewstr = 'Просмотр';
+                $actions = html_writer::link($reviewurl, $reviewstr, ['class' => 'btn btn-sm btn-primary']);
                 echo html_writer::tag('td', $actions);
                 echo html_writer::end_tag('tr');
             }
             echo html_writer::end_tag('tbody');
             echo html_writer::end_tag('table');
             
-            // Pagination
+            // Пагинация
             if ($totalpages > 1) {
                 echo html_writer::start_div('pagination-wrapper', ['style' => 'margin-top: 20px; text-align: center;']);
                 $baseurl = new moodle_url('/local/deanpromoodle/pages/teacher.php', ['tab' => $tab, 'courseid' => $courseid, 'perpage' => $perpage]);
+                $prevstr = get_string('previous', 'local_deanpromoodle');
+                $nextstr = get_string('next', 'local_deanpromoodle');
+                $pagestr = get_string('page', 'local_deanpromoodle');
+                $ofstr = get_string('of', 'local_deanpromoodle');
                 if ($page > 0) {
                     $prevurl = clone $baseurl;
                     $prevurl->param('page', $page - 1);
-                    echo html_writer::link($prevurl, '« Previous', ['class' => 'btn btn-sm']);
+                    echo html_writer::link($prevurl, '« ' . $prevstr, ['class' => 'btn btn-sm']);
                 }
-                echo html_writer::span("Page " . ($page + 1) . " of " . $totalpages . " ($total items)", ['style' => 'margin: 0 15px;']);
+                echo html_writer::span($pagestr . " " . ($page + 1) . " " . $ofstr . " " . $totalpages . " ($total)", ['style' => 'margin: 0 15px;']);
                 if ($page < $totalpages - 1) {
                     $nexturl = clone $baseurl;
                     $nexturl->param('page', $page + 1);
-                    echo html_writer::link($nexturl, 'Next »', ['class' => 'btn btn-sm']);
+                    echo html_writer::link($nexturl, $nextstr . ' »', ['class' => 'btn btn-sm']);
                 }
                 echo html_writer::end_div();
             }
@@ -381,7 +392,7 @@ switch ($tab) {
         break;
         
     case 'forums':
-        // Get unreplied forum posts
+        // Получение сообщений форумов без ответов преподавателя
         $unrepliedposts = [];
         foreach ($teachercourses as $course) {
             $forums = get_all_instances_in_course('forum', $course, false);
