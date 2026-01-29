@@ -83,9 +83,18 @@ if (!$hasaccess) {
 
 // Получение параметров
 $tab = optional_param('tab', 'courses', PARAM_ALPHA); // courses, programs
+$action = optional_param('action', '', PARAM_ALPHA); // viewprogram
+$programid = optional_param('programid', 0, PARAM_INT);
 
 // Настройка страницы
-$PAGE->set_url(new moodle_url('/local/deanpromoodle/pages/student.php', ['tab' => $tab]));
+$urlparams = ['tab' => $tab];
+if ($action) {
+    $urlparams['action'] = $action;
+}
+if ($programid > 0) {
+    $urlparams['programid'] = $programid;
+}
+$PAGE->set_url(new moodle_url('/local/deanpromoodle/pages/student.php', $urlparams));
 $PAGE->set_context(context_system::instance());
 // Получение заголовка с проверкой и fallback на русский
 $pagetitle = get_string('studentpagetitle', 'local_deanpromoodle');
@@ -114,10 +123,223 @@ $tabs[] = new tabobject('programs',
     new moodle_url('/local/deanpromoodle/pages/student.php', ['tab' => 'programs']),
     'Мои программы');
 
-echo $OUTPUT->tabtree($tabs, $tab);
+// Если это просмотр программы, не показываем вкладки
+if ($action != 'viewprogram') {
+    echo $OUTPUT->tabtree($tabs, $tab);
+}
 
-// Содержимое страницы в зависимости от вкладки
-switch ($tab) {
+// Содержимое страницы в зависимости от вкладки или действия
+if ($action == 'viewprogram' && $programid > 0) {
+    // Страница просмотра программы с предметами
+    echo html_writer::start_div('local-deanpromoodle-student-content', ['style' => 'margin-top: 20px;']);
+    
+    // Кнопка "Назад"
+    echo html_writer::start_div('', ['style' => 'margin-bottom: 20px;']);
+    echo html_writer::link(
+        new moodle_url('/local/deanpromoodle/pages/student.php', ['tab' => 'programs']),
+        '<i class="fas fa-arrow-left"></i> Назад к программам',
+        ['class' => 'btn btn-secondary', 'style' => 'text-decoration: none;']
+    );
+    echo html_writer::end_div();
+    
+    try {
+        // Получаем информацию о программе
+        $program = $DB->get_record('local_deanpromoodle_programs', ['id' => $programid, 'visible' => 1]);
+        
+        if (!$program) {
+            echo html_writer::div('Программа не найдена.', 'alert alert-danger');
+        } else {
+            // Проверяем, что студент имеет доступ к этой программе (через когорты)
+            $studentcohorts = $DB->get_records_sql(
+                "SELECT c.id
+                 FROM {cohort_members} cm
+                 JOIN {cohort} c ON c.id = cm.cohortid
+                 WHERE cm.userid = ?",
+                [$USER->id]
+            );
+            
+            $cohortids = array_keys($studentcohorts);
+            if (!empty($cohortids)) {
+                $placeholders = implode(',', array_fill(0, count($cohortids), '?'));
+                $hasaccess = $DB->record_exists_sql(
+                    "SELECT 1
+                     FROM {local_deanpromoodle_program_cohorts} pc
+                     WHERE pc.programid = ? AND pc.cohortid IN ($placeholders)",
+                    array_merge([$programid], $cohortids)
+                );
+            } else {
+                $hasaccess = false;
+            }
+            
+            if (!$hasaccess) {
+                echo html_writer::div('У вас нет доступа к этой программе.', 'alert alert-danger');
+            } else {
+                echo html_writer::tag('h2', 'Программа: ' . htmlspecialchars($program->name, ENT_QUOTES, 'UTF-8'), ['style' => 'margin-bottom: 20px;']);
+                
+                // Получаем предметы программы через AJAX или напрямую
+                require_once($CFG->libdir . '/enrollib.php');
+                $mycourses = enrol_get_my_courses(['id']);
+                $mycourseids = array_keys($mycourses);
+                
+                // Получаем предметы программы
+                $subjects = $DB->get_records_sql(
+                    "SELECT s.id, s.name, s.code, s.shortdescription, ps.sortorder
+                     FROM {local_deanpromoodle_program_subjects} ps
+                     JOIN {local_deanpromoodle_subjects} s ON s.id = ps.subjectid
+                     WHERE ps.programid = ?
+                     ORDER BY ps.sortorder ASC",
+                    [$programid]
+                );
+                
+                if (empty($subjects)) {
+                    echo html_writer::div('В программе пока нет предметов.', 'alert alert-info');
+                } else {
+                    // Стили для таблицы предметов
+                    echo html_writer::start_tag('style');
+                    echo "
+                        .subjects-table {
+                            background: white;
+                            border-radius: 8px;
+                            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                            overflow: hidden;
+                        }
+                        .subjects-table table {
+                            margin: 0;
+                            width: 100%;
+                        }
+                        .subjects-table thead th {
+                            background-color: #f8f9fa;
+                            padding: 12px 16px;
+                            text-align: left;
+                            font-weight: 600;
+                            color: #495057;
+                            border-bottom: 2px solid #dee2e6;
+                        }
+                        .subjects-table tbody tr {
+                            border-bottom: 1px solid #f0f0f0;
+                        }
+                        .subjects-table tbody tr:hover {
+                            background-color: #f8f9fa;
+                        }
+                        .subjects-table tbody td {
+                            padding: 12px 16px;
+                            vertical-align: top;
+                        }
+                        .subject-status-started {
+                            color: #28a745;
+                            font-weight: 500;
+                        }
+                        .subject-status-not-started {
+                            color: #6c757d;
+                        }
+                        .subject-courses-list {
+                            margin-top: 8px;
+                            padding-left: 20px;
+                            font-size: 0.9em;
+                        }
+                        .subject-courses-list li {
+                            margin: 4px 0;
+                        }
+                        .course-link-enrolled {
+                            color: #28a745;
+                            font-weight: 500;
+                            text-decoration: none;
+                        }
+                        .course-link-enrolled:hover {
+                            text-decoration: underline;
+                        }
+                        .course-link-not-enrolled {
+                            color: #6c757d;
+                        }
+                    ";
+                    echo html_writer::end_tag('style');
+                    
+                    echo html_writer::start_div('subjects-table');
+                    echo html_writer::start_tag('table', ['class' => 'table']);
+                    echo html_writer::start_tag('thead');
+                    echo html_writer::start_tag('tr');
+                    echo html_writer::tag('th', '№', ['style' => 'width: 60px;']);
+                    echo html_writer::tag('th', 'Название предмета');
+                    echo html_writer::tag('th', 'Код', ['style' => 'width: 150px;']);
+                    echo html_writer::tag('th', 'Статус', ['style' => 'width: 120px;']);
+                    echo html_writer::tag('th', 'Курсы');
+                    echo html_writer::end_tag('tr');
+                    echo html_writer::end_tag('thead');
+                    echo html_writer::start_tag('tbody');
+                    
+                    foreach ($subjects as $index => $subject) {
+                        // Получаем курсы предмета
+                        $subjectcourses = $DB->get_records_sql(
+                            "SELECT c.id, c.fullname, c.shortname
+                             FROM {local_deanpromoodle_subject_courses} sc
+                             JOIN {course} c ON c.id = sc.courseid
+                             WHERE sc.subjectid = ?
+                             ORDER BY sc.sortorder ASC, c.fullname ASC",
+                            [$subject->id]
+                        );
+                        
+                        $subjectstarted = false;
+                        $courseshtml = '';
+                        
+                        if (!empty($subjectcourses)) {
+                            $courseshtml = '<ul class="subject-courses-list">';
+                            foreach ($subjectcourses as $course) {
+                                $isenrolled = in_array($course->id, $mycourseids);
+                                if ($isenrolled) {
+                                    $subjectstarted = true;
+                                    $courseurl = new moodle_url('/course/view.php', ['id' => $course->id]);
+                                    $courseshtml .= '<li>' . html_writer::link($courseurl, 
+                                        '<i class="fas fa-check"></i> ' . htmlspecialchars($course->fullname, ENT_QUOTES, 'UTF-8'), 
+                                        ['class' => 'course-link-enrolled', 'target' => '_blank']
+                                    ) . '</li>';
+                                } else {
+                                    $courseshtml .= '<li><span class="course-link-not-enrolled">' . 
+                                        htmlspecialchars($course->fullname, ENT_QUOTES, 'UTF-8') . '</span></li>';
+                                }
+                            }
+                            $courseshtml .= '</ul>';
+                        } else {
+                            $courseshtml = '<span class="text-muted">Нет курсов</span>';
+                        }
+                        
+                        echo html_writer::start_tag('tr');
+                        echo html_writer::tag('td', $index + 1);
+                        echo html_writer::tag('td', htmlspecialchars($subject->name, ENT_QUOTES, 'UTF-8'), [
+                            'style' => 'font-weight: 500;'
+                        ]);
+                        echo html_writer::tag('td', $subject->code ? htmlspecialchars($subject->code, ENT_QUOTES, 'UTF-8') : '-');
+                        
+                        // Статус
+                        if ($subjectstarted) {
+                            echo html_writer::tag('td', 
+                                '<span class="subject-status-started"><i class="fas fa-check-circle"></i> Начат</span>'
+                            );
+                        } else {
+                            echo html_writer::tag('td', 
+                                '<span class="subject-status-not-started">Не начат</span>'
+                            );
+                        }
+                        
+                        // Курсы
+                        echo html_writer::tag('td', $courseshtml);
+                        
+                        echo html_writer::end_tag('tr');
+                    }
+                    
+                    echo html_writer::end_tag('tbody');
+                    echo html_writer::end_tag('table');
+                    echo html_writer::end_div();
+                }
+            }
+        }
+    } catch (\Exception $e) {
+        echo html_writer::div('Ошибка: ' . $e->getMessage(), 'alert alert-danger');
+    }
+    
+    echo html_writer::end_div();
+} else {
+    // Обычные вкладки
+    switch ($tab) {
     case 'courses':
         // Вкладка "Мои курсы"
         echo html_writer::start_div('local-deanpromoodle-student-content', ['style' => 'margin-top: 20px;']);
@@ -337,14 +559,16 @@ switch ($tab) {
                     foreach ($programs as $program) {
                         echo html_writer::start_tag('tr');
                         
-                        // Название программы (кликабельное)
+                        // Название программы (кликабельное - открывает новую страницу)
                         $programname = htmlspecialchars($program->name, ENT_QUOTES, 'UTF-8');
+                        $programurl = new moodle_url('/local/deanpromoodle/pages/student.php', [
+                            'action' => 'viewprogram',
+                            'programid' => $program->id
+                        ]);
                         echo html_writer::start_tag('td');
-                        echo html_writer::link('#', $programname, [
-                            'class' => 'view-program-subjects',
-                            'data-program-id' => $program->id,
-                            'data-program-name' => $programname,
-                            'style' => 'font-weight: 500; color: #007bff; text-decoration: none; cursor: pointer;'
+                        echo html_writer::link($programurl, $programname, [
+                            'style' => 'font-weight: 500; color: #007bff; text-decoration: none;',
+                            'target' => '_blank'
                         ]);
                         echo html_writer::end_tag('td');
                         
@@ -393,162 +617,6 @@ switch ($tab) {
                     echo html_writer::end_tag('tbody');
                     echo html_writer::end_tag('table');
                     echo html_writer::end_div();
-                    
-                    // Модальное окно для просмотра предметов программы
-                    echo html_writer::start_div('modal fade', [
-                        'id' => 'programSubjectsModal',
-                        'tabindex' => '-1',
-                        'role' => 'dialog'
-                    ]);
-                    echo html_writer::start_div('modal-dialog modal-lg', ['role' => 'document']);
-                    echo html_writer::start_div('modal-content');
-                    echo html_writer::start_div('modal-header');
-                    echo html_writer::tag('h5', 'Предметы программы', ['class' => 'modal-title', 'id' => 'programSubjectsModalTitle']);
-                    echo html_writer::start_tag('button', [
-                        'type' => 'button',
-                        'class' => 'close',
-                        'data-dismiss' => 'modal',
-                        'aria-label' => 'Закрыть'
-                    ]);
-                    echo html_writer::tag('span', '×', ['aria-hidden' => 'true']);
-                    echo html_writer::end_tag('button');
-                    echo html_writer::end_div();
-                    echo html_writer::start_div('modal-body', ['id' => 'programSubjectsModalBody']);
-                    echo html_writer::div('Загрузка предметов...', 'text-muted text-center');
-                    echo html_writer::end_div();
-                    echo html_writer::start_div('modal-footer');
-                    echo html_writer::start_tag('button', [
-                        'type' => 'button',
-                        'class' => 'btn btn-secondary',
-                        'data-dismiss' => 'modal'
-                    ]);
-                    echo 'Закрыть';
-                    echo html_writer::end_tag('button');
-                    echo html_writer::end_div();
-                    echo html_writer::end_div();
-                    echo html_writer::end_div();
-                    echo html_writer::end_div();
-                    
-                    // Стили для модального окна
-                    echo html_writer::start_tag('style');
-                    echo "
-                        #programSubjectsModal .modal-header {
-                            position: relative;
-                            padding: 15px 20px;
-                            border-bottom: 1px solid #dee2e6;
-                        }
-                        #programSubjectsModal .modal-header .close {
-                            position: absolute;
-                            top: 10px;
-                            right: 15px;
-                            padding: 0;
-                            margin: 0;
-                            background: transparent;
-                            border: none;
-                            font-size: 28px;
-                            font-weight: 700;
-                            line-height: 1;
-                            color: #000;
-                            text-shadow: 0 1px 0 #fff;
-                            opacity: 0.5;
-                            cursor: pointer;
-                            z-index: 10;
-                        }
-                        #programSubjectsModal .modal-header .close:hover {
-                            opacity: 0.75;
-                        }
-                        .subject-status-started {
-                            color: #28a745;
-                            font-weight: 500;
-                        }
-                        .subject-status-not-started {
-                            color: #6c757d;
-                        }
-                        .subject-courses-list {
-                            margin-top: 8px;
-                            padding-left: 20px;
-                            font-size: 0.9em;
-                            color: #6c757d;
-                        }
-                        .subject-courses-list li {
-                            margin: 4px 0;
-                        }
-                    ";
-                    echo html_writer::end_tag('style');
-                    
-                    // JavaScript для открытия модального окна и загрузки предметов
-                    $PAGE->requires->js_init_code("
-                        (function() {
-                            document.querySelectorAll('.view-program-subjects').forEach(function(link) {
-                                link.addEventListener('click', function(e) {
-                                    e.preventDefault();
-                                    var programId = this.getAttribute('data-program-id');
-                                    var programName = this.getAttribute('data-program-name');
-                                    
-                                    // Устанавливаем заголовок модального окна
-                                    document.getElementById('programSubjectsModalTitle').textContent = 'Предметы программы: ' + programName;
-                                    
-                                    // Показываем загрузку
-                                    document.getElementById('programSubjectsModalBody').innerHTML = '<div class=\"text-muted text-center\">Загрузка предметов...</div>';
-                                    
-                                    // Показываем модальное окно
-                                    if (typeof jQuery !== 'undefined' && jQuery.fn.modal) {
-                                        jQuery('#programSubjectsModal').modal('show');
-                                    } else if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
-                                        var modal = new bootstrap.Modal(document.getElementById('programSubjectsModal'));
-                                        modal.show();
-                                    }
-                                    
-                                    // Загружаем предметы через AJAX
-                                    var xhr = new XMLHttpRequest();
-                                    xhr.open('GET', '/local/deanpromoodle/pages/admin_ajax.php?action=getprogramsubjectsforstudent&programid=' + programId, true);
-                                    xhr.onreadystatechange = function() {
-                                        if (xhr.readyState === 4 && xhr.status === 200) {
-                                            try {
-                                                var response = JSON.parse(xhr.responseText);
-                                                if (response.success && response.subjects) {
-                                                    var html = '<table class=\"table table-striped\"><thead><tr><th style=\"width: 60px;\">№</th><th>Название предмета</th><th>Код</th><th>Статус</th><th>Курсы</th></tr></thead><tbody>';
-                                                    response.subjects.forEach(function(subject, index) {
-                                                        html += '<tr>';
-                                                        html += '<td>' + (index + 1) + '</td>';
-                                                        html += '<td>' + (subject.name || '-') + '</td>';
-                                                        html += '<td>' + (subject.code || '-') + '</td>';
-                                                        if (subject.started) {
-                                                            html += '<td><span class=\"subject-status-started\"><i class=\"fas fa-check-circle\"></i> Начат</span></td>';
-                                                        } else {
-                                                            html += '<td><span class=\"subject-status-not-started\">Не начат</span></td>';
-                                                        }
-                                                        html += '<td>';
-                                                        if (subject.courses && subject.courses.length > 0) {
-                                                            html += '<ul class=\"subject-courses-list\">';
-                                                            subject.courses.forEach(function(course) {
-                                                                var courseLink = course.enrolled ? 
-                                                                    '<a href=\"/course/view.php?id=' + course.id + '\" target=\"_blank\" style=\"color: #28a745; font-weight: 500;\"><i class=\"fas fa-check\"></i> ' + course.name + '</a>' :
-                                                                    '<span style=\"color: #6c757d;\">' + course.name + '</span>';
-                                                                html += '<li>' + courseLink + '</li>';
-                                                            });
-                                                            html += '</ul>';
-                                                        } else {
-                                                            html += '<span class=\"text-muted\">Нет курсов</span>';
-                                                        }
-                                                        html += '</td>';
-                                                        html += '</tr>';
-                                                    });
-                                                    html += '</tbody></table>';
-                                                    document.getElementById('programSubjectsModalBody').innerHTML = html;
-                                                } else {
-                                                    document.getElementById('programSubjectsModalBody').innerHTML = '<div class=\"alert alert-info\">Предметы не найдены</div>';
-                                                }
-                                            } catch (e) {
-                                                document.getElementById('programSubjectsModalBody').innerHTML = '<div class=\"alert alert-danger\">Ошибка при обработке ответа</div>';
-                                            }
-                                        }
-                                    };
-                                    xhr.send();
-                                });
-                            });
-                        })();
-                    ");
                 }
             }
         } catch (\Exception $e) {
@@ -562,6 +630,7 @@ switch ($tab) {
         // По умолчанию показываем курсы
         redirect(new moodle_url('/local/deanpromoodle/pages/student.php', ['tab' => 'courses']));
         break;
+    }
 }
 
 // Информация об авторе в футере
