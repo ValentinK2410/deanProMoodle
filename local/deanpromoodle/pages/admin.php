@@ -1519,6 +1519,8 @@ switch ($tab) {
                 $code = optional_param('code', '', PARAM_TEXT);
                 $description = optional_param('description', '', PARAM_RAW);
                 $institution = optional_param('institution', '', PARAM_TEXT);
+                $is_paid = optional_param('is_paid', 0, PARAM_INT);
+                $price = optional_param('price', '', PARAM_TEXT);
                 $visible = optional_param('visible', 1, PARAM_INT);
                 $subjectsorder = optional_param('subjects_order', '', PARAM_TEXT);
                 
@@ -1532,6 +1534,8 @@ switch ($tab) {
                         $data->code = $code;
                         $data->description = $description;
                         $data->institution = $institution;
+                        $data->is_paid = $is_paid;
+                        $data->price = !empty($price) ? (float)$price : null;
                         $data->visible = $visible;
                         $data->timemodified = time();
                         
@@ -1756,6 +1760,36 @@ switch ($tab) {
                 false,
                 ['class' => 'form-control', 'id' => 'institution']
             );
+            echo html_writer::end_div();
+            
+            // Тип оплаты
+            echo html_writer::start_div('form-group', ['style' => 'margin-bottom: 15px;']);
+            echo html_writer::label('Тип оплаты', 'is_paid');
+            echo html_writer::select(
+                [0 => 'Бесплатный', 1 => 'Платный'],
+                'is_paid',
+                $program ? (int)$program->is_paid : 0,
+                false,
+                ['class' => 'form-control', 'id' => 'is_paid']
+            );
+            echo html_writer::end_div();
+            
+            // Цена
+            echo html_writer::start_div('form-group', ['style' => 'margin-bottom: 15px;']);
+            echo html_writer::label('Цена', 'price');
+            echo html_writer::empty_tag('input', [
+                'type' => 'number',
+                'name' => 'price',
+                'id' => 'price',
+                'class' => 'form-control',
+                'value' => $program && isset($program->price) ? number_format((float)$program->price, 2, '.', '') : '',
+                'step' => '0.01',
+                'min' => '0',
+                'placeholder' => '0.00'
+            ]);
+            echo html_writer::start_div('form-text', ['style' => 'font-size: 12px; color: #6c757d; margin-top: 5px;']);
+            echo 'Укажите цену программы (только для платных программ)';
+            echo html_writer::end_div();
             echo html_writer::end_div();
             
             // Предметы программы
@@ -2433,6 +2467,8 @@ switch ($tab) {
                         'subjectscount' => $subjectscount,
                         'cohortscount' => $cohortscount,
                         'subjectslist' => implode(', ', $subjectslist),
+                        'is_paid' => isset($program->is_paid) ? (int)$program->is_paid : 0,
+                        'price' => isset($program->price) ? (float)$program->price : null,
                         'visible' => $program->visible
                     ];
                 }
@@ -2586,6 +2622,8 @@ switch ($tab) {
                     $programsubjectscount = (int)$program->subjectscount;
                     $programcohortscount = (int)$program->cohortscount;
                     $programsubjectslist = is_string($program->subjectslist) ? $program->subjectslist : '';
+                    $programispaid = isset($program->is_paid) ? (int)$program->is_paid : 0;
+                    $programprice = isset($program->price) && $program->price > 0 ? (float)$program->price : null;
                     $programvisible = (bool)$program->visible;
                     
                     echo html_writer::start_tag('tr');
@@ -2631,12 +2669,20 @@ switch ($tab) {
                     
                     // Тип оплаты
                     echo html_writer::start_tag('td');
-                    echo '<span class="badge badge-free"><i class="fas fa-gift"></i> Бесплатный</span>';
+                    if ($programispaid) {
+                        echo '<span class="badge" style="background-color: #ff9800; color: white;"><i class="fas fa-ruble-sign"></i> Платный</span>';
+                    } else {
+                        echo '<span class="badge badge-free"><i class="fas fa-gift"></i> Бесплатный</span>';
+                    }
                     echo html_writer::end_tag('td');
                     
                     // Цена
                     echo html_writer::start_tag('td');
-                    echo '-';
+                    if ($programispaid && $programprice !== null) {
+                        echo number_format($programprice, 2, '.', ' ') . ' ₽';
+                    } else {
+                        echo '-';
+                    }
                     echo html_writer::end_tag('td');
                     
                     // Статус

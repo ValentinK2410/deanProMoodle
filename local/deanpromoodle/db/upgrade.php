@@ -74,5 +74,24 @@ function xmldb_local_deanpromoodle_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026013002, 'local', 'deanpromoodle');
     }
     
+    // Добавляем поля price и is_paid в таблицу local_deanpromoodle_programs
+    if ($oldversion < 2026013003) {
+        $table = new xmldb_table('local_deanpromoodle_programs');
+        
+        // Поле is_paid (тип оплаты: 0 - бесплатный, 1 - платный)
+        $field = new xmldb_field('is_paid', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, '0', 'institution');
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+        
+        // Поле price (цена)
+        $field = new xmldb_field('price', XMLDB_TYPE_NUMBER, '10, 2', null, null, null, null, 'is_paid');
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+        
+        upgrade_plugin_savepoint(true, 2026013003, 'local', 'deanpromoodle');
+    }
+    
     return true;
 }

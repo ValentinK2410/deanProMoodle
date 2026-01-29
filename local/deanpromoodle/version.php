@@ -26,7 +26,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_deanpromoodle';
-$plugin->version = 2026013002; // YYYYMMDDXX format - добавлена таблица учебных заведений
+$plugin->version = 2026013003; // YYYYMMDDXX format - добавлены поля price и is_paid в таблицу программ
 $plugin->requires = 2022041900; // Moodle 4.0+
 $plugin->maturity = MATURITY_ALPHA;
 $plugin->release = 'v1.0.0-alpha';

@@ -55,6 +55,8 @@
         <FIELD NAME="code" TYPE="char" LENGTH="100" NOTNULL="false"/>
         <FIELD NAME="description" TYPE="text" NOTNULL="false"/>
         <FIELD NAME="institution" TYPE="char" LENGTH="255" NOTNULL="false"/>
+        <FIELD NAME="is_paid" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="price" TYPE="number" LENGTH="10,2" NOTNULL="false"/>
         <FIELD NAME="visible" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="1"/>
         <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0"/>
         <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0"/>
