@@ -1599,25 +1599,40 @@ switch ($tab) {
             // Учебное заведение
             echo html_writer::start_div('form-group', ['style' => 'margin-bottom: 15px;']);
             echo html_writer::label('Учебное заведение', 'institution');
-            global $CFG;
-            $institutionvalue = '';
-            if ($program && !empty($program->institution)) {
-                // Если есть значение в БД, используем его
-                $institutionvalue = htmlspecialchars($program->institution, ENT_QUOTES, 'UTF-8');
-            } elseif ($program && (empty($program->institution) || is_null($program->institution))) {
-                // Если программа существует, но поле пустое, используем значение по умолчанию
-                $institutionvalue = $CFG->fullname ?: 'Московская богословская семинария';
-            } else {
-                // При создании новой программы используем значение по умолчанию
-                $institutionvalue = $CFG->fullname ?: 'Московская богословская семинария';
+            
+            // Получаем все учебные заведения из БД
+            $institutions = [];
+            try {
+                $institutions = $DB->get_records('local_deanpromoodle_institutions', ['visible' => 1], 'name ASC');
+            } catch (\Exception $e) {
+                // Если таблица не существует, используем пустой массив
+                $institutions = [];
             }
-            echo html_writer::empty_tag('input', [
-                'type' => 'text',
-                'name' => 'institution',
-                'id' => 'institution',
-                'class' => 'form-control',
-                'value' => $institutionvalue
-            ]);
+            
+            // Формируем массив для select
+            $institutionoptions = ['' => '-- Выберите учебное заведение --'];
+            foreach ($institutions as $inst) {
+                $institutionoptions[$inst->name] = htmlspecialchars($inst->name, ENT_QUOTES, 'UTF-8');
+            }
+            
+            // Определяем выбранное значение
+            $selectedinstitution = '';
+            if ($program && !empty($program->institution)) {
+                // Если есть значение в БД, проверяем, существует ли оно в списке
+                $selectedinstitution = htmlspecialchars($program->institution, ENT_QUOTES, 'UTF-8');
+                // Если значение не найдено в списке, добавляем его
+                if (!isset($institutionoptions[$selectedinstitution])) {
+                    $institutionoptions[$selectedinstitution] = $selectedinstitution;
+                }
+            }
+            
+            echo html_writer::select(
+                $institutionoptions,
+                'institution',
+                $selectedinstitution,
+                false,
+                ['class' => 'form-control', 'id' => 'institution']
+            );
             echo html_writer::end_div();
             
             // Выбор предметов
