@@ -280,7 +280,8 @@ switch ($tab) {
                 echo html_writer::tag('td', htmlspecialchars($item->studentname));
                 echo html_writer::tag('td', $item->submitted);
                 $gradeurl = new moodle_url('/mod/assign/view.php', ['id' => $item->assignmentid, 'action' => 'grading', 'userid' => $item->userid]);
-                $actions = html_writer::link($gradeurl, 'Grade', ['class' => 'btn btn-sm btn-primary']);
+                $gradestr = 'Оценить';
+                $actions = html_writer::link($gradeurl, $gradestr, ['class' => 'btn btn-sm btn-primary', 'target' => '_blank']);
                 echo html_writer::tag('td', $actions);
                 echo html_writer::end_tag('tr');
             }
@@ -506,7 +507,8 @@ switch ($tab) {
                 echo html_writer::tag('td', htmlspecialchars($item->subject));
                 echo html_writer::tag('td', $item->posted);
                 $posturl = new moodle_url('/mod/forum/discuss.php', ['d' => $item->discussionid]);
-                $actions = html_writer::link($posturl, 'Reply', ['class' => 'btn btn-sm btn-primary']);
+                $replystr = 'Ответить';
+                $actions = html_writer::link($posturl, $replystr, ['class' => 'btn btn-sm btn-primary', 'target' => '_blank']);
                 echo html_writer::tag('td', $actions);
                 echo html_writer::end_tag('tr');
             }
