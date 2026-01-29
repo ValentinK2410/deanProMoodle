@@ -1552,11 +1552,18 @@ switch ($tab) {
                             $programid = $data->id;
                             
                             // Явно обновляем поле price отдельно, чтобы гарантировать обновление
-                            $pricevalue = trim($price);
-                            if ($is_paid && $pricevalue !== '' && is_numeric($pricevalue)) {
-                                $DB->set_field('local_deanpromoodle_programs', 'price', (float)$pricevalue, ['id' => $programid]);
-                            } else {
-                                $DB->set_field('local_deanpromoodle_programs', 'price', null, ['id' => $programid]);
+                            // Проверяем, существует ли поле price в таблице
+                            $dbman = $DB->get_manager();
+                            $table = new xmldb_table('local_deanpromoodle_programs');
+                            $field = new xmldb_field('price');
+                            
+                            if ($dbman->field_exists($table, $field)) {
+                                $pricevalue = trim($price);
+                                if ($is_paid && $pricevalue !== '' && is_numeric($pricevalue)) {
+                                    $DB->set_field('local_deanpromoodle_programs', 'price', (float)$pricevalue, ['id' => $programid]);
+                                } else {
+                                    $DB->set_field('local_deanpromoodle_programs', 'price', null, ['id' => $programid]);
+                                }
                             }
                         } else {
                             $data->timecreated = time();
