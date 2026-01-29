@@ -966,8 +966,11 @@ switch ($tab) {
             // Подготовка данных для каждой категории
             $programsdata = [];
             foreach ($categories as $category) {
-                // Количество курсов в категории
-                $coursescount = $DB->count_records('course', ['category' => $category->id, 'id' => $DB->sql_compare_text('id') . ' > 1']);
+                // Количество курсов в категории (исключаем системный курс с id=1)
+                $coursescount = $DB->count_records_sql(
+                    "SELECT COUNT(*) FROM {course} WHERE category = ? AND id > 1",
+                    [$category->id]
+                );
                 
                 // Получаем курсы категории для подсчета студентов и преподавателей
                 $categorycourses = $DB->get_records('course', ['category' => $category->id], '', 'id');
