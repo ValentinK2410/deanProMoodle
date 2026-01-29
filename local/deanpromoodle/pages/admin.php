@@ -990,7 +990,7 @@ switch ($tab) {
         
         if (!$tablesexist) {
             echo html_writer::div('Таблицы программ еще не созданы. Пожалуйста, обновите плагин через админ-панель Moodle (Настройки сайта → Уведомления → Обновить).', 'alert alert-warning');
-            if (isset($errormsg) && debugging('', DEBUG_DEVELOPER)) {
+            if (!empty($errormsg)) {
                 echo html_writer::div('Ошибка: ' . htmlspecialchars($errormsg, ENT_QUOTES, 'UTF-8'), 'alert alert-info', ['style' => 'font-size: 12px; margin-top: 10px;']);
             }
             echo html_writer::end_div();
@@ -1252,10 +1252,12 @@ switch ($tab) {
                 break;
             }
             
+            // Инициализируем переменные для JavaScript заранее
+            $programsjson = '[]';
+            $programsoptions = [];
+            
             if (empty($programs)) {
                 echo html_writer::div('Программы не найдены. Создайте первую программу.', 'alert alert-info');
-                // Устанавливаем пустой массив для JavaScript
-                $programsjson = '[]';
             } else {
                 // Получаем название сайта как учебное заведение
                 $sitename = $CFG->fullname ?: 'Московская богословская семинария';
@@ -1550,11 +1552,8 @@ switch ($tab) {
             }
             
             // Модальное окно для прикрепления когорт к программе
-            // Инициализируем $programsjson всегда
-            if (!isset($programs) || empty($programs)) {
-                $programsjson = '[]';
-                $programsoptions = [];
-            } else {
+            // Обновляем $programsjson и $programsoptions если есть программы
+            if (!empty($programs)) {
                 $programsjson = json_encode(array_map(function($p) {
                     return ['id' => $p->id, 'name' => $p->name];
                 }, $programs));
