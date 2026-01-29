@@ -1519,7 +1519,6 @@ switch ($tab) {
                 $code = optional_param('code', '', PARAM_TEXT);
                 $description = optional_param('description', '', PARAM_RAW);
                 $institution = optional_param('institution', '', PARAM_TEXT);
-                $is_paid = optional_param('is_paid', 0, PARAM_INT);
                 $visible = optional_param('visible', 1, PARAM_INT);
                 $subjectsorder = optional_param('subjects_order', '', PARAM_TEXT);
                 
@@ -1533,7 +1532,6 @@ switch ($tab) {
                         $data->code = $code;
                         $data->description = $description;
                         $data->institution = $institution;
-                        $data->is_paid = $is_paid;
                         $data->visible = $visible;
                         $data->timemodified = time();
                         
@@ -1757,18 +1755,6 @@ switch ($tab) {
                 $selectedinstitution,
                 false,
                 ['class' => 'form-control', 'id' => 'institution']
-            );
-            echo html_writer::end_div();
-            
-            // Тип оплаты
-            echo html_writer::start_div('form-group', ['style' => 'margin-bottom: 15px;']);
-            echo html_writer::label('Тип оплаты', 'is_paid');
-            echo html_writer::select(
-                [0 => 'Бесплатный', 1 => 'Платный'],
-                'is_paid',
-                $program ? (int)$program->is_paid : 0,
-                false,
-                ['class' => 'form-control', 'id' => 'is_paid']
             );
             echo html_writer::end_div();
             
@@ -2447,7 +2433,6 @@ switch ($tab) {
                         'subjectscount' => $subjectscount,
                         'cohortscount' => $cohortscount,
                         'subjectslist' => implode(', ', $subjectslist),
-                        'is_paid' => isset($program->is_paid) ? (int)$program->is_paid : 0,
                         'visible' => $program->visible
                     ];
                 }
@@ -2584,7 +2569,6 @@ switch ($tab) {
                 echo html_writer::tag('th', 'Название курса');
                 echo html_writer::tag('th', 'Учебное заведение');
                 echo html_writer::tag('th', 'Связи');
-                echo html_writer::tag('th', 'Тип оплаты');
                 echo html_writer::tag('th', 'Статус');
                 echo html_writer::tag('th', 'Действия');
                 echo html_writer::end_tag('tr');
@@ -2600,7 +2584,6 @@ switch ($tab) {
                     $programsubjectscount = (int)$program->subjectscount;
                     $programcohortscount = (int)$program->cohortscount;
                     $programsubjectslist = is_string($program->subjectslist) ? $program->subjectslist : '';
-                    $programispaid = isset($program->is_paid) ? (int)$program->is_paid : 0;
                     $programvisible = (bool)$program->visible;
                     
                     echo html_writer::start_tag('tr');
@@ -2641,15 +2624,6 @@ switch ($tab) {
                         echo '-';
                     } else {
                         echo implode(' ', $relations);
-                    }
-                    echo html_writer::end_tag('td');
-                    
-                    // Тип оплаты
-                    echo html_writer::start_tag('td');
-                    if ($programispaid) {
-                        echo '<span class="badge" style="background-color: #ff9800; color: white;"><i class="fas fa-ruble-sign"></i> Платный</span>';
-                    } else {
-                        echo '<span class="badge badge-free"><i class="fas fa-gift"></i> Бесплатный</span>';
                     }
                     echo html_writer::end_tag('td');
                     
