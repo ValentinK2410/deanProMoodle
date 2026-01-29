@@ -123,6 +123,9 @@ $tabs[] = new tabobject('students',
 $tabs[] = new tabobject('programs', 
     new moodle_url('/local/deanpromoodle/pages/admin.php', ['tab' => 'programs']),
     'Программы');
+$tabs[] = new tabobject('categories', 
+    new moodle_url('/local/deanpromoodle/pages/admin.php', ['tab' => 'categories']),
+    'Категории курсов');
 
 echo $OUTPUT->tabtree($tabs, $tab);
 
@@ -1035,6 +1038,116 @@ switch ($tab) {
             echo html_writer::start_tag('tr');
             echo html_writer::tag('th', 'ID');
             echo html_writer::tag('th', 'Название программы');
+            echo html_writer::tag('th', 'Количество курсов');
+            echo html_writer::tag('th', 'Количество студентов');
+            echo html_writer::tag('th', 'Количество преподавателей');
+            echo html_writer::tag('th', 'Статус');
+            echo html_writer::end_tag('tr');
+            echo html_writer::end_tag('thead');
+            echo html_writer::start_tag('tbody');
+            
+            foreach ($programsdata as $program) {
+                echo html_writer::start_tag('tr');
+                echo html_writer::tag('td', $program->id);
+                echo html_writer::tag('td', htmlspecialchars($program->name));
+                echo html_writer::tag('td', html_writer::tag('strong', $program->coursescount, ['style' => 'color: #007bff;']));
+                echo html_writer::tag('td', html_writer::tag('span', $program->studentscount, ['style' => 'color: green; font-weight: bold;']));
+                echo html_writer::tag('td', html_writer::tag('span', $program->teacherscount, ['style' => 'color: orange; font-weight: bold;']));
+                $status = $program->visible ? html_writer::tag('span', 'Активна', ['style' => 'color: green;']) : html_writer::tag('span', 'Скрыта', ['style' => 'color: red;']);
+                echo html_writer::tag('td', $status);
+                echo html_writer::end_tag('tr');
+            }
+            
+            echo html_writer::end_tag('tbody');
+            echo html_writer::end_tag('table');
+        }
+        
+        echo html_writer::end_div();
+        break;
+    
+    case 'categories':
+        // Вкладка "Категории курсов" - дубликат вкладки "Программы"
+        echo html_writer::start_div('local-deanpromoodle-admin-content', ['style' => 'margin-bottom: 30px;']);
+        echo html_writer::tag('h2', 'Категории курсов', ['style' => 'margin-bottom: 20px;']);
+        
+        // Получение всех категорий курсов
+        $categories = $DB->get_records('course_categories', null, 'name ASC');
+        
+        if (empty($categories)) {
+            echo html_writer::div('Категории курсов не найдены.', 'alert alert-info');
+        } else {
+            // Подготовка данных для каждой категории
+            $programsdata = [];
+            foreach ($categories as $category) {
+                // Количество курсов в категории (исключаем системный курс с id=1)
+                $coursescount = $DB->count_records_sql(
+                    "SELECT COUNT(*) FROM {course} WHERE category = ? AND id > 1",
+                    [$category->id]
+                );
+                
+                // Получаем курсы категории для подсчета студентов и преподавателей
+                $categorycourses = $DB->get_records('course', ['category' => $category->id], '', 'id');
+                $courseids = array_keys($categorycourses);
+                
+                $studentscount = 0;
+                $teacherscount = 0;
+                
+                if (!empty($courseids)) {
+                    // Подсчет студентов
+                    $studentroleid = $DB->get_field('role', 'id', ['shortname' => 'student']);
+                    if ($studentroleid) {
+                        $courseids_placeholders = implode(',', array_fill(0, count($courseids), '?'));
+                        $coursecontextids = $DB->get_fieldset_sql(
+                            "SELECT id FROM {context} WHERE instanceid IN ($courseids_placeholders) AND contextlevel = 50",
+                            $courseids
+                        );
+                        
+                        if (!empty($coursecontextids)) {
+                            $contextplaceholders = implode(',', array_fill(0, count($coursecontextids), '?'));
+                            $studentscount = $DB->count_records_sql(
+                                "SELECT COUNT(DISTINCT ra.userid)
+                                 FROM {role_assignments} ra
+                                 WHERE ra.contextid IN ($contextplaceholders)
+                                 AND ra.roleid = ?",
+                                array_merge($coursecontextids, [$studentroleid])
+                            );
+                        }
+                    }
+                    
+                    // Подсчет преподавателей
+                    $teacherroleids = $DB->get_fieldset_select('role', 'id', "shortname IN ('teacher', 'editingteacher', 'manager')");
+                    if (!empty($teacherroleids)) {
+                        if (!empty($coursecontextids)) {
+                            $contextplaceholders = implode(',', array_fill(0, count($coursecontextids), '?'));
+                            $roleplaceholders = implode(',', array_fill(0, count($teacherroleids), '?'));
+                            $teacherscount = $DB->count_records_sql(
+                                "SELECT COUNT(DISTINCT ra.userid)
+                                 FROM {role_assignments} ra
+                                 WHERE ra.contextid IN ($contextplaceholders)
+                                 AND ra.roleid IN ($roleplaceholders)",
+                                array_merge($coursecontextids, $teacherroleids)
+                            );
+                        }
+                    }
+                }
+                
+                $programsdata[] = (object)[
+                    'id' => $category->id,
+                    'name' => $category->name,
+                    'description' => $category->description,
+                    'coursescount' => $coursescount,
+                    'studentscount' => $studentscount,
+                    'teacherscount' => $teacherscount,
+                    'visible' => $category->visible
+                ];
+            }
+            
+            // Отображение таблицы
+            echo html_writer::start_tag('table', ['class' => 'table table-striped table-hover', 'style' => 'width: 100%;']);
+            echo html_writer::start_tag('thead');
+            echo html_writer::start_tag('tr');
+            echo html_writer::tag('th', 'ID');
+            echo html_writer::tag('th', 'Название категории');
             echo html_writer::tag('th', 'Количество курсов');
             echo html_writer::tag('th', 'Количество студентов');
             echo html_writer::tag('th', 'Количество преподавателей');
