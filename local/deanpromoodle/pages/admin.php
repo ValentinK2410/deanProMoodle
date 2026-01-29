@@ -39,7 +39,33 @@ if (!file_exists($CFG->dirroot . '/local/deanpromoodle/version.php')) {
     die('Error: Plugin not found. Please install the plugin through Moodle admin interface.');
 }
 
-require_capability('local/deanpromoodle:viewadmin', context_system::instance());
+// Check access - try capability first, then check user roles
+$context = context_system::instance();
+$hasaccess = false;
+
+// Check capability
+if (has_capability('local/deanpromoodle:viewadmin', $context)) {
+    $hasaccess = true;
+} else {
+    // Fallback: check if user is site administrator
+    if (has_capability('moodle/site:config', $context)) {
+        $hasaccess = true;
+    } else {
+        // Check manager role
+        global $USER;
+        $roles = get_user_roles($context, $USER->id, false);
+        foreach ($roles as $role) {
+            if ($role->shortname == 'manager') {
+                $hasaccess = true;
+                break;
+            }
+        }
+    }
+}
+
+if (!$hasaccess) {
+    require_capability('local/deanpromoodle:viewadmin', $context);
+}
 
 // Set up page
 $PAGE->set_url(new moodle_url('/local/deanpromoodle/pages/admin.php'));
