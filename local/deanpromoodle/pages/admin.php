@@ -1225,9 +1225,16 @@ switch ($tab) {
                 // Название курса
                 echo html_writer::start_tag('td');
                 echo html_writer::start_div('course-name-cell');
-                echo html_writer::div(htmlspecialchars($programfullname, ENT_QUOTES, 'UTF-8'), ['class' => 'course-name-full']);
+                // Безопасное преобразование названий перед использованием
+                $fullnametext = is_string($programfullname) ? $programfullname : (is_scalar($programfullname) ? (string)$programfullname : 'Без названия');
+                $fullnametext = htmlspecialchars($fullnametext, ENT_QUOTES, 'UTF-8');
+                echo html_writer::div($fullnametext, ['class' => 'course-name-full']);
                 if ($programshortname) {
-                    echo html_writer::div(htmlspecialchars($programshortname, ENT_QUOTES, 'UTF-8'), ['class' => 'course-name-short']);
+                    $shortnametext = is_string($programshortname) ? $programshortname : (is_scalar($programshortname) ? (string)$programshortname : '');
+                    if ($shortnametext) {
+                        $shortnametext = htmlspecialchars($shortnametext, ENT_QUOTES, 'UTF-8');
+                        echo html_writer::div($shortnametext, ['class' => 'course-name-short']);
+                    }
                 }
                 echo html_writer::end_div();
                 echo html_writer::end_tag('td');
