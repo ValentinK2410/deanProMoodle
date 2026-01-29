@@ -524,7 +524,13 @@ switch ($tab) {
                 }
                 $rolesdisplay = !empty($rolenames) ? implode(', ', $rolenames) : '-';
                 
-                echo html_writer::start_tag('tr');
+                // Делаем строку кликабельной для открытия модального окна
+                echo html_writer::start_tag('tr', [
+                    'class' => 'teacher-row',
+                    'data-teacher-id' => $teacher->id,
+                    'data-teacher-name' => htmlspecialchars(fullname($teacher)),
+                    'style' => 'cursor: pointer;'
+                ]);
                 echo html_writer::tag('td', $teacher->id);
                 echo html_writer::tag('td', htmlspecialchars(fullname($teacher)));
                 echo html_writer::tag('td', htmlspecialchars($teacher->email));
