@@ -248,11 +248,28 @@ switch ($tab) {
             echo html_writer::start_tag('table', ['class' => 'table table-striped table-hover', 'style' => 'width: 100%;']);
             echo html_writer::start_tag('thead');
             echo html_writer::start_tag('tr');
-            echo html_writer::tag('th', 'Course');
-            echo html_writer::tag('th', 'Assignment');
-            echo html_writer::tag('th', 'Student');
-            echo html_writer::tag('th', 'Submitted');
-            echo html_writer::tag('th', 'Actions');
+            $coursestr = get_string('courses', 'local_deanpromoodle');
+            if (strpos($coursestr, '[[') !== false) {
+                $coursestr = 'Курс';
+            }
+            $assignmentstr = get_string('assignments', 'local_deanpromoodle');
+            if (strpos($assignmentstr, '[[') !== false) {
+                $assignmentstr = 'Задание';
+            }
+            $fullnamestr = get_string('fullname', 'local_deanpromoodle');
+            if (strpos($fullnamestr, '[[') !== false) {
+                $fullnamestr = 'Студент';
+            }
+            $actionsstr = get_string('actions', 'local_deanpromoodle');
+            if (strpos($actionsstr, '[[') !== false) {
+                $actionsstr = 'Действия';
+            }
+            echo html_writer::tag('th', $coursestr); // Курс
+            echo html_writer::tag('th', $assignmentstr); // Задание
+            echo html_writer::tag('th', $fullnamestr); // Студент
+            $submittedstr = 'Отправлено';
+            echo html_writer::tag('th', $submittedstr);
+            echo html_writer::tag('th', $actionsstr); // Действия
             echo html_writer::end_tag('tr');
             echo html_writer::end_tag('thead');
             echo html_writer::start_tag('tbody');
