@@ -1651,6 +1651,13 @@ switch ($tab) {
                     box-shadow: 0 3px 10px rgba(0,0,0,0.15);
                     position: relative;
                     overflow: hidden;
+                    color: white;
+                    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+                    -webkit-font-smoothing: antialiased;
+                }
+                .action-btn span {
+                    filter: brightness(0) invert(1);
+                    display: inline-block;
                 }
                 .action-btn::after {
                     content: '';
@@ -1810,13 +1817,13 @@ switch ($tab) {
                     echo html_writer::start_div('action-buttons');
                     echo html_writer::link(
                         new moodle_url('/local/deanpromoodle/pages/admin.php', ['tab' => 'programs', 'action' => 'edit', 'programid' => $programid]),
-                        '✏',
+                        '<span>✏</span>',
                         [
                             'class' => 'action-btn action-btn-edit',
                             'title' => 'Редактировать'
                         ]
                     );
-                    echo html_writer::link('#', '🗑', [
+                    echo html_writer::link('#', '<span>🗑</span>', [
                         'class' => 'action-btn action-btn-delete delete-program',
                         'title' => 'Удалить',
                         'data-program-id' => $programid
