@@ -70,17 +70,25 @@ if (!$hasaccess) {
 }
 
 // Получение параметров
+$tab = optional_param('tab', 'history', PARAM_ALPHA); // history, teachers, students
 $teacherid = optional_param('teacherid', 0, PARAM_INT);
 $period = optional_param('period', 'month', PARAM_ALPHA); // day, week, month, year
 $datefrom = optional_param('datefrom', '', PARAM_TEXT);
 $dateto = optional_param('dateto', '', PARAM_TEXT);
+$studentperiod = optional_param('studentperiod', 'month', PARAM_ALPHA);
+$studentdatefrom = optional_param('studentdatefrom', '', PARAM_TEXT);
+$studentdateto = optional_param('studentdateto', '', PARAM_TEXT);
 
 // Настройка страницы
 $PAGE->set_url(new moodle_url('/local/deanpromoodle/pages/admin.php', [
+    'tab' => $tab,
     'teacherid' => $teacherid,
     'period' => $period,
     'datefrom' => $datefrom,
-    'dateto' => $dateto
+    'dateto' => $dateto,
+    'studentperiod' => $studentperiod,
+    'studentdatefrom' => $studentdatefrom,
+    'studentdateto' => $studentdateto
 ]));
 $PAGE->set_context(context_system::instance());
 // Получение заголовка с проверкой и fallback на русский
@@ -100,6 +108,20 @@ echo $OUTPUT->header();
 // Заголовок уже выводится через set_heading(), не нужно дублировать
 
 global $DB, $USER;
+
+// Вкладки
+$tabs = [];
+$tabs[] = new tabobject('history', 
+    new moodle_url('/local/deanpromoodle/pages/admin.php', ['tab' => 'history']),
+    'История преподавателя');
+$tabs[] = new tabobject('teachers', 
+    new moodle_url('/local/deanpromoodle/pages/admin.php', ['tab' => 'teachers']),
+    'Преподаватели');
+$tabs[] = new tabobject('students', 
+    new moodle_url('/local/deanpromoodle/pages/admin.php', ['tab' => 'students']),
+    'Студенты');
+
+echo $OUTPUT->tabtree($tabs, $tab);
 
 // Получение ID ролей преподавателей
 $teacherroleids = $DB->get_fieldset_select('role', 'id', "shortname IN ('teacher', 'editingteacher', 'manager')");
@@ -132,9 +154,12 @@ if (!empty($teacherroleids)) {
     }
 }
 
-// Форма выбора преподавателя и периода
-echo html_writer::start_div('local-deanpromoodle-admin-content', ['style' => 'margin-bottom: 30px;']);
-echo html_writer::tag('h2', 'История преподавателя', ['style' => 'margin-bottom: 20px;']);
+// Содержимое в зависимости от выбранной вкладки
+switch ($tab) {
+    case 'history':
+        // Форма выбора преподавателя и периода
+        echo html_writer::start_div('local-deanpromoodle-admin-content', ['style' => 'margin-bottom: 30px;']);
+        echo html_writer::tag('h2', 'История преподавателя', ['style' => 'margin-bottom: 20px;']);
 
 echo html_writer::start_tag('form', [
     'method' => 'get',
@@ -419,9 +444,282 @@ if ($teacherid > 0 || $teacherid == 0) {
         echo html_writer::end_tag('tbody');
         echo html_writer::end_tag('table');
     }
+    echo html_writer::end_div();
+    break;
+    
+    case 'teachers':
+        // Вкладка "Преподаватели" - список всех преподавателей
+        echo html_writer::start_div('local-deanpromoodle-admin-content', ['style' => 'margin-bottom: 30px;']);
+        echo html_writer::tag('h2', 'Список преподавателей', ['style' => 'margin-bottom: 20px;']);
+        
+        if (empty($teachers)) {
+            echo html_writer::div('Преподаватели не найдены.', 'alert alert-info');
+        } else {
+            echo html_writer::start_tag('table', ['class' => 'table table-striped table-hover', 'style' => 'width: 100%;']);
+            echo html_writer::start_tag('thead');
+            echo html_writer::start_tag('tr');
+            echo html_writer::tag('th', 'ID');
+            echo html_writer::tag('th', 'ФИО');
+            echo html_writer::tag('th', 'Email');
+            echo html_writer::tag('th', 'Дата регистрации');
+            echo html_writer::tag('th', 'Последний вход');
+            echo html_writer::end_tag('tr');
+            echo html_writer::end_tag('thead');
+            echo html_writer::start_tag('tbody');
+            
+            foreach ($teachers as $teacher) {
+                $userrecord = $DB->get_record('user', ['id' => $teacher->id]);
+                echo html_writer::start_tag('tr');
+                echo html_writer::tag('td', $teacher->id);
+                echo html_writer::tag('td', htmlspecialchars(fullname($teacher)));
+                echo html_writer::tag('td', htmlspecialchars($teacher->email));
+                echo html_writer::tag('td', $userrecord ? userdate($userrecord->timecreated) : '-');
+                echo html_writer::tag('td', $userrecord && $userrecord->lastaccess > 0 ? userdate($userrecord->lastaccess) : 'Никогда');
+                echo html_writer::end_tag('tr');
+            }
+            
+            echo html_writer::end_tag('tbody');
+            echo html_writer::end_tag('table');
+        }
+        echo html_writer::end_div();
+        break;
+    
+    case 'students':
+        // Вкладка "Студенты" - статистика по студентам
+        echo html_writer::start_div('local-deanpromoodle-admin-content', ['style' => 'margin-bottom: 30px;']);
+        echo html_writer::tag('h2', 'Статистика студентов', ['style' => 'margin-bottom: 20px;']);
+        
+        // Форма фильтрации
+        echo html_writer::start_tag('form', [
+            'method' => 'get',
+            'action' => new moodle_url('/local/deanpromoodle/pages/admin.php'),
+            'class' => 'form-inline',
+            'style' => 'background-color: #f5f5f5; padding: 20px; border-radius: 5px; margin-bottom: 20px;'
+        ]);
+        echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'tab', 'value' => 'students']);
+        
+        echo html_writer::label('Период: ', 'studentperiod');
+        $periodoptions = [
+            'day' => 'День',
+            'week' => 'Неделя',
+            'month' => 'Месяц',
+            'year' => 'Год'
+        ];
+        echo html_writer::select($periodoptions, 'studentperiod', $studentperiod, false, ['class' => 'form-control', 'style' => 'margin-left: 5px; margin-right: 15px;']);
+        
+        echo html_writer::label('С: ', 'studentdatefrom');
+        echo html_writer::empty_tag('input', [
+            'type' => 'date',
+            'name' => 'studentdatefrom',
+            'value' => $studentdatefrom,
+            'class' => 'form-control',
+            'style' => 'margin-left: 5px; margin-right: 15px;'
+        ]);
+        
+        echo html_writer::label('По: ', 'studentdateto');
+        echo html_writer::empty_tag('input', [
+            'type' => 'date',
+            'name' => 'studentdateto',
+            'value' => $studentdateto,
+            'class' => 'form-control',
+            'style' => 'margin-left: 5px; margin-right: 15px;'
+        ]);
+        
+        echo html_writer::empty_tag('input', [
+            'type' => 'submit',
+            'value' => 'Показать',
+            'class' => 'btn btn-primary',
+            'style' => 'margin-left: 10px;'
+        ]);
+        echo html_writer::end_tag('form');
+        
+        // Определение диапазона дат
+        $now = time();
+        switch ($studentperiod) {
+            case 'day':
+                $startdate = $studentdatefrom ? strtotime($studentdatefrom) : mktime(0, 0, 0, date('n', $now), date('j', $now), date('Y', $now));
+                $enddate = $studentdateto ? strtotime($studentdateto . ' 23:59:59') : mktime(23, 59, 59, date('n', $now), date('j', $now), date('Y', $now));
+                $dateformat = 'Y-m-d';
+                break;
+            case 'week':
+                $startdate = $studentdatefrom ? strtotime($studentdatefrom) : strtotime('monday this week');
+                $enddate = $studentdateto ? strtotime($studentdateto . ' 23:59:59') : strtotime('sunday this week 23:59:59');
+                $dateformat = 'Y-W';
+                break;
+            case 'month':
+                $startdate = $studentdatefrom ? strtotime($studentdatefrom) : mktime(0, 0, 0, date('n', $now), 1, date('Y', $now));
+                $enddate = $studentdateto ? strtotime($studentdateto . ' 23:59:59') : mktime(23, 59, 59, date('n', $now), date('t', $now), date('Y', $now));
+                $dateformat = 'Y-m';
+                break;
+            case 'year':
+                $startdate = $studentdatefrom ? strtotime($studentdatefrom) : mktime(0, 0, 0, 1, 1, date('Y', $now));
+                $enddate = $studentdateto ? strtotime($studentdateto . ' 23:59:59') : mktime(23, 59, 59, 12, 31, date('Y', $now));
+                $dateformat = 'Y';
+                break;
+        }
+        
+        // Получение ID роли студента
+        $studentroleid = $DB->get_field('role', 'id', ['shortname' => 'student']);
+        
+        // Получение статистики по зачислениям
+        $enrolments = $DB->get_records_sql(
+            "SELECT ue.timestart, ue.timeend, ue.status,
+                    u.id as userid, u.firstname, u.lastname, u.email,
+                    c.fullname as coursename, c.id as courseid
+             FROM {user_enrolments} ue
+             JOIN {enrol} e ON e.id = ue.enrolid
+             JOIN {course} c ON c.id = e.courseid
+             JOIN {user} u ON u.id = ue.userid
+             JOIN {role_assignments} ra ON ra.userid = u.id AND ra.contextid = (
+                 SELECT id FROM {context} WHERE instanceid = c.id AND contextlevel = 50 LIMIT 1
+             )
+             WHERE ra.roleid = ?
+             AND ue.timestart >= ? AND ue.timestart <= ?
+             ORDER BY ue.timestart DESC",
+            [$studentroleid, $startdate, $enddate]
+        );
+        
+        // Получение статистики по отчислениям
+        $unenrolments = $DB->get_records_sql(
+            "SELECT ue.timeend, ue.status,
+                    u.id as userid, u.firstname, u.lastname, u.email,
+                    c.fullname as coursename, c.id as courseid
+             FROM {user_enrolments} ue
+             JOIN {enrol} e ON e.id = ue.enrolid
+             JOIN {course} c ON c.id = e.courseid
+             JOIN {user} u ON u.id = ue.userid
+             JOIN {role_assignments} ra ON ra.userid = u.id AND ra.contextid = (
+                 SELECT id FROM {context} WHERE instanceid = c.id AND contextlevel = 50 LIMIT 1
+             )
+             WHERE ra.roleid = ?
+             AND ue.timeend > 0
+             AND ue.timeend >= ? AND ue.timeend <= ?
+             ORDER BY ue.timeend DESC",
+            [$studentroleid, $startdate, $enddate]
+        );
+        
+        // Получение статистики по удаленным студентам
+        $deletedstudents = $DB->get_records_sql(
+            "SELECT u.id, u.firstname, u.lastname, u.email, u.timemodified, u.deleted
+             FROM {user} u
+             JOIN {role_assignments} ra ON ra.userid = u.id
+             WHERE ra.roleid = ?
+             AND u.deleted = 1
+             AND u.timemodified >= ? AND u.timemodified <= ?
+             ORDER BY u.timemodified DESC",
+            [$studentroleid, $startdate, $enddate]
+        );
+        
+        // Получение статистики по обновлению данных студентов
+        $updatedstudents = $DB->get_records_sql(
+            "SELECT DISTINCT u.id, u.firstname, u.lastname, u.email, u.timemodified
+             FROM {user} u
+             JOIN {role_assignments} ra ON ra.userid = u.id
+             WHERE ra.roleid = ?
+             AND u.deleted = 0
+             AND u.timemodified >= ? AND u.timemodified <= ?
+             AND u.timemodified > u.timecreated
+             ORDER BY u.timemodified DESC
+             LIMIT 1000",
+            [$studentroleid, $startdate, $enddate]
+        );
+        
+        // Группировка данных по периоду
+        $groupeddata = [];
+        
+        // Группировка зачислений
+        foreach ($enrolments as $item) {
+            $datekey = date($dateformat, $item->timestart);
+            if (!isset($groupeddata[$datekey])) {
+                $groupeddata[$datekey] = [
+                    'enrolled' => 0,
+                    'unenrolled' => 0,
+                    'deleted' => 0,
+                    'updated' => 0
+                ];
+            }
+            $groupeddata[$datekey]['enrolled']++;
+        }
+        
+        // Группировка отчислений
+        foreach ($unenrolments as $item) {
+            $datekey = date($dateformat, $item->timeend);
+            if (!isset($groupeddata[$datekey])) {
+                $groupeddata[$datekey] = [
+                    'enrolled' => 0,
+                    'unenrolled' => 0,
+                    'deleted' => 0,
+                    'updated' => 0
+                ];
+            }
+            $groupeddata[$datekey]['unenrolled']++;
+        }
+        
+        // Группировка удалений
+        foreach ($deletedstudents as $item) {
+            $datekey = date($dateformat, $item->timemodified);
+            if (!isset($groupeddata[$datekey])) {
+                $groupeddata[$datekey] = [
+                    'enrolled' => 0,
+                    'unenrolled' => 0,
+                    'deleted' => 0,
+                    'updated' => 0
+                ];
+            }
+            $groupeddata[$datekey]['deleted']++;
+        }
+        
+        // Группировка обновлений
+        foreach ($updatedstudents as $item) {
+            $datekey = date($dateformat, $item->timemodified);
+            if (!isset($groupeddata[$datekey])) {
+                $groupeddata[$datekey] = [
+                    'enrolled' => 0,
+                    'unenrolled' => 0,
+                    'deleted' => 0,
+                    'updated' => 0
+                ];
+            }
+            $groupeddata[$datekey]['updated']++;
+        }
+        
+        // Отображение результатов
+        if (empty($groupeddata)) {
+            echo html_writer::div('Данные не найдены за выбранный период.', 'alert alert-info');
+        } else {
+            krsort($groupeddata); // Сортировка по дате (новые сверху)
+            
+            echo html_writer::start_tag('table', ['class' => 'table table-striped table-hover', 'style' => 'width: 100%; margin-top: 20px;']);
+            echo html_writer::start_tag('thead');
+            echo html_writer::start_tag('tr');
+            echo html_writer::tag('th', 'Период');
+            echo html_writer::tag('th', 'Зачислено');
+            echo html_writer::tag('th', 'Отчислено');
+            echo html_writer::tag('th', 'Удалено');
+            echo html_writer::tag('th', 'Обновлено данных');
+            echo html_writer::tag('th', 'Всего');
+            echo html_writer::end_tag('tr');
+            echo html_writer::end_tag('thead');
+            echo html_writer::start_tag('tbody');
+            
+            foreach ($groupeddata as $periodkey => $data) {
+                $total = $data['enrolled'] + $data['unenrolled'] + $data['deleted'] + $data['updated'];
+                echo html_writer::start_tag('tr');
+                echo html_writer::tag('td', htmlspecialchars($periodkey));
+                echo html_writer::tag('td', html_writer::tag('span', $data['enrolled'], ['style' => 'color: green; font-weight: bold;']));
+                echo html_writer::tag('td', html_writer::tag('span', $data['unenrolled'], ['style' => 'color: orange; font-weight: bold;']));
+                echo html_writer::tag('td', html_writer::tag('span', $data['deleted'], ['style' => 'color: red; font-weight: bold;']));
+                echo html_writer::tag('td', html_writer::tag('span', $data['updated'], ['style' => 'color: blue; font-weight: bold;']));
+                echo html_writer::tag('td', html_writer::tag('strong', $total));
+                echo html_writer::end_tag('tr');
+            }
+            
+            echo html_writer::end_tag('tbody');
+            echo html_writer::end_tag('table');
+        }
+        echo html_writer::end_div();
+        break;
 }
-
-echo html_writer::end_div();
 
 // Информация об авторе в футере
 echo html_writer::start_div('local-deanpromoodle-author-footer', ['style' => 'margin-top: 40px; padding-top: 20px; border-top: 1px solid #dee2e6; text-align: center; color: #6c757d; font-size: 0.9em;']);
