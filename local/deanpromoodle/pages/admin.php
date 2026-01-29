@@ -170,7 +170,7 @@ if (!empty($teacherroleids)) {
         $teachersdata[$record->userid]['roles'][] = $record->roleshortname;
     }
     
-    if (!empty($teachersdata)) {
+        if (!empty($teachersdata)) {
         $userids = array_keys($teachersdata);
         $userplaceholders = implode(',', array_fill(0, count($userids), '?'));
         $userrecords = $DB->get_records_sql(
@@ -182,10 +182,43 @@ if (!empty($teacherroleids)) {
             $userids
         );
         
-        // Объединяем данные пользователей с ролями
+        // Подсчет количества курсов для каждого преподавателя
+        $teachercoursescount = [];
+        if (!empty($userids) && !empty($teacherroleids)) {
+            $placeholders_count = implode(',', array_fill(0, count($teacherroleids), '?'));
+            foreach ($userids as $uid) {
+                $coursecontextids = $DB->get_fieldset_sql(
+                    "SELECT DISTINCT ra.contextid
+                     FROM {role_assignments} ra
+                     JOIN {context} ctx ON ctx.id = ra.contextid
+                     WHERE ctx.contextlevel = 50
+                     AND ra.userid = ?
+                     AND ra.roleid IN ($placeholders_count)",
+                    array_merge([$uid], $teacherroleids)
+                );
+                
+                if (!empty($coursecontextids)) {
+                    $contextplaceholders = implode(',', array_fill(0, count($coursecontextids), '?'));
+                    $count = $DB->count_records_sql(
+                        "SELECT COUNT(DISTINCT c.id)
+                         FROM {course} c
+                         JOIN {context} ctx ON ctx.instanceid = c.id AND ctx.contextlevel = 50
+                         WHERE ctx.id IN ($contextplaceholders)
+                         AND c.id > 1",
+                        $coursecontextids
+                    );
+                    $teachercoursescount[$uid] = $count;
+                } else {
+                    $teachercoursescount[$uid] = 0;
+                }
+            }
+        }
+        
+        // Объединяем данные пользователей с ролями и количеством курсов
         foreach ($userrecords as $user) {
             $roles = isset($teachersdata[$user->id]) ? $teachersdata[$user->id]['roles'] : [];
             $user->roles = array_unique($roles);
+            $user->coursescount = isset($teachercoursescount[$user->id]) ? $teachercoursescount[$user->id] : 0;
             $teachers[$user->id] = $user;
         }
     }
@@ -499,6 +532,7 @@ switch ($tab) {
             echo html_writer::tag('th', 'ФИО');
             echo html_writer::tag('th', 'Email');
             echo html_writer::tag('th', 'Роль');
+            echo html_writer::tag('th', 'Количество курсов');
             echo html_writer::tag('th', 'Дата регистрации');
             echo html_writer::tag('th', 'Последний вход');
             echo html_writer::end_tag('tr');
@@ -535,6 +569,8 @@ switch ($tab) {
                 echo html_writer::tag('td', htmlspecialchars(fullname($teacher)));
                 echo html_writer::tag('td', htmlspecialchars($teacher->email));
                 echo html_writer::tag('td', htmlspecialchars($rolesdisplay));
+                $coursescount = isset($teacher->coursescount) ? $teacher->coursescount : 0;
+                echo html_writer::tag('td', html_writer::tag('strong', $coursescount, ['style' => 'color: #007bff;']));
                 echo html_writer::tag('td', $userrecord ? userdate($userrecord->timecreated) : '-');
                 echo html_writer::tag('td', $userrecord && $userrecord->lastaccess > 0 ? userdate($userrecord->lastaccess) : 'Никогда');
                 echo html_writer::end_tag('tr');
