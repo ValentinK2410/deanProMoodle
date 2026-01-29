@@ -70,3 +70,13 @@ $string['page'] = 'Page';
 $string['of'] = 'of';
 $string['previous'] = 'Previous';
 $string['next'] = 'Next';
+
+// Tabs
+$string['assignments'] = 'Assignments';
+$string['quizzes'] = 'Quizzes';
+$string['forums'] = 'Forums';
+
+// Tab content
+$string['noassignmentsfound'] = 'No ungraded assignments found';
+$string['noquizzesfound'] = 'No failed quiz attempts found';
+$string['noforumspostsfound'] = 'No unreplied forum posts found';

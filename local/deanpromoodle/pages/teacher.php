@@ -16,7 +16,7 @@
 
 /**
  * Teacher page for local_deanpromoodle plugin.
- * Student review functionality.
+ * Tabs: Assignments, Quizzes, Forums
  *
  * @package    local_deanpromoodle
  * @copyright  2026
@@ -32,6 +32,9 @@ if (!file_exists($configpath)) {
 require_once($configpath);
 require_once($CFG->libdir . '/tablelib.php');
 require_once($CFG->libdir . '/enrollib.php');
+require_once($CFG->dirroot . '/mod/assign/locallib.php');
+require_once($CFG->dirroot . '/mod/quiz/locallib.php');
+require_once($CFG->dirroot . '/mod/forum/lib.php');
 
 // Check access
 require_login();
@@ -83,15 +86,15 @@ if (!$hasaccess) {
 }
 
 // Get parameters
+$tab = optional_param('tab', 'assignments', PARAM_ALPHA); // assignments, quizzes, forums
 $courseid = optional_param('courseid', 0, PARAM_INT);
-$search = optional_param('search', '', PARAM_TEXT);
 $page = optional_param('page', 0, PARAM_INT);
 $perpage = optional_param('perpage', 25, PARAM_INT);
 
 // Set up page
 $PAGE->set_url(new moodle_url('/local/deanpromoodle/pages/teacher.php', [
+    'tab' => $tab,
     'courseid' => $courseid,
-    'search' => $search,
     'page' => $page,
     'perpage' => $perpage
 ]));
@@ -103,291 +106,376 @@ $PAGE->set_pagelayout('standard');
 // Add CSS
 $PAGE->requires->css('/local/deanpromoodle/styles.css');
 
-// Get all courses
+// Get courses where user is teacher
 global $USER, $DB;
-$allcourses = [];
+$teachercourses = [];
 if ($courseid == 0) {
-    // Get all courses
-    $courses = $DB->get_records('course', ['visible' => 1], 'fullname ASC', 'id, fullname, shortname');
-    if ($courses) {
-        foreach ($courses as $course) {
-            if ($course->id > 1) { // Skip site course
-                $allcourses[$course->id] = $course;
+    // Get all courses where user is teacher
+    $courses = enrol_get_my_courses();
+    foreach ($courses as $course) {
+        if ($course->id > 1) {
+            $coursecontext = context_course::instance($course->id);
+            if (has_capability('moodle/course:viewparticipants', $coursecontext) || 
+                has_capability('moodle/course:manageactivities', $coursecontext)) {
+                $teachercourses[$course->id] = $course;
             }
         }
     }
 } else {
     $course = get_course($courseid);
     if ($course && $course->id > 1) {
-        $allcourses[$courseid] = $course;
-    }
-}
-
-// Get all teachers from courses
-$allteachers = [];
-if (!empty($allcourses)) {
-    foreach ($allcourses as $course) {
-        $coursecontext = context_course::instance($course->id);
-        
-        // Get users with teacher/editingteacher roles
-        $teachers = get_enrolled_users($coursecontext, 'moodle/course:manageactivities', 0, 'u.*', 'u.lastname, u.firstname');
-        if (!is_array($teachers)) {
-            $teachers = [];
-        }
-        
-        // Also get users with teacher role explicitly
-        $roleids = $DB->get_fieldset_select('role', 'id', "shortname IN ('teacher', 'editingteacher', 'manager')");
-        if (!empty($roleids) && is_array($roleids)) {
-            $placeholders = implode(',', array_fill(0, count($roleids), '?'));
-            $roleassignments = $DB->get_records_sql(
-                "SELECT ra.userid, u.*
-                 FROM {role_assignments} ra
-                 JOIN {user} u ON u.id = ra.userid
-                 WHERE ra.contextid = ? AND ra.roleid IN ($placeholders)
-                 AND u.deleted = 0",
-                array_merge([$coursecontext->id], $roleids)
-            );
-            
-            if ($roleassignments) {
-                foreach ($roleassignments as $assignment) {
-                    if (!isset($teachers[$assignment->userid])) {
-                        $teachers[$assignment->userid] = $assignment;
-                    }
-                }
-            }
-        }
-        
-        if (!empty($teachers)) {
-            foreach ($teachers as $teacher) {
-                if (!isset($allteachers[$teacher->id])) {
-                    $allteachers[$teacher->id] = $teacher;
-                    $allteachers[$teacher->id]->courses = [];
-                }
-                // Add course info with full details
-                $coursename = $course->fullname;
-                $allteachers[$teacher->id]->courses[] = $coursename;
-            }
+        $coursecontext = context_course::instance($courseid);
+        if (has_capability('moodle/course:viewparticipants', $coursecontext) || 
+            has_capability('moodle/course:manageactivities', $coursecontext)) {
+            $teachercourses[$courseid] = $course;
         }
     }
-}
-
-// Apply search filter
-if (!empty($search) && !empty($allteachers)) {
-    $filteredteachers = [];
-    foreach ($allteachers as $teacher) {
-        $searchlower = mb_strtolower($search);
-        $fullname = mb_strtolower($teacher->firstname . ' ' . $teacher->lastname);
-        $email = mb_strtolower($teacher->email ?? '');
-        $username = mb_strtolower($teacher->username ?? '');
-        
-        if (strpos($fullname, $searchlower) !== false || 
-            strpos($email, $searchlower) !== false ||
-            strpos($username, $searchlower) !== false) {
-            $filteredteachers[$teacher->id] = $teacher;
-        }
-    }
-    $allteachers = $filteredteachers;
-}
-
-// Ensure $allteachers is an array
-if (!is_array($allteachers)) {
-    $allteachers = [];
-}
-
-// Pagination
-$totalteachers = count($allteachers);
-$totalpages = $totalteachers > 0 ? ceil($totalteachers / $perpage) : 0;
-$offset = $page * $perpage;
-$paginatedteachers = [];
-if (!empty($allteachers)) {
-    $paginatedteachers = array_slice($allteachers, $offset, $perpage, true);
-}
-if (!is_array($paginatedteachers)) {
-    $paginatedteachers = [];
 }
 
 // Output page
 echo $OUTPUT->header();
 echo $OUTPUT->heading(get_string('teacherpagetitle', 'local_deanpromoodle'));
 
-// Search and filter form
-echo html_writer::start_div('local-deanpromoodle-teacher-filters', ['style' => 'margin-bottom: 20px;']);
-echo html_writer::start_tag('form', [
-    'method' => 'get',
-    'action' => new moodle_url('/local/deanpromoodle/pages/teacher.php'),
-    'class' => 'form-inline'
-]);
+// Tabs
+$tabs = [];
+$tabs[] = new tabobject('assignments', 
+    new moodle_url('/local/deanpromoodle/pages/teacher.php', ['tab' => 'assignments', 'courseid' => $courseid]),
+    get_string('assignments', 'local_deanpromoodle'));
+$tabs[] = new tabobject('quizzes', 
+    new moodle_url('/local/deanpromoodle/pages/teacher.php', ['tab' => 'quizzes', 'courseid' => $courseid]),
+    get_string('quizzes', 'local_deanpromoodle'));
+$tabs[] = new tabobject('forums', 
+    new moodle_url('/local/deanpromoodle/pages/teacher.php', ['tab' => 'forums', 'courseid' => $courseid]),
+    get_string('forums', 'local_deanpromoodle'));
 
-// Search field
-echo html_writer::start_div('form-group', ['style' => 'margin-right: 10px;']);
-$searchlabel = get_string('searchteachers', 'local_deanpromoodle');
-if (strpos($searchlabel, '[[') !== false) {
-    $searchlabel = 'Search teachers'; // Fallback
-}
-echo html_writer::label($searchlabel, 'search', false, ['class' => 'sr-only']);
-$searchplaceholder = get_string('searchteachers', 'local_deanpromoodle');
-if (strpos($searchplaceholder, '[[') !== false) {
-    $searchplaceholder = 'Search teachers'; // Fallback
-}
-echo html_writer::empty_tag('input', [
-    'type' => 'text',
-    'name' => 'search',
-    'id' => 'search',
-    'value' => $search,
-    'placeholder' => $searchplaceholder,
-    'class' => 'form-control',
-    'style' => 'width: 300px; display: inline-block;'
-]);
-echo html_writer::end_div();
+echo $OUTPUT->tabtree($tabs, $tab);
 
 // Course filter
-if (count($allcourses) > 1) {
-    echo html_writer::start_div('form-group', ['style' => 'margin-right: 10px;']);
-    $filterlabel = get_string('filterbycourse', 'local_deanpromoodle');
-    if (strpos($filterlabel, '[[') !== false) {
-        $filterlabel = 'Filter by course'; // Fallback
-    }
-    echo html_writer::label($filterlabel, 'courseid', false, ['class' => 'sr-only']);
+if (count($teachercourses) > 1) {
+    echo html_writer::start_div('local-deanpromoodle-teacher-filters', ['style' => 'margin-bottom: 20px; margin-top: 20px;']);
+    echo html_writer::start_tag('form', [
+        'method' => 'get',
+        'action' => new moodle_url('/local/deanpromoodle/pages/teacher.php'),
+        'class' => 'form-inline'
+    ]);
+    echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'tab', 'value' => $tab]);
     $allcoursesstr = get_string('allcourses', 'local_deanpromoodle');
     if (strpos($allcoursesstr, '[[') !== false) {
-        $allcoursesstr = 'All courses'; // Fallback
+        $allcoursesstr = 'All courses';
     }
     $courseoptions = [0 => $allcoursesstr];
-    foreach ($allcourses as $cid => $c) {
+    foreach ($teachercourses as $cid => $c) {
         $courseoptions[$cid] = $c->fullname;
     }
-    echo html_writer::select($courseoptions, 'courseid', $courseid, false, ['class' => 'form-control', 'style' => 'display: inline-block;']);
+    echo html_writer::label('Course: ', 'courseid');
+    echo html_writer::select($courseoptions, 'courseid', $courseid, false, ['class' => 'form-control', 'style' => 'display: inline-block; margin-left: 5px;']);
+    echo html_writer::empty_tag('input', ['type' => 'submit', 'value' => 'Filter', 'class' => 'btn btn-primary', 'style' => 'margin-left: 10px;']);
+    echo html_writer::end_tag('form');
     echo html_writer::end_div();
 }
 
-// Submit button
-$searchbutton = get_string('search', 'local_deanpromoodle');
-if (strpos($searchbutton, '[[') !== false) {
-    $searchbutton = get_string('search'); // Use Moodle core string
-}
-echo html_writer::empty_tag('input', [
-    'type' => 'submit',
-    'value' => $searchbutton,
-    'class' => 'btn btn-primary'
-]);
-
-echo html_writer::end_tag('form');
-echo html_writer::end_div();
-
-// Teachers table
-if (empty($paginatedteachers)) {
-    echo html_writer::div(
-        get_string('noteachersfound', 'local_deanpromoodle'),
-        'alert alert-info',
-        ['style' => 'margin-top: 20px;']
-    );
-} else {
-    echo html_writer::start_tag('table', [
-        'class' => 'table table-striped table-hover',
-        'style' => 'width: 100%; margin-top: 20px;'
-    ]);
-    
-    // Table header
-    echo html_writer::start_tag('thead');
-    echo html_writer::start_tag('tr');
-    $fullnamestr = get_string('fullname', 'local_deanpromoodle');
-    if (strpos($fullnamestr, '[[') !== false) {
-        $fullnamestr = get_string('fullname');
-    }
-    $emailstr = get_string('email', 'local_deanpromoodle');
-    if (strpos($emailstr, '[[') !== false) {
-        $emailstr = get_string('email');
-    }
-    $usernamestr = get_string('username', 'local_deanpromoodle');
-    if (strpos($usernamestr, '[[') !== false) {
-        $usernamestr = get_string('username');
-    }
-    $coursesstr = get_string('courses', 'local_deanpromoodle');
-    if (strpos($coursesstr, '[[') !== false) {
-        $coursesstr = get_string('courses');
-    }
-    $actionsstr = get_string('actions', 'local_deanpromoodle');
-    if (strpos($actionsstr, '[[') !== false) {
-        $actionsstr = 'Actions';
-    }
-    echo html_writer::tag('th', $fullnamestr, ['style' => 'width: 20%;']);
-    echo html_writer::tag('th', $emailstr, ['style' => 'width: 20%;']);
-    echo html_writer::tag('th', $usernamestr, ['style' => 'width: 15%;']);
-    echo html_writer::tag('th', $coursesstr, ['style' => 'width: 35%;']);
-    echo html_writer::tag('th', $actionsstr, ['style' => 'width: 10%;']);
-    echo html_writer::end_tag('tr');
-    echo html_writer::end_tag('thead');
-    
-    // Table body
-    echo html_writer::start_tag('tbody');
-    foreach ($paginatedteachers as $teacher) {
-        echo html_writer::start_tag('tr');
-        
-        // Full name
-        $fullname = fullname($teacher);
-        echo html_writer::tag('td', $fullname);
-        
-        // Email
-        echo html_writer::tag('td', htmlspecialchars($teacher->email));
-        
-        // Username
-        echo html_writer::tag('td', htmlspecialchars($teacher->username));
-        
-        // Courses - display as list with line breaks
-        $courselist = implode('<br>', array_map('htmlspecialchars', $teacher->courses));
-        echo html_writer::tag('td', $courselist, ['style' => 'max-width: 500px; word-wrap: break-word;']);
-        
-        // Actions
-        $profileurl = new moodle_url('/user/profile.php', ['id' => $teacher->id]);
-        $viewprofilestr = get_string('viewprofile', 'local_deanpromoodle');
-        if (strpos($viewprofilestr, '[[') !== false) {
-            $viewprofilestr = get_string('viewprofile');
-        }
-        $actions = html_writer::link(
-            $profileurl,
-            $viewprofilestr,
-            ['class' => 'btn btn-sm btn-primary']
-        );
-        echo html_writer::tag('td', $actions);
-        
-        echo html_writer::end_tag('tr');
-    }
-    echo html_writer::end_tag('tbody');
-    echo html_writer::end_tag('table');
-    
-    // Pagination
-    if ($totalpages > 1) {
-        echo html_writer::start_div('pagination-wrapper', ['style' => 'margin-top: 20px;']);
-        $baseurl = new moodle_url('/local/deanpromoodle/pages/teacher.php', [
-            'courseid' => $courseid,
-            'search' => $search,
-            'perpage' => $perpage
-        ]);
-        
-        // Previous page
-        if ($page > 0) {
-            $prevurl = clone $baseurl;
-            $prevurl->param('page', $page - 1);
-            echo html_writer::link($prevurl, '« ' . get_string('previous', 'local_deanpromoodle'), ['class' => 'btn btn-sm']);
+// Content based on selected tab
+switch ($tab) {
+    case 'assignments':
+        // Get ungraded assignments
+        $ungradedassignments = [];
+        foreach ($teachercourses as $course) {
+            $coursecontext = context_course::instance($course->id);
+            $assignments = get_all_instances_in_course('assign', $course, false);
+            
+            foreach ($assignments as $assignment) {
+                $cm = get_coursemodule_from_instance('assign', $assignment->id, $course->id);
+                $assigncontext = context_module::instance($cm->id);
+                
+                // Get submissions that need grading
+                $submissions = $DB->get_records_sql(
+                    "SELECT s.*, u.firstname, u.lastname, u.email, u.id as userid
+                     FROM {assign_submission} s
+                     JOIN {user} u ON u.id = s.userid
+                     WHERE s.assignment = ? AND s.status = 'submitted' 
+                     AND (s.timemodified > 0)
+                     AND NOT EXISTS (
+                         SELECT 1 FROM {assign_grades} g 
+                         WHERE g.assignment = s.assignment AND g.userid = s.userid
+                     )
+                     ORDER BY s.timemodified DESC",
+                    [$assignment->id]
+                );
+                
+                foreach ($submissions as $submission) {
+                    $ungradedassignments[] = (object)[
+                        'id' => $submission->id,
+                        'assignmentid' => $assignment->id,
+                        'assignmentname' => $assignment->name,
+                        'courseid' => $course->id,
+                        'coursename' => $course->fullname,
+                        'userid' => $submission->userid,
+                        'studentname' => fullname($submission),
+                        'email' => $submission->email,
+                        'submitted' => userdate($submission->timemodified),
+                        'timemodified' => $submission->timemodified
+                    ];
+                }
+            }
         }
         
-        // Page info
-        echo html_writer::span(
-            get_string('page', 'local_deanpromoodle') . ' ' . ($page + 1) . ' ' . 
-            get_string('of', 'local_deanpromoodle') . ' ' . $totalpages . 
-            ' (' . $totalteachers . ' ' . get_string('teachers', 'local_deanpromoodle') . ')',
-            ['style' => 'margin: 0 15px;']
-        );
+        // Pagination
+        $total = count($ungradedassignments);
+        $totalpages = $total > 0 ? ceil($total / $perpage) : 0;
+        $offset = $page * $perpage;
+        $paginated = array_slice($ungradedassignments, $offset, $perpage);
         
-        // Next page
-        if ($page < $totalpages - 1) {
-            $nexturl = clone $baseurl;
-            $nexturl->param('page', $page + 1);
-            echo html_writer::link($nexturl, get_string('next', 'local_deanpromoodle') . ' »', ['class' => 'btn btn-sm']);
+        // Display table
+        if (empty($paginated)) {
+            echo html_writer::div(get_string('noassignmentsfound', 'local_deanpromoodle'), 'alert alert-info');
+        } else {
+            echo html_writer::start_tag('table', ['class' => 'table table-striped table-hover', 'style' => 'width: 100%;']);
+            echo html_writer::start_tag('thead');
+            echo html_writer::start_tag('tr');
+            echo html_writer::tag('th', 'Course');
+            echo html_writer::tag('th', 'Assignment');
+            echo html_writer::tag('th', 'Student');
+            echo html_writer::tag('th', 'Submitted');
+            echo html_writer::tag('th', 'Actions');
+            echo html_writer::end_tag('tr');
+            echo html_writer::end_tag('thead');
+            echo html_writer::start_tag('tbody');
+            foreach ($paginated as $item) {
+                echo html_writer::start_tag('tr');
+                echo html_writer::tag('td', htmlspecialchars($item->coursename));
+                echo html_writer::tag('td', htmlspecialchars($item->assignmentname));
+                echo html_writer::tag('td', htmlspecialchars($item->studentname));
+                echo html_writer::tag('td', $item->submitted);
+                $gradeurl = new moodle_url('/mod/assign/view.php', ['id' => $item->assignmentid, 'action' => 'grading', 'userid' => $item->userid]);
+                $actions = html_writer::link($gradeurl, 'Grade', ['class' => 'btn btn-sm btn-primary']);
+                echo html_writer::tag('td', $actions);
+                echo html_writer::end_tag('tr');
+            }
+            echo html_writer::end_tag('tbody');
+            echo html_writer::end_tag('table');
+            
+            // Pagination
+            if ($totalpages > 1) {
+                echo html_writer::start_div('pagination-wrapper', ['style' => 'margin-top: 20px; text-align: center;']);
+                $baseurl = new moodle_url('/local/deanpromoodle/pages/teacher.php', ['tab' => $tab, 'courseid' => $courseid, 'perpage' => $perpage]);
+                if ($page > 0) {
+                    $prevurl = clone $baseurl;
+                    $prevurl->param('page', $page - 1);
+                    echo html_writer::link($prevurl, '« Previous', ['class' => 'btn btn-sm']);
+                }
+                echo html_writer::span("Page " . ($page + 1) . " of " . $totalpages . " ($total items)", ['style' => 'margin: 0 15px;']);
+                if ($page < $totalpages - 1) {
+                    $nexturl = clone $baseurl;
+                    $nexturl->param('page', $page + 1);
+                    echo html_writer::link($nexturl, 'Next »', ['class' => 'btn btn-sm']);
+                }
+                echo html_writer::end_div();
+            }
+        }
+        break;
+        
+    case 'quizzes':
+        // Get failed quiz attempts (exams only)
+        $failedquizzes = [];
+        foreach ($teachercourses as $course) {
+            $quizzes = get_all_instances_in_course('quiz', $course, false);
+            
+            foreach ($quizzes as $quiz) {
+                // Check if it's an exam (you may need to adjust this logic)
+                // For now, we'll get all failed attempts
+                $attempts = $DB->get_records_sql(
+                    "SELECT qa.*, u.firstname, u.lastname, u.email, u.id as userid, q.name as quizname
+                     FROM {quiz_attempts} qa
+                     JOIN {user} u ON u.id = qa.userid
+                     JOIN {quiz} q ON q.id = qa.quiz
+                     WHERE qa.quiz = ? AND qa.state = 'finished' AND qa.sumgrades < q.sumgrades
+                     ORDER BY qa.timemodified DESC",
+                    [$quiz->id]
+                );
+                
+                foreach ($attempts as $attempt) {
+                    $failedquizzes[] = (object)[
+                        'id' => $attempt->id,
+                        'quizid' => $quiz->id,
+                        'quizname' => $quiz->name,
+                        'courseid' => $course->id,
+                        'coursename' => $course->fullname,
+                        'userid' => $attempt->userid,
+                        'studentname' => fullname($attempt),
+                        'email' => $attempt->email,
+                        'grade' => $attempt->sumgrades . ' / ' . $quiz->sumgrades,
+                        'attempted' => userdate($attempt->timemodified),
+                        'timemodified' => $attempt->timemodified
+                    ];
+                }
+            }
         }
         
-        echo html_writer::end_div();
-    }
+        // Pagination
+        $total = count($failedquizzes);
+        $totalpages = $total > 0 ? ceil($total / $perpage) : 0;
+        $offset = $page * $perpage;
+        $paginated = array_slice($failedquizzes, $offset, $perpage);
+        
+        // Display table
+        if (empty($paginated)) {
+            echo html_writer::div(get_string('noquizzesfound', 'local_deanpromoodle'), 'alert alert-info');
+        } else {
+            echo html_writer::start_tag('table', ['class' => 'table table-striped table-hover', 'style' => 'width: 100%;']);
+            echo html_writer::start_tag('thead');
+            echo html_writer::start_tag('tr');
+            echo html_writer::tag('th', 'Course');
+            echo html_writer::tag('th', 'Quiz');
+            echo html_writer::tag('th', 'Student');
+            echo html_writer::tag('th', 'Grade');
+            echo html_writer::tag('th', 'Attempted');
+            echo html_writer::tag('th', 'Actions');
+            echo html_writer::end_tag('tr');
+            echo html_writer::end_tag('thead');
+            echo html_writer::start_tag('tbody');
+            foreach ($paginated as $item) {
+                echo html_writer::start_tag('tr');
+                echo html_writer::tag('td', htmlspecialchars($item->coursename));
+                echo html_writer::tag('td', htmlspecialchars($item->quizname));
+                echo html_writer::tag('td', htmlspecialchars($item->studentname));
+                echo html_writer::tag('td', $item->grade);
+                echo html_writer::tag('td', $item->attempted);
+                $reviewurl = new moodle_url('/mod/quiz/review.php', ['attempt' => $item->id]);
+                $actions = html_writer::link($reviewurl, 'Review', ['class' => 'btn btn-sm btn-primary']);
+                echo html_writer::tag('td', $actions);
+                echo html_writer::end_tag('tr');
+            }
+            echo html_writer::end_tag('tbody');
+            echo html_writer::end_tag('table');
+            
+            // Pagination
+            if ($totalpages > 1) {
+                echo html_writer::start_div('pagination-wrapper', ['style' => 'margin-top: 20px; text-align: center;']);
+                $baseurl = new moodle_url('/local/deanpromoodle/pages/teacher.php', ['tab' => $tab, 'courseid' => $courseid, 'perpage' => $perpage]);
+                if ($page > 0) {
+                    $prevurl = clone $baseurl;
+                    $prevurl->param('page', $page - 1);
+                    echo html_writer::link($prevurl, '« Previous', ['class' => 'btn btn-sm']);
+                }
+                echo html_writer::span("Page " . ($page + 1) . " of " . $totalpages . " ($total items)", ['style' => 'margin: 0 15px;']);
+                if ($page < $totalpages - 1) {
+                    $nexturl = clone $baseurl;
+                    $nexturl->param('page', $page + 1);
+                    echo html_writer::link($nexturl, 'Next »', ['class' => 'btn btn-sm']);
+                }
+                echo html_writer::end_div();
+            }
+        }
+        break;
+        
+    case 'forums':
+        // Get unreplied forum posts
+        $unrepliedposts = [];
+        foreach ($teachercourses as $course) {
+            $forums = get_all_instances_in_course('forum', $course, false);
+            
+            foreach ($forums as $forum) {
+                $cm = get_coursemodule_from_instance('forum', $forum->id, $course->id);
+                $forumcontext = context_module::instance($cm->id);
+                
+                // Get posts without teacher replies
+                $posts = $DB->get_records_sql(
+                    "SELECT p.*, u.firstname, u.lastname, u.email, u.id as userid, d.name as discussionname
+                     FROM {forum_posts} p
+                     JOIN {user} u ON u.id = p.userid
+                     JOIN {forum_discussions} d ON d.id = p.discussion
+                     WHERE d.forum = ? AND p.parent = 0
+                     AND NOT EXISTS (
+                         SELECT 1 FROM {forum_posts} p2
+                         JOIN {role_assignments} ra ON ra.userid = p2.userid
+                         JOIN {role} r ON r.id = ra.roleid
+                         WHERE p2.discussion = p.discussion 
+                         AND p2.id > p.id
+                         AND r.shortname IN ('teacher', 'editingteacher', 'manager')
+                         AND ra.contextid = ?
+                     )
+                     ORDER BY p.created DESC",
+                    [$forum->id, $forumcontext->id]
+                );
+                
+                foreach ($posts as $post) {
+                    $unrepliedposts[] = (object)[
+                        'id' => $post->id,
+                        'forumid' => $forum->id,
+                        'forumname' => $forum->name,
+                        'discussionid' => $post->discussion,
+                        'discussionname' => $post->discussionname,
+                        'courseid' => $course->id,
+                        'coursename' => $course->fullname,
+                        'userid' => $post->userid,
+                        'studentname' => fullname($post),
+                        'email' => $post->email,
+                        'subject' => $post->subject,
+                        'posted' => userdate($post->created),
+                        'created' => $post->created
+                    ];
+                }
+            }
+        }
+        
+        // Pagination
+        $total = count($unrepliedposts);
+        $totalpages = $total > 0 ? ceil($total / $perpage) : 0;
+        $offset = $page * $perpage;
+        $paginated = array_slice($unrepliedposts, $offset, $perpage);
+        
+        // Display table
+        if (empty($paginated)) {
+            echo html_writer::div(get_string('noforumspostsfound', 'local_deanpromoodle'), 'alert alert-info');
+        } else {
+            echo html_writer::start_tag('table', ['class' => 'table table-striped table-hover', 'style' => 'width: 100%;']);
+            echo html_writer::start_tag('thead');
+            echo html_writer::start_tag('tr');
+            echo html_writer::tag('th', 'Course');
+            echo html_writer::tag('th', 'Forum');
+            echo html_writer::tag('th', 'Discussion');
+            echo html_writer::tag('th', 'Student');
+            echo html_writer::tag('th', 'Subject');
+            echo html_writer::tag('th', 'Posted');
+            echo html_writer::tag('th', 'Actions');
+            echo html_writer::end_tag('tr');
+            echo html_writer::end_tag('thead');
+            echo html_writer::start_tag('tbody');
+            foreach ($paginated as $item) {
+                echo html_writer::start_tag('tr');
+                echo html_writer::tag('td', htmlspecialchars($item->coursename));
+                echo html_writer::tag('td', htmlspecialchars($item->forumname));
+                echo html_writer::tag('td', htmlspecialchars($item->discussionname));
+                echo html_writer::tag('td', htmlspecialchars($item->studentname));
+                echo html_writer::tag('td', htmlspecialchars($item->subject));
+                echo html_writer::tag('td', $item->posted);
+                $posturl = new moodle_url('/mod/forum/discuss.php', ['d' => $item->discussionid]);
+                $actions = html_writer::link($posturl, 'Reply', ['class' => 'btn btn-sm btn-primary']);
+                echo html_writer::tag('td', $actions);
+                echo html_writer::end_tag('tr');
+            }
+            echo html_writer::end_tag('tbody');
+            echo html_writer::end_tag('table');
+            
+            // Pagination
+            if ($totalpages > 1) {
+                echo html_writer::start_div('pagination-wrapper', ['style' => 'margin-top: 20px; text-align: center;']);
+                $baseurl = new moodle_url('/local/deanpromoodle/pages/teacher.php', ['tab' => $tab, 'courseid' => $courseid, 'perpage' => $perpage]);
+                if ($page > 0) {
+                    $prevurl = clone $baseurl;
+                    $prevurl->param('page', $page - 1);
+                    echo html_writer::link($prevurl, '« Previous', ['class' => 'btn btn-sm']);
+                }
+                echo html_writer::span("Page " . ($page + 1) . " of " . $totalpages . " ($total items)", ['style' => 'margin: 0 15px;']);
+                if ($page < $totalpages - 1) {
+                    $nexturl = clone $baseurl;
+                    $nexturl->param('page', $page + 1);
+                    echo html_writer::link($nexturl, 'Next »', ['class' => 'btn btn-sm']);
+                }
+                echo html_writer::end_div();
+            }
+        }
+        break;
 }
 
 echo $OUTPUT->footer();
