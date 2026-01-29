@@ -1668,13 +1668,16 @@ switch ($tab) {
             $formtitle = $isedit ? 'Редактировать программу' : 'Создать программу';
             echo html_writer::tag('h2', $formtitle, ['style' => 'margin-bottom: 20px;']);
             
+            $formparams = [
+                'tab' => 'programs',
+                'action' => $action
+            ];
+            if ($isedit && $programid > 0) {
+                $formparams['programid'] = $programid;
+            }
             echo html_writer::start_tag('form', [
                 'method' => 'post',
-                'action' => new moodle_url('/local/deanpromoodle/pages/admin.php', [
-                    'tab' => 'programs',
-                    'action' => $action,
-                    'programid' => $programid
-                ]),
+                'action' => new moodle_url('/local/deanpromoodle/pages/admin.php', $formparams),
                 'style' => 'max-width: 800px;'
             ]);
             
@@ -1934,9 +1937,9 @@ switch ($tab) {
             echo html_writer::start_tag('script');
             echo "
             (function() {
-                var programId = " . ($isedit ? $programid : 0) . ";
+                var programId = " . ($isedit && isset($programid) ? (int)$programid : 0) . ";
                 var isEdit = " . ($isedit ? 'true' : 'false') . ";
-                var nextRelationId = " . ($maxrelationid + 1) . ";
+                var nextRelationId = " . ((isset($maxrelationid) ? (int)$maxrelationid : 0) + 1) . ";
                 
                 // Функция обновления скрытого поля с порядком предметов
                 function updateSubjectsOrder() {
@@ -2053,7 +2056,7 @@ switch ($tab) {
                     var btnUp = document.createElement('a');
                     btnUp.href = '#';
                     btnUp.className = 'btn btn-sm btn-outline-primary move-subject-up';
-                    btnUp.title = 'Вверх';
+                    btnUp.title = 'Up';
                     btnUp.setAttribute('data-relation-id', relationId);
                     btnUp.style.padding = '4px 8px';
                     btnUp.innerHTML = '<i class=\"fas fa-arrow-up\"></i>';
@@ -2062,7 +2065,7 @@ switch ($tab) {
                     var btnDown = document.createElement('a');
                     btnDown.href = '#';
                     btnDown.className = 'btn btn-sm btn-outline-primary move-subject-down';
-                    btnDown.title = 'Вниз';
+                    btnDown.title = 'Down';
                     btnDown.setAttribute('data-relation-id', relationId);
                     btnDown.style.padding = '4px 8px';
                     btnDown.innerHTML = '<i class=\"fas fa-arrow-down\"></i>';
@@ -2071,7 +2074,7 @@ switch ($tab) {
                     var btnRemove = document.createElement('a');
                     btnRemove.href = '#';
                     btnRemove.className = 'btn btn-sm btn-outline-danger remove-subject';
-                    btnRemove.title = 'Удалить';
+                    btnRemove.title = 'Remove';
                     btnRemove.setAttribute('data-subject-id', subject.id);
                     btnRemove.setAttribute('data-relation-id', relationId);
                     btnRemove.style.padding = '4px 8px';
@@ -2085,7 +2088,7 @@ switch ($tab) {
                     updateOrderNumbers();
                 }
                 
-                // Обработчик кнопки "Добавить предмет"
+                // Handler for Add Subject button
                 var addSubjectBtn = document.getElementById('add-subject-to-program-btn');
                 if (addSubjectBtn) {
                     addSubjectBtn.addEventListener('click', function(e) {
