@@ -334,9 +334,12 @@ switch ($tab) {
                 );
                 
                 foreach ($submissions as $submission) {
+                    // Получаем ID модуля курса (cmid) для правильной ссылки
+                    $cm = get_coursemodule_from_instance('assign', $assignment->id, $course->id);
                     $ungradedassignments[] = (object)[
                         'id' => $submission->id,
                         'assignmentid' => $assignment->id,
+                        'cmid' => $cm->id, // ID модуля курса для ссылки
                         'assignmentname' => $assignment->name,
                         'courseid' => $course->id,
                         'coursename' => $course->fullname,
@@ -394,7 +397,8 @@ switch ($tab) {
                 echo html_writer::tag('td', htmlspecialchars($item->assignmentname));
                 echo html_writer::tag('td', htmlspecialchars($item->studentname));
                 echo html_writer::tag('td', $item->submitted);
-                $gradeurl = new moodle_url('/mod/assign/view.php', ['id' => $item->assignmentid, 'action' => 'grading', 'userid' => $item->userid]);
+                // Используем cmid (ID модуля курса) вместо assignmentid
+                $gradeurl = new moodle_url('/mod/assign/view.php', ['id' => $item->cmid, 'action' => 'grading', 'userid' => $item->userid]);
                 $gradestr = 'Оценить';
                 $actions = html_writer::link($gradeurl, $gradestr, ['class' => 'btn btn-sm btn-primary', 'target' => '_blank']);
                 echo html_writer::tag('td', $actions);
