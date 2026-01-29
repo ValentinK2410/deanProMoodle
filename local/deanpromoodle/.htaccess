@@ -1,17 +1,7 @@
-# Prevent direct access to plugin directory
-# Allow access only to specific PHP files
-
-# Deny directory listing
+# Prevent directory listing
 Options -Indexes
 
-# Allow access to PHP files
+# Allow access to PHP files (Apache 2.4 syntax)
 <FilesMatch "\.php$">
-    Order Allow,Deny
-    Allow from all
-</FilesMatch>
-
-# Deny access to other files
-<FilesMatch "^(?!.*\.php$).*$">
-    Order Deny,Allow
-    Deny from all
+    Require all granted
 </FilesMatch>
