@@ -543,6 +543,83 @@ switch ($tab) {
             echo html_writer::end_tag('tbody');
             echo html_writer::end_tag('table');
         }
+        
+        // Модальное окно для отображения курсов преподавателя
+        echo html_writer::start_div('modal fade', ['id' => 'teacherCoursesModal', 'tabindex' => '-1', 'role' => 'dialog']);
+        echo html_writer::start_div('modal-dialog modal-lg', ['role' => 'document']);
+        echo html_writer::start_div('modal-content');
+        echo html_writer::start_div('modal-header');
+        echo html_writer::tag('h5', 'Курсы преподавателя', ['class' => 'modal-title', 'id' => 'modalTeacherName']);
+        echo html_writer::start_tag('button', ['type' => 'button', 'class' => 'close', 'data-dismiss' => 'modal', 'aria-label' => 'Close']);
+        echo html_writer::tag('span', '×', ['aria-hidden' => 'true']);
+        echo html_writer::end_tag('button');
+        echo html_writer::end_div(); // modal-header
+        echo html_writer::start_div('modal-body', ['id' => 'modalTeacherCourses']);
+        echo html_writer::div('Загрузка...', 'text-center');
+        echo html_writer::end_div(); // modal-body
+        echo html_writer::start_div('modal-footer');
+        echo html_writer::start_tag('button', ['type' => 'button', 'class' => 'btn btn-secondary', 'data-dismiss' => 'modal']);
+        echo 'Закрыть';
+        echo html_writer::end_tag('button');
+        echo html_writer::end_div(); // modal-footer
+        echo html_writer::end_div(); // modal-content
+        echo html_writer::end_div(); // modal-dialog
+        echo html_writer::end_div(); // modal
+        
+        // JavaScript для загрузки курсов преподавателя
+        $PAGE->requires->js_init_code("
+            (function() {
+                var teacherRows = document.querySelectorAll('.teacher-row');
+                teacherRows.forEach(function(row) {
+                    row.addEventListener('click', function() {
+                        var teacherId = this.getAttribute('data-teacher-id');
+                        var teacherName = this.getAttribute('data-teacher-name');
+                        var modal = document.getElementById('teacherCoursesModal');
+                        var modalTitle = document.getElementById('modalTeacherName');
+                        var modalBody = document.getElementById('modalTeacherCourses');
+                        
+                        modalTitle.textContent = 'Курсы преподавателя: ' + teacherName;
+                        modalBody.innerHTML = '<div class=\"text-center\">Загрузка...</div>';
+                        
+                        // AJAX запрос для получения курсов
+                        var xhr = new XMLHttpRequest();
+                        xhr.open('GET', '/local/deanpromoodle/pages/admin_ajax.php?action=getteachercourses&teacherid=' + teacherId, true);
+                        xhr.onreadystatechange = function() {
+                            if (xhr.readyState === 4) {
+                                if (xhr.status === 200) {
+                                    try {
+                                        var response = JSON.parse(xhr.responseText);
+                                        if (response.success) {
+                                            var html = '<table class=\"table table-striped table-hover\"><thead><tr><th>ID</th><th>Название курса</th><th>Категория</th><th>Дата начала</th><th>Дата окончания</th></tr></thead><tbody>';
+                                            if (response.courses && response.courses.length > 0) {
+                                                response.courses.forEach(function(course) {
+                                                    html += '<tr><td>' + course.id + '</td><td>' + course.fullname + '</td><td>' + (course.categoryname || '-') + '</td><td>' + (course.startdate || '-') + '</td><td>' + (course.enddate || '-') + '</td></tr>';
+                                                });
+                                            } else {
+                                                html += '<tr><td colspan=\"5\" class=\"text-center\">Курсы не найдены</td></tr>';
+                                            }
+                                            html += '</tbody></table>';
+                                            modalBody.innerHTML = html;
+                                        } else {
+                                            modalBody.innerHTML = '<div class=\"alert alert-danger\">Ошибка: ' + (response.error || 'Неизвестная ошибка') + '</div>';
+                                        }
+                                    } catch (e) {
+                                        modalBody.innerHTML = '<div class=\"alert alert-danger\">Ошибка при обработке ответа сервера</div>';
+                                    }
+                                } else {
+                                    modalBody.innerHTML = '<div class=\"alert alert-danger\">Ошибка загрузки данных</div>';
+                                }
+                            }
+                        };
+                        xhr.send();
+                        
+                        // Показываем модальное окно (Bootstrap)
+                        jQuery(modal).modal('show');
+                    });
+                });
+            })();
+        ");
+        
         echo html_writer::end_div();
         break;
     
