@@ -451,6 +451,17 @@ switch ($tab) {
                     array_merge([$coursecontext->id], $teacherroleids)
                 );
                 
+                // Если нет преподавателей в контексте курса, проверяем системный контекст
+                if (empty($teacheruserids)) {
+                    $systemcontext = context_system::instance();
+                    $teacheruserids = $DB->get_fieldset_sql(
+                        "SELECT DISTINCT ra.userid
+                         FROM {role_assignments} ra
+                         WHERE ra.contextid = ? AND ra.roleid IN ($placeholders)",
+                        array_merge([$systemcontext->id], $teacherroleids)
+                    );
+                }
+                
                 if (empty($teacheruserids)) {
                     continue;
                 }
@@ -476,6 +487,7 @@ switch ($tab) {
                 $studentplaceholders = implode(',', array_fill(0, count($studentuserids), '?'));
                 
                 // Получение сообщений студентов, на которые не ответили преподаватели
+                // Проверяем по времени создания: если после сообщения студента нет ответа от преподавателя
                 $posts = $DB->get_records_sql(
                     "SELECT p.*, u.firstname, u.lastname, u.email, u.id as userid, d.name as discussionname
                      FROM {forum_posts} p
@@ -486,7 +498,7 @@ switch ($tab) {
                      AND NOT EXISTS (
                          SELECT 1 FROM {forum_posts} p2
                          WHERE p2.discussion = p.discussion 
-                         AND p2.id > p.id
+                         AND p2.created > p.created
                          AND p2.userid IN ($teacherplaceholders)
                      )
                      ORDER BY p.created DESC",
