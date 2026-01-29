@@ -103,65 +103,84 @@ $PAGE->set_pagelayout('standard');
 // Add CSS
 $PAGE->requires->css('/local/deanpromoodle/styles.css');
 
-// Get all courses where user is teacher
-global $USER;
-$teachercourses = [];
+// Get all courses
+global $USER, $DB;
+$allcourses = [];
 if ($courseid == 0) {
-    // Get all courses where user is teacher
-    $courses = enrol_get_my_courses();
+    // Get all courses
+    $courses = $DB->get_records('course', ['visible' => 1], 'fullname ASC', 'id, fullname, shortname');
     foreach ($courses as $course) {
-        $coursecontext = context_course::instance($course->id);
-        if (has_capability('moodle/course:viewparticipants', $coursecontext) || 
-            has_capability('moodle/course:manageactivities', $coursecontext)) {
-            $teachercourses[$course->id] = $course;
+        if ($course->id > 1) { // Skip site course
+            $allcourses[$course->id] = $course;
         }
     }
 } else {
     $course = get_course($courseid);
-    $coursecontext = context_course::instance($courseid);
-    if (has_capability('moodle/course:viewparticipants', $coursecontext) || 
-        has_capability('moodle/course:manageactivities', $coursecontext)) {
-        $teachercourses[$courseid] = $course;
+    if ($course->id > 1) {
+        $allcourses[$courseid] = $course;
     }
 }
 
-// Get all students
-$allstudents = [];
-foreach ($teachercourses as $course) {
+// Get all teachers from courses
+$allteachers = [];
+foreach ($allcourses as $course) {
     $coursecontext = context_course::instance($course->id);
-    $students = get_enrolled_users($coursecontext, 'moodle/course:view', 0, 'u.*', 'u.lastname, u.firstname');
     
-    foreach ($students as $student) {
-        if (!isset($allstudents[$student->id])) {
-            $allstudents[$student->id] = $student;
-            $allstudents[$student->id]->courses = [];
+    // Get users with teacher/editingteacher roles
+    $teachers = get_enrolled_users($coursecontext, 'moodle/course:manageactivities', 0, 'u.*', 'u.lastname, u.firstname');
+    
+    // Also get users with teacher role explicitly
+    $roleids = $DB->get_fieldset_select('role', 'id', "shortname IN ('teacher', 'editingteacher', 'manager')");
+    if (!empty($roleids)) {
+        $roleassignments = $DB->get_records_sql(
+            "SELECT ra.userid, u.*
+             FROM {role_assignments} ra
+             JOIN {user} u ON u.id = ra.userid
+             WHERE ra.contextid = ? AND ra.roleid IN (" . implode(',', $roleids) . ")
+             AND u.deleted = 0",
+            [$coursecontext->id]
+        );
+        
+        foreach ($roleassignments as $assignment) {
+            if (!isset($teachers[$assignment->userid])) {
+                $teachers[$assignment->userid] = $assignment;
+            }
         }
-        $allstudents[$student->id]->courses[] = $course->fullname;
+    }
+    
+    foreach ($teachers as $teacher) {
+        if (!isset($allteachers[$teacher->id])) {
+            $allteachers[$teacher->id] = $teacher;
+            $allteachers[$teacher->id]->courses = [];
+        }
+        // Add course info with full details
+        $coursename = $course->fullname;
+        $allteachers[$teacher->id]->courses[] = $coursename;
     }
 }
 
 // Apply search filter
 if (!empty($search)) {
-    $filteredstudents = [];
-    foreach ($allstudents as $student) {
+    $filteredteachers = [];
+    foreach ($allteachers as $teacher) {
         $searchlower = mb_strtolower($search);
-        $fullname = mb_strtolower($student->firstname . ' ' . $student->lastname);
-        $email = mb_strtolower($student->email);
+        $fullname = mb_strtolower($teacher->firstname . ' ' . $teacher->lastname);
+        $email = mb_strtolower($teacher->email);
         
         if (strpos($fullname, $searchlower) !== false || 
             strpos($email, $searchlower) !== false ||
-            strpos(mb_strtolower($student->username), $searchlower) !== false) {
-            $filteredstudents[$student->id] = $student;
+            strpos(mb_strtolower($teacher->username), $searchlower) !== false) {
+            $filteredteachers[$teacher->id] = $teacher;
         }
     }
-    $allstudents = $filteredstudents;
+    $allteachers = $filteredteachers;
 }
 
 // Pagination
-$totalstudents = count($allstudents);
-$totalpages = ceil($totalstudents / $perpage);
+$totalteachers = count($allteachers);
+$totalpages = ceil($totalteachers / $perpage);
 $offset = $page * $perpage;
-$paginatedstudents = array_slice($allstudents, $offset, $perpage, true);
+$paginatedteachers = array_slice($allteachers, $offset, $perpage, true);
 
 // Output page
 echo $OUTPUT->header();
@@ -177,13 +196,13 @@ echo html_writer::start_tag('form', [
 
 // Search field
 echo html_writer::start_div('form-group', ['style' => 'margin-right: 10px;']);
-echo html_writer::label(get_string('searchstudents', 'local_deanpromoodle'), 'search', false, ['class' => 'sr-only']);
+echo html_writer::label(get_string('searchteachers', 'local_deanpromoodle'), 'search', false, ['class' => 'sr-only']);
 echo html_writer::empty_tag('input', [
     'type' => 'text',
     'name' => 'search',
     'id' => 'search',
     'value' => $search,
-    'placeholder' => get_string('searchstudents', 'local_deanpromoodle'),
+    'placeholder' => get_string('searchteachers', 'local_deanpromoodle'),
     'class' => 'form-control',
     'style' => 'width: 300px; display: inline-block;'
 ]);
@@ -211,10 +230,10 @@ echo html_writer::empty_tag('input', [
 echo html_writer::end_tag('form');
 echo html_writer::end_div();
 
-// Students table
-if (empty($paginatedstudents)) {
+// Teachers table
+if (empty($paginatedteachers)) {
     echo html_writer::div(
-        get_string('nostudentsfound', 'local_deanpromoodle'),
+        get_string('noteachersfound', 'local_deanpromoodle'),
         'alert alert-info',
         ['style' => 'margin-top: 20px;']
     );
@@ -227,35 +246,35 @@ if (empty($paginatedstudents)) {
     // Table header
     echo html_writer::start_tag('thead');
     echo html_writer::start_tag('tr');
-    echo html_writer::tag('th', get_string('fullname', 'local_deanpromoodle'), ['style' => 'width: 25%;']);
-    echo html_writer::tag('th', get_string('email', 'local_deanpromoodle'), ['style' => 'width: 25%;']);
+    echo html_writer::tag('th', get_string('fullname', 'local_deanpromoodle'), ['style' => 'width: 20%;']);
+    echo html_writer::tag('th', get_string('email', 'local_deanpromoodle'), ['style' => 'width: 20%;']);
     echo html_writer::tag('th', get_string('username', 'local_deanpromoodle'), ['style' => 'width: 15%;']);
-    echo html_writer::tag('th', get_string('courses', 'local_deanpromoodle'), ['style' => 'width: 25%;']);
+    echo html_writer::tag('th', get_string('courses', 'local_deanpromoodle'), ['style' => 'width: 35%;']);
     echo html_writer::tag('th', get_string('actions', 'local_deanpromoodle'), ['style' => 'width: 10%;']);
     echo html_writer::end_tag('tr');
     echo html_writer::end_tag('thead');
     
     // Table body
     echo html_writer::start_tag('tbody');
-    foreach ($paginatedstudents as $student) {
+    foreach ($paginatedteachers as $teacher) {
         echo html_writer::start_tag('tr');
         
         // Full name
-        $fullname = fullname($student);
+        $fullname = fullname($teacher);
         echo html_writer::tag('td', $fullname);
         
         // Email
-        echo html_writer::tag('td', htmlspecialchars($student->email));
+        echo html_writer::tag('td', htmlspecialchars($teacher->email));
         
         // Username
-        echo html_writer::tag('td', htmlspecialchars($student->username));
+        echo html_writer::tag('td', htmlspecialchars($teacher->username));
         
-        // Courses
-        $courselist = implode(', ', $student->courses);
-        echo html_writer::tag('td', htmlspecialchars($courselist));
+        // Courses - display as list with line breaks
+        $courselist = implode('<br>', array_map('htmlspecialchars', $teacher->courses));
+        echo html_writer::tag('td', $courselist, ['style' => 'max-width: 500px; word-wrap: break-word;']);
         
         // Actions
-        $profileurl = new moodle_url('/user/profile.php', ['id' => $student->id]);
+        $profileurl = new moodle_url('/user/profile.php', ['id' => $teacher->id]);
         $actions = html_writer::link(
             $profileurl,
             get_string('viewprofile', 'local_deanpromoodle'),
@@ -288,7 +307,7 @@ if (empty($paginatedstudents)) {
         echo html_writer::span(
             get_string('page', 'local_deanpromoodle') . ' ' . ($page + 1) . ' ' . 
             get_string('of', 'local_deanpromoodle') . ' ' . $totalpages . 
-            ' (' . $totalstudents . ' ' . get_string('students', 'local_deanpromoodle') . ')',
+            ' (' . $totalteachers . ' ' . get_string('teachers', 'local_deanpromoodle') . ')',
             ['style' => 'margin: 0 15px;']
         );
         
