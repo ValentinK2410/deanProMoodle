@@ -393,7 +393,7 @@ switch ($tab) {
                 echo html_writer::tag('td', $item->attempted);
                 $reviewurl = new moodle_url('/mod/quiz/review.php', ['attempt' => $item->id]);
                 $reviewstr = 'Просмотр';
-                $actions = html_writer::link($reviewurl, $reviewstr, ['class' => 'btn btn-sm btn-primary']);
+                $actions = html_writer::link($reviewurl, $reviewstr, ['class' => 'btn btn-sm btn-primary', 'target' => '_blank']);
                 echo html_writer::tag('td', $actions);
                 echo html_writer::end_tag('tr');
             }
