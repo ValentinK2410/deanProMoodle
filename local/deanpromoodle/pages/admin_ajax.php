@@ -65,6 +65,7 @@ if (!$hasaccess) {
 // Получение параметров
 $action = optional_param('action', '', PARAM_ALPHA);
 $teacherid = optional_param('teacherid', 0, PARAM_INT);
+$categoryid = optional_param('categoryid', 0, PARAM_INT);
 
 header('Content-Type: application/json');
 
@@ -126,6 +127,186 @@ if ($action == 'getteachercourses' && $teacherid > 0) {
         'courses' => $formattedcourses,
         'count' => count($formattedcourses)
     ]);
+} elseif ($action == 'getcategorycourses' && $categoryid > 0) {
+    // Получение курсов категории
+    global $DB;
+    
+    $courses = $DB->get_records_sql(
+        "SELECT c.id, c.fullname, c.shortname, c.startdate, c.enddate
+         FROM {course} c
+         WHERE c.category = ?
+         AND c.id > 1
+         ORDER BY c.fullname",
+        [$categoryid]
+    );
+    
+    $formattedcourses = [];
+    foreach ($courses as $course) {
+        $formattedcourses[] = [
+            'id' => $course->id,
+            'fullname' => $course->fullname,
+            'shortname' => $course->shortname ?: '-',
+            'startdate' => $course->startdate > 0 ? userdate($course->startdate) : '-',
+            'enddate' => $course->enddate > 0 ? userdate($course->enddate) : '-'
+        ];
+    }
+    
+    echo json_encode([
+        'success' => true,
+        'courses' => $formattedcourses,
+        'count' => count($formattedcourses)
+    ]);
+} elseif ($action == 'getcategorystudents' && $categoryid > 0) {
+    // Получение студентов категории
+    global $DB;
+    
+    // Получаем все курсы категории
+    $categorycourses = $DB->get_records('course', ['category' => $categoryid], '', 'id');
+    $courseids = array_keys($categorycourses);
+    
+    $students = [];
+    if (!empty($courseids)) {
+        // Получаем контексты курсов
+        $courseids_placeholders = implode(',', array_fill(0, count($courseids), '?'));
+        $coursecontextids = $DB->get_fieldset_sql(
+            "SELECT id FROM {context} WHERE instanceid IN ($courseids_placeholders) AND contextlevel = 50",
+            $courseids
+        );
+        
+        if (!empty($coursecontextids)) {
+            // Получаем ID роли студента
+            $studentroleid = $DB->get_field('role', 'id', ['shortname' => 'student']);
+            
+            if ($studentroleid) {
+                $contextplaceholders = implode(',', array_fill(0, count($coursecontextids), '?'));
+                $studentids = $DB->get_fieldset_sql(
+                    "SELECT DISTINCT ra.userid
+                     FROM {role_assignments} ra
+                     WHERE ra.contextid IN ($contextplaceholders)
+                     AND ra.roleid = ?",
+                    array_merge($coursecontextids, [$studentroleid])
+                );
+                
+                if (!empty($studentids)) {
+                    $studentids_placeholders = implode(',', array_fill(0, count($studentids), '?'));
+                    $students = $DB->get_records_sql(
+                        "SELECT u.id, u.firstname, u.lastname, u.email, u.timecreated, u.lastaccess
+                         FROM {user} u
+                         WHERE u.id IN ($studentids_placeholders)
+                         AND u.deleted = 0
+                         ORDER BY u.lastname, u.firstname",
+                        $studentids
+                    );
+                }
+            }
+        }
+    }
+    
+    $formattedstudents = [];
+    foreach ($students as $student) {
+        $formattedstudents[] = [
+            'id' => $student->id,
+            'fullname' => fullname($student),
+            'email' => $student->email ?: '-',
+            'timecreated' => $student->timecreated > 0 ? userdate($student->timecreated) : '-',
+            'lastaccess' => $student->lastaccess > 0 ? userdate($student->lastaccess) : '-'
+        ];
+    }
+    
+    echo json_encode([
+        'success' => true,
+        'students' => $formattedstudents,
+        'count' => count($formattedstudents)
+    ]);
+} elseif ($action == 'getcategoryteachers' && $categoryid > 0) {
+    // Получение преподавателей категории
+    global $DB;
+    
+    // Получаем все курсы категории
+    $categorycourses = $DB->get_records('course', ['category' => $categoryid], '', 'id');
+    $courseids = array_keys($categorycourses);
+    
+    $teachers = [];
+    if (!empty($courseids)) {
+        // Получаем контексты курсов
+        $courseids_placeholders = implode(',', array_fill(0, count($courseids), '?'));
+        $coursecontextids = $DB->get_fieldset_sql(
+            "SELECT id FROM {context} WHERE instanceid IN ($courseids_placeholders) AND contextlevel = 50",
+            $courseids
+        );
+        
+        if (!empty($coursecontextids)) {
+            // Получаем ID ролей преподавателей
+            $teacherroleids = $DB->get_fieldset_select('role', 'id', "shortname IN ('teacher', 'editingteacher', 'manager')");
+            
+            if (!empty($teacherroleids)) {
+                $contextplaceholders = implode(',', array_fill(0, count($coursecontextids), '?'));
+                $roleplaceholders = implode(',', array_fill(0, count($teacherroleids), '?'));
+                
+                // Получаем преподавателей с их ролями
+                $teacherdata = $DB->get_records_sql(
+                    "SELECT DISTINCT ra.userid, r.shortname as roleshortname, r.name as rolename
+                     FROM {role_assignments} ra
+                     JOIN {role} r ON r.id = ra.roleid
+                     WHERE ra.contextid IN ($contextplaceholders)
+                     AND ra.roleid IN ($roleplaceholders)",
+                    array_merge($coursecontextids, $teacherroleids)
+                );
+                
+                // Группируем по пользователям и собираем роли
+                $teacherusers = [];
+                foreach ($teacherdata as $td) {
+                    if (!isset($teacherusers[$td->userid])) {
+                        $teacherusers[$td->userid] = [
+                            'userid' => $td->userid,
+                            'roles' => []
+                        ];
+                    }
+                    $teacherusers[$td->userid]['roles'][] = $td->roleshortname;
+                }
+                
+                // Получаем данные пользователей
+                if (!empty($teacherusers)) {
+                    $teacherids = array_keys($teacherusers);
+                    $teacherids_placeholders = implode(',', array_fill(0, count($teacherids), '?'));
+                    $userdata = $DB->get_records_sql(
+                        "SELECT u.id, u.firstname, u.lastname, u.email, u.timecreated
+                         FROM {user} u
+                         WHERE u.id IN ($teacherids_placeholders)
+                         AND u.deleted = 0",
+                        $teacherids
+                    );
+                    
+                    foreach ($userdata as $user) {
+                        $roles = $teacherusers[$user->id]['roles'];
+                        $rolenames = [];
+                        $rolenamesmap = [
+                            'teacher' => 'Преподаватель',
+                            'editingteacher' => 'Редактирующий преподаватель',
+                            'manager' => 'Менеджер'
+                        ];
+                        foreach ($roles as $r) {
+                            $rolenames[] = isset($rolenamesmap[$r]) ? $rolenamesmap[$r] : $r;
+                        }
+                        
+                        $teachers[] = [
+                            'id' => $user->id,
+                            'fullname' => fullname($user),
+                            'email' => $user->email ?: '-',
+                            'role' => implode(', ', $rolenames),
+                            'timecreated' => $user->timecreated > 0 ? userdate($user->timecreated) : '-'
+                        ];
+                    }
+                }
+            }
+        }
+    }
+    
+    echo json_encode([
+        'success' => true,
+        'teachers' => $teachers,
+        'count' => count($teachers)
+    ]);
 } else {
-    echo json_encode(['success' => false, 'error' => 'Invalid action or teacher ID']);
+    echo json_encode(['success' => false, 'error' => 'Invalid action or parameters']);
 }

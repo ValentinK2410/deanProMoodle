@@ -1160,9 +1160,46 @@ switch ($tab) {
                 echo html_writer::start_tag('tr');
                 echo html_writer::tag('td', $program->id);
                 echo html_writer::tag('td', htmlspecialchars($program->name));
-                echo html_writer::tag('td', html_writer::tag('strong', $program->coursescount, ['style' => 'color: #007bff;']));
-                echo html_writer::tag('td', html_writer::tag('span', $program->studentscount, ['style' => 'color: green; font-weight: bold;']));
-                echo html_writer::tag('td', html_writer::tag('span', $program->teacherscount, ['style' => 'color: orange; font-weight: bold;']));
+                
+                // Количество курсов - ссылка если > 0
+                $coursescell = $program->coursescount;
+                if ($program->coursescount > 0) {
+                    $coursescell = html_writer::link('#', $program->coursescount, [
+                        'class' => 'category-link',
+                        'data-category-id' => $program->id,
+                        'data-type' => 'courses',
+                        'data-category-name' => htmlspecialchars($program->name),
+                        'style' => 'color: #007bff; font-weight: bold; text-decoration: none; cursor: pointer;'
+                    ]);
+                }
+                echo html_writer::tag('td', html_writer::tag('strong', $coursescell));
+                
+                // Количество студентов - ссылка если > 0
+                $studentscell = $program->studentscount;
+                if ($program->studentscount > 0) {
+                    $studentscell = html_writer::link('#', $program->studentscount, [
+                        'class' => 'category-link',
+                        'data-category-id' => $program->id,
+                        'data-type' => 'students',
+                        'data-category-name' => htmlspecialchars($program->name),
+                        'style' => 'color: green; font-weight: bold; text-decoration: none; cursor: pointer;'
+                    ]);
+                }
+                echo html_writer::tag('td', html_writer::tag('span', $studentscell));
+                
+                // Количество преподавателей - ссылка если > 0
+                $teacherscell = $program->teacherscount;
+                if ($program->teacherscount > 0) {
+                    $teacherscell = html_writer::link('#', $program->teacherscount, [
+                        'class' => 'category-link',
+                        'data-category-id' => $program->id,
+                        'data-type' => 'teachers',
+                        'data-category-name' => htmlspecialchars($program->name),
+                        'style' => 'color: orange; font-weight: bold; text-decoration: none; cursor: pointer;'
+                    ]);
+                }
+                echo html_writer::tag('td', html_writer::tag('span', $teacherscell));
+                
                 $status = $program->visible ? html_writer::tag('span', 'Активна', ['style' => 'color: green;']) : html_writer::tag('span', 'Скрыта', ['style' => 'color: red;']);
                 echo html_writer::tag('td', $status);
                 echo html_writer::end_tag('tr');
@@ -1171,6 +1208,161 @@ switch ($tab) {
             echo html_writer::end_tag('tbody');
             echo html_writer::end_tag('table');
         }
+        
+        // Модальное окно для отображения списка курсов/студентов/преподавателей категории
+        echo html_writer::start_div('modal fade', [
+            'id' => 'categoryDetailsModal',
+            'tabindex' => '-1',
+            'role' => 'dialog',
+            'aria-labelledby' => 'categoryDetailsModalLabel',
+            'aria-hidden' => 'true'
+        ]);
+        echo html_writer::start_div('modal-dialog modal-lg', ['role' => 'document']);
+        echo html_writer::start_div('modal-content');
+        echo html_writer::start_div('modal-header');
+        echo html_writer::tag('h5', 'Детали категории', ['class' => 'modal-title', 'id' => 'categoryDetailsModalLabel']);
+        echo html_writer::start_tag('button', [
+            'type' => 'button',
+            'class' => 'close',
+            'data-dismiss' => 'modal',
+            'aria-label' => 'Закрыть',
+            'onclick' => 'jQuery(\'#categoryDetailsModal\').modal(\'hide\');'
+        ]);
+        echo html_writer::tag('span', '×', ['aria-hidden' => 'true']);
+        echo html_writer::end_tag('button');
+        echo html_writer::end_div(); // modal-header
+        echo html_writer::start_div('modal-body', ['id' => 'modalCategoryDetails']);
+        echo html_writer::div('Загрузка...', 'text-center');
+        echo html_writer::end_div(); // modal-body
+        echo html_writer::start_div('modal-footer');
+        echo html_writer::start_tag('button', [
+            'type' => 'button',
+            'class' => 'btn btn-secondary',
+            'data-dismiss' => 'modal',
+            'onclick' => 'jQuery(\'#categoryDetailsModal\').modal(\'hide\');'
+        ]);
+        echo 'Закрыть';
+        echo html_writer::end_tag('button');
+        echo html_writer::end_div(); // modal-footer
+        echo html_writer::end_div(); // modal-content
+        echo html_writer::end_div(); // modal-dialog
+        echo html_writer::end_div(); // modal
+        
+        // JavaScript для загрузки данных категории
+        $PAGE->requires->js_init_code("
+            (function() {
+                var categoryLinks = document.querySelectorAll('.category-link');
+                categoryLinks.forEach(function(link) {
+                    link.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        var categoryId = this.getAttribute('data-category-id');
+                        var dataType = this.getAttribute('data-type');
+                        var categoryName = this.getAttribute('data-category-name');
+                        var modal = document.getElementById('categoryDetailsModal');
+                        var modalTitle = document.getElementById('categoryDetailsModalLabel');
+                        var modalBody = document.getElementById('modalCategoryDetails');
+                        
+                        var typeLabels = {
+                            'courses': 'Курсы',
+                            'students': 'Студенты',
+                            'teachers': 'Преподаватели'
+                        };
+                        
+                        modalTitle.textContent = typeLabels[dataType] + ' категории: ' + categoryName;
+                        modalBody.innerHTML = '<div class=\"text-center\">Загрузка...</div>';
+                        
+                        // AJAX запрос для получения данных
+                        var xhr = new XMLHttpRequest();
+                        xhr.open('GET', '/local/deanpromoodle/pages/admin_ajax.php?action=getcategory' + dataType + '&categoryid=' + categoryId, true);
+                        xhr.onreadystatechange = function() {
+                            if (xhr.readyState === 4) {
+                                if (xhr.status === 200) {
+                                    try {
+                                        var response = JSON.parse(xhr.responseText);
+                                        if (response.success) {
+                                            var html = '';
+                                            if (dataType === 'courses') {
+                                                html = '<table class=\"table table-striped table-hover\"><thead><tr><th>ID</th><th>Название курса</th><th>Краткое название</th><th>Дата начала</th><th>Дата окончания</th></tr></thead><tbody>';
+                                                if (response.courses && response.courses.length > 0) {
+                                                    response.courses.forEach(function(course) {
+                                                        html += '<tr><td>' + course.id + '</td><td>' + course.fullname + '</td><td>' + (course.shortname || '-') + '</td><td>' + (course.startdate || '-') + '</td><td>' + (course.enddate || '-') + '</td></tr>';
+                                                    });
+                                                } else {
+                                                    html += '<tr><td colspan=\"5\" class=\"text-center\">Курсы не найдены</td></tr>';
+                                                }
+                                                html += '</tbody></table>';
+                                            } else if (dataType === 'students') {
+                                                html = '<table class=\"table table-striped table-hover\"><thead><tr><th>ID</th><th>ФИО</th><th>Email</th><th>Дата регистрации</th><th>Последний вход</th></tr></thead><tbody>';
+                                                if (response.students && response.students.length > 0) {
+                                                    response.students.forEach(function(student) {
+                                                        html += '<tr><td>' + student.id + '</td><td>' + student.fullname + '</td><td>' + (student.email || '-') + '</td><td>' + (student.timecreated || '-') + '</td><td>' + (student.lastaccess || '-') + '</td></tr>';
+                                                    });
+                                                } else {
+                                                    html += '<tr><td colspan=\"5\" class=\"text-center\">Студенты не найдены</td></tr>';
+                                                }
+                                                html += '</tbody></table>';
+                                            } else if (dataType === 'teachers') {
+                                                html = '<table class=\"table table-striped table-hover\"><thead><tr><th>ID</th><th>ФИО</th><th>Email</th><th>Роль</th><th>Дата регистрации</th></tr></thead><tbody>';
+                                                if (response.teachers && response.teachers.length > 0) {
+                                                    response.teachers.forEach(function(teacher) {
+                                                        html += '<tr><td>' + teacher.id + '</td><td>' + teacher.fullname + '</td><td>' + (teacher.email || '-') + '</td><td>' + (teacher.role || '-') + '</td><td>' + (teacher.timecreated || '-') + '</td></tr>';
+                                                    });
+                                                } else {
+                                                    html += '<tr><td colspan=\"5\" class=\"text-center\">Преподаватели не найдены</td></tr>';
+                                                }
+                                                html += '</tbody></table>';
+                                            }
+                                            modalBody.innerHTML = html;
+                                        } else {
+                                            modalBody.innerHTML = '<div class=\"alert alert-danger\">Ошибка: ' + (response.error || 'Неизвестная ошибка') + '</div>';
+                                        }
+                                    } catch (e) {
+                                        modalBody.innerHTML = '<div class=\"alert alert-danger\">Ошибка при обработке ответа сервера</div>';
+                                    }
+                                } else {
+                                    modalBody.innerHTML = '<div class=\"alert alert-danger\">Ошибка загрузки данных</div>';
+                                }
+                            }
+                        };
+                        xhr.send();
+                        
+                        // Показываем модальное окно (Bootstrap/jQuery)
+                        if (typeof jQuery !== 'undefined' && jQuery.fn.modal) {
+                            jQuery(modal).modal('show');
+                        } else if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                            var bsModal = new bootstrap.Modal(modal);
+                            bsModal.show();
+                        } else {
+                            // Fallback: просто показываем модальное окно через CSS
+                            modal.style.display = 'block';
+                            modal.classList.add('show');
+                            document.body.classList.add('modal-open');
+                        }
+                    });
+                });
+                
+                // Обработчик закрытия модального окна при клике вне его
+                var modalElement = document.getElementById('categoryDetailsModal');
+                if (modalElement) {
+                    modalElement.addEventListener('click', function(e) {
+                        if (e.target === modalElement) {
+                            if (typeof jQuery !== 'undefined' && jQuery.fn.modal) {
+                                jQuery(modalElement).modal('hide');
+                            } else if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                                var bsModal = bootstrap.Modal.getInstance(modalElement);
+                                if (bsModal) {
+                                    bsModal.hide();
+                                }
+                            } else {
+                                modalElement.style.display = 'none';
+                                modalElement.classList.remove('show');
+                                document.body.classList.remove('modal-open');
+                            }
+                        }
+                    });
+                }
+            })();
+        ");
         
         echo html_writer::end_div();
         break;
