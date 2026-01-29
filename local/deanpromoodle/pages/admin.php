@@ -67,11 +67,16 @@ if (!$hasaccess) {
     require_capability('local/deanpromoodle:viewadmin', $context);
 }
 
-// Set up page
+// Настройка страницы
 $PAGE->set_url(new moodle_url('/local/deanpromoodle/pages/admin.php'));
 $PAGE->set_context(context_system::instance());
-$PAGE->set_title(get_string('adminpagetitle', 'local_deanpromoodle'));
-$PAGE->set_heading(get_string('adminpagetitle', 'local_deanpromoodle'));
+// Получение заголовка с проверкой и fallback на русский
+$pagetitle = get_string('adminpagetitle', 'local_deanpromoodle');
+if (strpos($pagetitle, '[[') !== false || $pagetitle == 'Admin Dashboard') {
+    $pagetitle = 'Панель администратора'; // Fallback на русский
+}
+$PAGE->set_title($pagetitle);
+$PAGE->set_heading($pagetitle);
 $PAGE->set_pagelayout('admin');
 
 // Вывод страницы

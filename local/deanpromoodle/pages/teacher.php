@@ -99,8 +99,13 @@ $PAGE->set_url(new moodle_url('/local/deanpromoodle/pages/teacher.php', [
     'perpage' => $perpage
 ]));
 $PAGE->set_context(context_system::instance());
-$PAGE->set_title(get_string('teacherpagetitle', 'local_deanpromoodle'));
-$PAGE->set_heading(get_string('teacherpagetitle', 'local_deanpromoodle'));
+// Получение заголовка с проверкой и fallback на русский
+$pagetitle = get_string('teacherpagetitle', 'local_deanpromoodle');
+if (strpos($pagetitle, '[[') !== false || $pagetitle == 'Teacher Dashboard') {
+    $pagetitle = 'Панель преподавателя'; // Fallback на русский
+}
+$PAGE->set_title($pagetitle);
+$PAGE->set_heading($pagetitle);
 $PAGE->set_pagelayout('standard');
 
 // Подключение CSS
