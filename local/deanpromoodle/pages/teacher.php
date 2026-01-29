@@ -481,20 +481,40 @@ switch ($tab) {
         $offset = $page * $perpage;
         $paginated = array_slice($unrepliedposts, $offset, $perpage);
         
-        // Display table
+        // Отображение таблицы
         if (empty($paginated)) {
             echo html_writer::div(get_string('noforumspostsfound', 'local_deanpromoodle'), 'alert alert-info');
         } else {
             echo html_writer::start_tag('table', ['class' => 'table table-striped table-hover', 'style' => 'width: 100%;']);
             echo html_writer::start_tag('thead');
             echo html_writer::start_tag('tr');
-            echo html_writer::tag('th', 'Course');
-            echo html_writer::tag('th', 'Forum');
-            echo html_writer::tag('th', 'Discussion');
-            echo html_writer::tag('th', 'Student');
-            echo html_writer::tag('th', 'Subject');
-            echo html_writer::tag('th', 'Posted');
-            echo html_writer::tag('th', 'Actions');
+            // Получение и проверка языковых строк с fallback на русский
+            $coursestr = get_string('courses', 'local_deanpromoodle');
+            if (strpos($coursestr, '[[') !== false) {
+                $coursestr = 'Курс';
+            }
+            $forumsstr = get_string('forums', 'local_deanpromoodle');
+            if (strpos($forumsstr, '[[') !== false) {
+                $forumsstr = 'Форум';
+            }
+            $fullnamestr = get_string('fullname', 'local_deanpromoodle');
+            if (strpos($fullnamestr, '[[') !== false) {
+                $fullnamestr = 'Студент';
+            }
+            $actionsstr = get_string('actions', 'local_deanpromoodle');
+            if (strpos($actionsstr, '[[') !== false) {
+                $actionsstr = 'Действия';
+            }
+            echo html_writer::tag('th', $coursestr); // Курс
+            echo html_writer::tag('th', $forumsstr); // Форум
+            $discussionstr = 'Обсуждение';
+            echo html_writer::tag('th', $discussionstr);
+            echo html_writer::tag('th', $fullnamestr); // Студент
+            $subjectstr = 'Тема';
+            echo html_writer::tag('th', $subjectstr);
+            $postedstr = 'Опубликовано';
+            echo html_writer::tag('th', $postedstr);
+            echo html_writer::tag('th', $actionsstr); // Действия
             echo html_writer::end_tag('tr');
             echo html_writer::end_tag('thead');
             echo html_writer::start_tag('tbody');
