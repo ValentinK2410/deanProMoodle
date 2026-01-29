@@ -1732,6 +1732,13 @@ switch ($tab) {
                     filter: brightness(0);
                     display: inline-block;
                 }
+                .action-btn i.fas,
+                .action-btn i.far,
+                .action-btn i.fab {
+                    filter: none;
+                    color: white;
+                    font-size: 18px;
+                }
                 .action-btn::after {
                     content: '';
                     position: absolute;
@@ -1898,7 +1905,7 @@ switch ($tab) {
                     );
                     echo html_writer::link(
                         new moodle_url('/local/deanpromoodle/pages/admin.php', ['tab' => 'programs', 'action' => 'copy', 'programid' => $programid]),
-                        '<span>🔄</span>',
+                        '<i class="fas fa-copy"></i>',
                         [
                             'class' => 'action-btn action-btn-copy',
                             'title' => 'Копировать'
