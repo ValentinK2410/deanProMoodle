@@ -506,11 +506,15 @@ switch ($tab) {
                 );
                 
                 foreach ($posts as $post) {
-                    // Обрезаем текст сообщения для отображения (первые 200 символов)
-                    $message = strip_tags($post->message);
-                    $message = mb_substr($message, 0, 200);
-                    if (mb_strlen(strip_tags($post->message)) > 200) {
-                        $message .= '...';
+                    // Обрезаем текст сообщения для отображения (только первые 10 слов)
+                    $fullmessage = strip_tags($post->message);
+                    $words = preg_split('/\s+/', trim($fullmessage));
+                    $wordlimit = 10;
+                    
+                    if (count($words) > $wordlimit) {
+                        $message = implode(' ', array_slice($words, 0, $wordlimit)) . '...';
+                    } else {
+                        $message = $fullmessage;
                     }
                     
                     $unrepliedposts[] = (object)[
@@ -526,7 +530,7 @@ switch ($tab) {
                         'email' => $post->email,
                         'subject' => $post->subject,
                         'message' => $message,
-                        'fullmessage' => strip_tags($post->message),
+                        'fullmessage' => $fullmessage,
                         'posted' => userdate($post->created),
                         'created' => $post->created
                     ];
