@@ -138,11 +138,120 @@ if ($courseid == 0) {
     }
 }
 
+// Подсчет количества для вкладок
+// Подсчет неоцененных заданий
+$assignmentscount = 0;
+foreach ($teachercourses as $course) {
+    $assignments = get_all_instances_in_course('assign', $course, false);
+    foreach ($assignments as $assignment) {
+        $submissionscount = $DB->count_records_sql(
+            "SELECT COUNT(DISTINCT s.id)
+             FROM {assign_submission} s
+             WHERE s.assignment = ? AND s.status = 'submitted' 
+             AND (s.timemodified > 0)
+             AND NOT EXISTS (
+                 SELECT 1 FROM {assign_grades} g 
+                 WHERE g.assignment = s.assignment AND g.userid = s.userid
+             )",
+            [$assignment->id]
+        );
+        $assignmentscount += $submissionscount;
+    }
+}
+
+// Подсчет несданных экзаменов
+$quizzescount = 0;
+foreach ($teachercourses as $course) {
+    $quizzes = get_all_instances_in_course('quiz', $course, false);
+    foreach ($quizzes as $quiz) {
+        $quizname = mb_strtolower($quiz->name);
+        if (strpos($quizname, 'экзамен') === false) {
+            continue;
+        }
+        $attemptscount = $DB->count_records_sql(
+            "SELECT COUNT(DISTINCT qa.id)
+             FROM {quiz_attempts} qa
+             LEFT JOIN {quiz_grades} qg ON qg.quiz = qa.quiz AND qg.userid = qa.userid
+             WHERE qa.quiz = ? 
+             AND qa.state = 'finished'
+             AND NOT (qa.sumgrades > 0 AND qa.timemodified > 0)
+             AND qg.grade IS NULL",
+            [$quiz->id]
+        );
+        $quizzescount += $attemptscount;
+    }
+}
+
+// Подсчет сообщений форумов без ответов преподавателя
+$forumscount = 0;
+$teacherroleids = $DB->get_fieldset_select('role', 'id', "shortname IN ('teacher', 'editingteacher', 'manager')");
+$studentroleid = $DB->get_field('role', 'id', ['shortname' => 'student']);
+if (!empty($teacherroleids) && $studentroleid) {
+    $forumids = [];
+    $courseforums = [];
+    foreach ($teachercourses as $course) {
+        $forums = get_all_instances_in_course('forum', $course, false);
+        foreach ($forums as $forum) {
+            $forumids[] = $forum->id;
+            $courseforums[$forum->id] = $course;
+        }
+    }
+    if (!empty($forumids)) {
+        $coursecontexts = [];
+        $allcourseids = array_unique(array_column($courseforums, 'id'));
+        foreach ($allcourseids as $cid) {
+            $coursecontexts[$cid] = context_course::instance($cid);
+        }
+        $systemcontext = context_system::instance();
+        $placeholders = implode(',', array_fill(0, count($teacherroleids), '?'));
+        $coursecontextids = array_map(function($ctx) { return $ctx->id; }, $coursecontexts);
+        $coursecontextplaceholders = implode(',', array_fill(0, count($coursecontextids), '?'));
+        
+        $allteacheruserids = $DB->get_fieldset_sql(
+            "SELECT DISTINCT ra.userid
+             FROM {role_assignments} ra
+             WHERE (ra.contextid IN ($coursecontextplaceholders) OR ra.contextid = ?)
+             AND ra.roleid IN ($placeholders)",
+            array_merge($coursecontextids, [$systemcontext->id], $teacherroleids)
+        );
+        
+        if (!empty($allteacheruserids)) {
+            $allstudentuserids = $DB->get_fieldset_sql(
+                "SELECT DISTINCT ra.userid
+                 FROM {role_assignments} ra
+                 WHERE ra.contextid IN ($coursecontextplaceholders)
+                 AND ra.roleid = ?",
+                array_merge($coursecontextids, [$studentroleid])
+            );
+            
+            if (!empty($allstudentuserids)) {
+                $forumplaceholders = implode(',', array_fill(0, count($forumids), '?'));
+                $teacherplaceholders = implode(',', array_fill(0, count($allteacheruserids), '?'));
+                $studentplaceholders = implode(',', array_fill(0, count($allstudentuserids), '?'));
+                
+                $forumscount = $DB->count_records_sql(
+                    "SELECT COUNT(DISTINCT p.id)
+                     FROM {forum_posts} p
+                     JOIN {forum_discussions} d ON d.id = p.discussion
+                     JOIN {forum} f ON f.id = d.forum
+                     LEFT JOIN {forum_posts} p2 ON p2.discussion = p.discussion 
+                         AND p2.created > p.created 
+                         AND p2.userid IN ($teacherplaceholders)
+                     WHERE d.forum IN ($forumplaceholders)
+                     AND p.userid IN ($studentplaceholders)
+                     AND p2.id IS NULL",
+                    array_merge($forumids, $allteacheruserids, $allstudentuserids)
+                );
+            }
+        }
+    }
+}
+
 // Вывод страницы
 echo $OUTPUT->header();
 // Заголовок уже выводится через set_heading(), не нужно дублировать
 
-// Вкладки
+// Вкладки с количеством
 $tabs = [];
 $assignmentsstr = get_string('assignments', 'local_deanpromoodle');
 if (strpos($assignmentsstr, '[[') !== false) {
@@ -158,13 +267,13 @@ if (strpos($forumsstr, '[[') !== false) {
 }
 $tabs[] = new tabobject('assignments', 
     new moodle_url('/local/deanpromoodle/pages/teacher.php', ['tab' => 'assignments', 'courseid' => $courseid]),
-    $assignmentsstr);
+    $assignmentsstr . ' (' . $assignmentscount . ')');
 $tabs[] = new tabobject('quizzes', 
     new moodle_url('/local/deanpromoodle/pages/teacher.php', ['tab' => 'quizzes', 'courseid' => $courseid]),
-    $quizzesstr);
+    $quizzesstr . ' (' . $quizzescount . ')');
 $tabs[] = new tabobject('forums', 
     new moodle_url('/local/deanpromoodle/pages/teacher.php', ['tab' => 'forums', 'courseid' => $courseid]),
-    $forumsstr);
+    $forumsstr . ' (' . $forumscount . ')');
 
 echo $OUTPUT->tabtree($tabs, $tab);
 
