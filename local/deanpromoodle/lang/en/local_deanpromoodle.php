@@ -49,3 +49,21 @@ $string['adminpagecontent'] = 'Welcome to the Admin Dashboard. This page is for 
 
 // Access denied
 $string['accessdenied'] = 'Access denied. You do not have permission to view this page.';
+
+// Teacher page strings
+$string['searchstudents'] = 'Search students';
+$string['filterbycourse'] = 'Filter by course';
+$string['allcourses'] = 'All courses';
+$string['search'] = 'Search';
+$string['fullname'] = 'Full name';
+$string['email'] = 'Email';
+$string['username'] = 'Username';
+$string['courses'] = 'Courses';
+$string['actions'] = 'Actions';
+$string['viewprofile'] = 'View profile';
+$string['nostudentsfound'] = 'No students found';
+$string['students'] = 'students';
+$string['page'] = 'Page';
+$string['of'] = 'of';
+$string['previous'] = 'Previous';
+$string['next'] = 'Next';
