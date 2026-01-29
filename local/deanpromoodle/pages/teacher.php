@@ -340,14 +340,30 @@ switch ($tab) {
             echo html_writer::start_tag('table', ['class' => 'table table-striped table-hover', 'style' => 'width: 100%;']);
             echo html_writer::start_tag('thead');
             echo html_writer::start_tag('tr');
-            echo html_writer::tag('th', get_string('courses', 'local_deanpromoodle')); // Курс
-            echo html_writer::tag('th', get_string('quizzes', 'local_deanpromoodle')); // Тест
-            echo html_writer::tag('th', get_string('fullname', 'local_deanpromoodle')); // Студент
+            $coursestr = get_string('courses', 'local_deanpromoodle');
+            if (strpos($coursestr, '[[') !== false) {
+                $coursestr = 'Курс';
+            }
+            $quizzesstr = get_string('quizzes', 'local_deanpromoodle');
+            if (strpos($quizzesstr, '[[') !== false) {
+                $quizzesstr = 'Тест';
+            }
+            $fullnamestr = get_string('fullname', 'local_deanpromoodle');
+            if (strpos($fullnamestr, '[[') !== false) {
+                $fullnamestr = 'Студент';
+            }
+            $actionsstr = get_string('actions', 'local_deanpromoodle');
+            if (strpos($actionsstr, '[[') !== false) {
+                $actionsstr = 'Действия';
+            }
+            echo html_writer::tag('th', $coursestr); // Курс
+            echo html_writer::tag('th', $quizzesstr); // Тест
+            echo html_writer::tag('th', $fullnamestr); // Студент
             $gradestr = 'Оценка';
             echo html_writer::tag('th', $gradestr);
             $attemptedstr = 'Попытка';
             echo html_writer::tag('th', $attemptedstr);
-            echo html_writer::tag('th', get_string('actions', 'local_deanpromoodle')); // Действия
+            echo html_writer::tag('th', $actionsstr); // Действия
             echo html_writer::end_tag('tr');
             echo html_writer::end_tag('thead');
             echo html_writer::start_tag('tbody');
