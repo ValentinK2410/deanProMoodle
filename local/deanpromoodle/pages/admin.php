@@ -1207,11 +1207,19 @@ switch ($tab) {
                 $programshortname = is_string($programshortname) ? $programshortname : (is_scalar($programshortname) ? (string)$programshortname : '');
                 $programcategoryname = is_string($programcategoryname) ? $programcategoryname : (is_scalar($programcategoryname) ? (string)$programcategoryname : 'Не указано');
                 
+                // Дополнительная гарантия - явное преобразование в строку
+                $programidstr = (string)$programidstr;
+                if (!is_string($programidstr)) {
+                    $programidstr = '0';
+                }
+                
                 echo html_writer::start_tag('tr');
                 
                 // ID
                 echo html_writer::start_tag('td');
-                echo html_writer::span($programidstr, ['class' => 'program-id-badge']);
+                // Используем явное преобразование прямо перед использованием
+                $idtext = (string)$programidstr;
+                echo html_writer::span($idtext, ['class' => 'program-id-badge']);
                 echo html_writer::end_tag('td');
                 
                 // Название курса
