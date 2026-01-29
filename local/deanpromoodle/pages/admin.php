@@ -1775,7 +1775,7 @@ switch ($tab) {
                                         foreach ($subjectsdata as $index => $subjectdata) {
                                             // Валидация данных
                                             if (empty($subjectdata['name'])) {
-                                                $errors[] = 'Предмет #' . ($index + 1) . ': отсутствует название';
+                                                $errors[] = 'Предмет #' . ((int)$index + 1) . ': отсутствует название';
                                                 $skipped++;
                                                 continue;
                                             }
