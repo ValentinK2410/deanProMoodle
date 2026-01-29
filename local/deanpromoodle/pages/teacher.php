@@ -109,78 +109,102 @@ $allcourses = [];
 if ($courseid == 0) {
     // Get all courses
     $courses = $DB->get_records('course', ['visible' => 1], 'fullname ASC', 'id, fullname, shortname');
-    foreach ($courses as $course) {
-        if ($course->id > 1) { // Skip site course
-            $allcourses[$course->id] = $course;
+    if ($courses) {
+        foreach ($courses as $course) {
+            if ($course->id > 1) { // Skip site course
+                $allcourses[$course->id] = $course;
+            }
         }
     }
 } else {
     $course = get_course($courseid);
-    if ($course->id > 1) {
+    if ($course && $course->id > 1) {
         $allcourses[$courseid] = $course;
     }
 }
 
 // Get all teachers from courses
 $allteachers = [];
-foreach ($allcourses as $course) {
-    $coursecontext = context_course::instance($course->id);
-    
-    // Get users with teacher/editingteacher roles
-    $teachers = get_enrolled_users($coursecontext, 'moodle/course:manageactivities', 0, 'u.*', 'u.lastname, u.firstname');
-    
-    // Also get users with teacher role explicitly
-    $roleids = $DB->get_fieldset_select('role', 'id', "shortname IN ('teacher', 'editingteacher', 'manager')");
-    if (!empty($roleids)) {
-        $roleassignments = $DB->get_records_sql(
-            "SELECT ra.userid, u.*
-             FROM {role_assignments} ra
-             JOIN {user} u ON u.id = ra.userid
-             WHERE ra.contextid = ? AND ra.roleid IN (" . implode(',', $roleids) . ")
-             AND u.deleted = 0",
-            [$coursecontext->id]
-        );
+if (!empty($allcourses)) {
+    foreach ($allcourses as $course) {
+        $coursecontext = context_course::instance($course->id);
         
-        foreach ($roleassignments as $assignment) {
-            if (!isset($teachers[$assignment->userid])) {
-                $teachers[$assignment->userid] = $assignment;
+        // Get users with teacher/editingteacher roles
+        $teachers = get_enrolled_users($coursecontext, 'moodle/course:manageactivities', 0, 'u.*', 'u.lastname, u.firstname');
+        if (!is_array($teachers)) {
+            $teachers = [];
+        }
+        
+        // Also get users with teacher role explicitly
+        $roleids = $DB->get_fieldset_select('role', 'id', "shortname IN ('teacher', 'editingteacher', 'manager')");
+        if (!empty($roleids) && is_array($roleids)) {
+            $placeholders = implode(',', array_fill(0, count($roleids), '?'));
+            $roleassignments = $DB->get_records_sql(
+                "SELECT ra.userid, u.*
+                 FROM {role_assignments} ra
+                 JOIN {user} u ON u.id = ra.userid
+                 WHERE ra.contextid = ? AND ra.roleid IN ($placeholders)
+                 AND u.deleted = 0",
+                array_merge([$coursecontext->id], $roleids)
+            );
+            
+            if ($roleassignments) {
+                foreach ($roleassignments as $assignment) {
+                    if (!isset($teachers[$assignment->userid])) {
+                        $teachers[$assignment->userid] = $assignment;
+                    }
+                }
             }
         }
-    }
-    
-    foreach ($teachers as $teacher) {
-        if (!isset($allteachers[$teacher->id])) {
-            $allteachers[$teacher->id] = $teacher;
-            $allteachers[$teacher->id]->courses = [];
+        
+        if (!empty($teachers)) {
+            foreach ($teachers as $teacher) {
+                if (!isset($allteachers[$teacher->id])) {
+                    $allteachers[$teacher->id] = $teacher;
+                    $allteachers[$teacher->id]->courses = [];
+                }
+                // Add course info with full details
+                $coursename = $course->fullname;
+                $allteachers[$teacher->id]->courses[] = $coursename;
+            }
         }
-        // Add course info with full details
-        $coursename = $course->fullname;
-        $allteachers[$teacher->id]->courses[] = $coursename;
     }
 }
 
 // Apply search filter
-if (!empty($search)) {
+if (!empty($search) && !empty($allteachers)) {
     $filteredteachers = [];
     foreach ($allteachers as $teacher) {
         $searchlower = mb_strtolower($search);
         $fullname = mb_strtolower($teacher->firstname . ' ' . $teacher->lastname);
-        $email = mb_strtolower($teacher->email);
+        $email = mb_strtolower($teacher->email ?? '');
+        $username = mb_strtolower($teacher->username ?? '');
         
         if (strpos($fullname, $searchlower) !== false || 
             strpos($email, $searchlower) !== false ||
-            strpos(mb_strtolower($teacher->username), $searchlower) !== false) {
+            strpos($username, $searchlower) !== false) {
             $filteredteachers[$teacher->id] = $teacher;
         }
     }
     $allteachers = $filteredteachers;
 }
 
+// Ensure $allteachers is an array
+if (!is_array($allteachers)) {
+    $allteachers = [];
+}
+
 // Pagination
 $totalteachers = count($allteachers);
-$totalpages = ceil($totalteachers / $perpage);
+$totalpages = $totalteachers > 0 ? ceil($totalteachers / $perpage) : 0;
 $offset = $page * $perpage;
-$paginatedteachers = array_slice($allteachers, $offset, $perpage, true);
+$paginatedteachers = [];
+if (!empty($allteachers)) {
+    $paginatedteachers = array_slice($allteachers, $offset, $perpage, true);
+}
+if (!is_array($paginatedteachers)) {
+    $paginatedteachers = [];
+}
 
 // Output page
 echo $OUTPUT->header();
