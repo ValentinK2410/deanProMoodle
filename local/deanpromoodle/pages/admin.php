@@ -1817,13 +1817,13 @@ switch ($tab) {
                     echo html_writer::start_div('action-buttons');
                     echo html_writer::link(
                         new moodle_url('/local/deanpromoodle/pages/admin.php', ['tab' => 'programs', 'action' => 'edit', 'programid' => $programid]),
-                        '<span>✏</span>',
+                        '<span>✎</span>',
                         [
                             'class' => 'action-btn action-btn-edit',
                             'title' => 'Редактировать'
                         ]
                     );
-                    echo html_writer::link('#', '<span>🗑</span>', [
+                    echo html_writer::link('#', '<span>✕</span>', [
                         'class' => 'action-btn action-btn-delete delete-program',
                         'title' => 'Удалить',
                         'data-program-id' => $programid
@@ -2760,24 +2760,24 @@ switch ($tab) {
                     // Просмотр
                     echo html_writer::link(
                         new moodle_url('/local/deanpromoodle/pages/admin.php', ['tab' => 'subjects', 'action' => 'view', 'subjectid' => $subject->id]),
-                        '👁',
+                        '<span>👁</span>',
                         ['class' => 'action-btn action-btn-view', 'title' => 'Просмотр']
                     );
                     // Редактирование
                     echo html_writer::link(
                         new moodle_url('/local/deanpromoodle/pages/admin.php', ['tab' => 'subjects', 'action' => 'edit', 'subjectid' => $subject->id]),
-                        '✏',
+                        '<span>✎</span>',
                         ['class' => 'action-btn action-btn-edit', 'title' => 'Редактировать']
                     );
                     // Прикрепить к программе
-                    echo html_writer::link('#', '🔗', [
+                    echo html_writer::link('#', '<span>⛓</span>', [
                         'class' => 'action-btn action-btn-link attach-subject-to-program',
                         'title' => 'Прикрепить к программе',
                         'data-subject-id' => $subject->id,
                         'data-subject-name' => htmlspecialchars($subjectname, ENT_QUOTES, 'UTF-8')
                     ]);
                     // Удаление
-                    echo html_writer::link('#', '🗑', [
+                    echo html_writer::link('#', '<span>✕</span>', [
                         'class' => 'action-btn action-btn-delete delete-subject',
                         'title' => 'Удалить',
                         'data-subject-id' => $subject->id
