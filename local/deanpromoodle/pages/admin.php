@@ -2787,6 +2787,40 @@ switch ($tab) {
             echo html_writer::end_div();
             
             // Модальное окно для просмотра прикрепленных групп программы
+            // Стили для модального окна просмотра групп программы
+            echo html_writer::start_tag('style');
+            echo "
+                #viewProgramCohortsModal .modal-header {
+                    position: relative;
+                    padding: 15px 20px;
+                    border-bottom: 1px solid #dee2e6;
+                }
+                #viewProgramCohortsModal .modal-header .close {
+                    position: absolute;
+                    top: 10px;
+                    right: 15px;
+                    padding: 0;
+                    margin: 0;
+                    background: transparent;
+                    border: none;
+                    font-size: 28px;
+                    font-weight: 700;
+                    line-height: 1;
+                    color: #000;
+                    text-shadow: 0 1px 0 #fff;
+                    opacity: 0.5;
+                    cursor: pointer;
+                    z-index: 10;
+                }
+                #viewProgramCohortsModal .modal-header .close:hover {
+                    opacity: 0.75;
+                }
+                #viewProgramCohortsModal .modal-header .close span {
+                    display: block;
+                }
+            ";
+            echo html_writer::end_tag('style');
+            
             echo html_writer::start_div('modal fade', [
                 'id' => 'viewProgramCohortsModal',
                 'tabindex' => '-1',
@@ -2800,6 +2834,7 @@ switch ($tab) {
                 'type' => 'button',
                 'class' => 'close',
                 'data-dismiss' => 'modal',
+                'aria-label' => 'Закрыть',
                 'onclick' => 'jQuery(\'#viewProgramCohortsModal\').modal(\'hide\');'
             ]);
             echo html_writer::tag('span', '×', ['aria-hidden' => 'true']);
@@ -2995,8 +3030,14 @@ switch ($tab) {
                                                     html += '<tr>';
                                                     html += '<td>' + cohort.id + '</td>';
                                                     html += '<td>' + escapeHtml(cohort.name) + '</td>';
-                                                    html += '<td>' + (cohort.idnumber || '-') + '</td>';
-                                                    html += '<td>' + (cohort.description ? escapeHtml(cohort.description.substring(0, 50)) + (cohort.description.length > 50 ? '...' : '') : '-') + '</td>';
+                                                    html += '<td>' + (cohort.idnumber ? escapeHtml(cohort.idnumber) : '-') + '</td>';
+                                                    // Описание отображаем как HTML, но ограничиваем длину
+                                                    var description = cohort.description || '';
+                                                    var descriptionHtml = description;
+                                                    if (description.length > 100) {
+                                                        descriptionHtml = description.substring(0, 100) + '...';
+                                                    }
+                                                    html += '<td>' + descriptionHtml + '</td>';
                                                     html += '<td><button class=\"btn btn-sm btn-danger detach-cohort-btn\" data-cohort-id=\"' + cohort.id + '\" data-program-id=\"' + programId + '\"><i class=\"fas fa-times\"></i> Открепить</button></td>';
                                                     html += '</tr>';
                                                 });
