@@ -975,14 +975,15 @@ switch ($tab) {
         
         // Проверяем существование таблиц БД
         $tablesexist = false;
+        $errormsg = '';
         try {
             // Проверяем существование таблицы через простой запрос
             $test = $DB->get_records('local_deanpromoodle_programs', [], '', 'id', 0, 1);
             $tablesexist = true;
-        } catch (dml_exception $e) {
+        } catch (\dml_exception $e) {
             $tablesexist = false;
             $errormsg = $e->getMessage();
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             $tablesexist = false;
             $errormsg = $e->getMessage();
         }
@@ -1009,7 +1010,7 @@ switch ($tab) {
                         echo html_writer::div('Программа не найдена.', 'alert alert-danger');
                         break;
                     }
-                } catch (Exception $e) {
+                } catch (\Exception $e) {
                     echo html_writer::div('Ошибка при получении программы: ' . $e->getMessage(), 'alert alert-danger');
                     break;
                 }
@@ -1068,7 +1069,7 @@ switch ($tab) {
                         
                         // Редирект на список программ
                         redirect(new moodle_url('/local/deanpromoodle/pages/admin.php', ['tab' => 'programs']));
-                    } catch (Exception $e) {
+                    } catch (\Exception $e) {
                         $transaction->rollback($e);
                         echo html_writer::div('Ошибка при сохранении: ' . $e->getMessage(), 'alert alert-danger');
                     }
@@ -1078,7 +1079,7 @@ switch ($tab) {
             // Получаем все предметы для выбора
             try {
                 $allsubjects = $DB->get_records('local_deanpromoodle_subjects', ['visible' => 1], 'sortorder ASC, name ASC');
-            } catch (Exception $e) {
+            } catch (\Exception $e) {
                 $allsubjects = [];
             }
             $selectedsubjectids = [];
@@ -1090,7 +1091,7 @@ switch ($tab) {
                         'programid = ?',
                         [$programid]
                     );
-                } catch (Exception $e) {
+                } catch (\Exception $e) {
                     $selectedsubjectids = [];
                 }
             }
@@ -1241,11 +1242,11 @@ switch ($tab) {
             $programs = [];
             try {
                 $programs = $DB->get_records('local_deanpromoodle_programs', null, 'name ASC');
-            } catch (dml_exception $e) {
+            } catch (\dml_exception $e) {
                 echo html_writer::div('Ошибка при получении программ из БД: ' . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8'), 'alert alert-danger');
                 echo html_writer::end_div();
                 break;
-            } catch (Exception $e) {
+            } catch (\Exception $e) {
                 echo html_writer::div('Ошибка при получении программ из БД: ' . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8'), 'alert alert-danger');
                 echo html_writer::end_div();
                 break;
@@ -1265,14 +1266,14 @@ switch ($tab) {
                     // Подсчет связанных предметов
                     try {
                         $subjectscount = $DB->count_records('local_deanpromoodle_program_subjects', ['programid' => $program->id]);
-                    } catch (Exception $e) {
+                    } catch (\Exception $e) {
                         $subjectscount = 0;
                     }
                     
                     // Подсчет связанных когорт
                     try {
                         $cohortscount = $DB->count_records('local_deanpromoodle_program_cohorts', ['programid' => $program->id]);
-                    } catch (Exception $e) {
+                    } catch (\Exception $e) {
                         $cohortscount = 0;
                     }
                     
@@ -1287,7 +1288,7 @@ switch ($tab) {
                              LIMIT 3",
                             [$program->id]
                         );
-                    } catch (Exception $e) {
+                    } catch (\Exception $e) {
                         $subjects = [];
                     }
                     $subjectslist = [];
