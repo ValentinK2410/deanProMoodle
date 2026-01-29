@@ -2267,11 +2267,6 @@ switch ($tab) {
                 'id' => 'import-programs-json-btn',
                 'style' => 'background-color: #28a745; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-weight: 500;'
             ]);
-            echo html_writer::link('#', '<i class="fas fa-link"></i> Прикрепить глобальную группу', [
-                'class' => 'btn btn-secondary',
-                'id' => 'attach-cohort-btn',
-                'style' => 'background-color: #6c757d; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-weight: 500;'
-            ]);
             echo html_writer::end_div();
             echo html_writer::end_div();
             
@@ -2663,6 +2658,12 @@ switch ($tab) {
                             'title' => 'Копировать'
                         ]
                     );
+                    echo html_writer::link('#', '<i class="fas fa-link"></i>', [
+                        'class' => 'action-btn action-btn-link attach-cohort-to-program',
+                        'title' => 'Прикрепить группу',
+                        'data-program-id' => $programid,
+                        'data-program-name' => htmlspecialchars($programname, ENT_QUOTES, 'UTF-8')
+                    ]);
                     echo html_writer::link('#', '<i class="fas fa-times"></i>', [
                         'class' => 'action-btn action-btn-delete delete-program',
                         'title' => 'Удалить',
@@ -2709,15 +2710,19 @@ switch ($tab) {
             echo html_writer::end_tag('button');
             echo html_writer::end_div();
             echo html_writer::start_div('modal-body');
-            echo html_writer::start_div('form-group');
-            echo html_writer::label('Выберите программу', 'program-select');
-            echo html_writer::select(
-                $programsoptions,
-                'program-select',
-                '',
-                ['' => 'Выберите программу...'],
-                ['id' => 'program-select', 'class' => 'form-control']
-            );
+            echo html_writer::start_div('form-group', ['id' => 'program-select-group']);
+            echo html_writer::label('Программа', 'program-select');
+            echo html_writer::tag('div', '<strong id="selected-program-name">Выберите программу</strong>', [
+                'id' => 'selected-program-display',
+                'class' => 'form-control',
+                'style' => 'padding: 8px 12px; background-color: #f8f9fa; border: 1px solid #ced4da; border-radius: 4px;'
+            ]);
+            echo html_writer::empty_tag('input', [
+                'type' => 'hidden',
+                'id' => 'program-select',
+                'name' => 'program-select',
+                'value' => ''
+            ]);
             echo html_writer::end_div();
             echo html_writer::start_div('form-group');
             echo html_writer::label('Поиск когорты', 'cohort-search');
@@ -2789,22 +2794,32 @@ switch ($tab) {
                     var programs = " . $programsjson . ";
                     var currentProgramId = null;
                     
-                    // Обработчик открытия модального окна
-                    document.getElementById('attach-cohort-btn').addEventListener('click', function(e) {
-                        e.preventDefault();
-                        if (typeof jQuery !== 'undefined' && jQuery.fn.modal) {
-                            jQuery('#attachCohortModal').modal('show');
-                        } else if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
-                            var modal = new bootstrap.Modal(document.getElementById('attachCohortModal'));
-                            modal.show();
-                        }
-                    });
-                    
-                    // Обработчик выбора программы
-                    document.getElementById('program-select').addEventListener('change', function() {
-                        currentProgramId = this.value;
-                        document.getElementById('cohort-search').value = '';
-                        document.getElementById('cohorts-list').innerHTML = '<div class=\"text-muted\">Введите текст для поиска когорт...</div>';
+                    // Обработчик открытия модального окна при клике на кнопку в строке программы
+                    document.querySelectorAll('.attach-cohort-to-program').forEach(function(btn) {
+                        btn.addEventListener('click', function(e) {
+                            e.preventDefault();
+                            var programId = this.getAttribute('data-program-id');
+                            var programName = this.getAttribute('data-program-name');
+                            
+                            if (!programId) return;
+                            
+                            // Устанавливаем выбранную программу
+                            currentProgramId = programId;
+                            document.getElementById('program-select').value = programId;
+                            document.getElementById('selected-program-name').textContent = programName;
+                            
+                            // Очищаем поиск и список
+                            document.getElementById('cohort-search').value = '';
+                            document.getElementById('cohorts-list').innerHTML = '<div class=\"text-muted\">Введите текст для поиска когорт...</div>';
+                            
+                            // Показываем модальное окно
+                            if (typeof jQuery !== 'undefined' && jQuery.fn.modal) {
+                                jQuery('#attachCohortModal').modal('show');
+                            } else if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                                var modal = new bootstrap.Modal(document.getElementById('attachCohortModal'));
+                                modal.show();
+                            }
+                        });
                     });
                     
                     // Поиск когорт
@@ -2815,7 +2830,7 @@ switch ($tab) {
                     if (cohortSearchInput) {
                         cohortSearchInput.addEventListener('input', function() {
                             if (!currentProgramId) {
-                                cohortsList.innerHTML = '<div class=\"alert alert-warning\">Сначала выберите программу</div>';
+                                cohortsList.innerHTML = '<div class=\"alert alert-warning\">Программа не выбрана</div>';
                                 return;
                             }
                             
