@@ -35,19 +35,55 @@ if (!file_exists($configpath)) {
 require_once($configpath);
 require_login();
 
-// Check access
-$context = context_system::instance();
-$hasaccess = false;
+// Получаем параметры ДО проверки доступа
+$action = optional_param('action', '', PARAM_ALPHA);
+$programid = optional_param('programid', 0, PARAM_INT);
 
-if (has_capability('local/deanpromoodle:viewadmin', $context)) {
-    $hasaccess = true;
-} else {
-    if (has_capability('moodle/site:config', $context)) {
+// Для действия getprogramsubjectsforstudent разрешаем доступ студентам
+if ($action == 'getprogramsubjectsforstudent') {
+    // Проверяем, что пользователь имеет доступ к студенческой странице
+    $context = context_system::instance();
+    $hasaccess = false;
+    
+    if (has_capability('local/deanpromoodle:viewstudent', $context)) {
         $hasaccess = true;
     } else {
         global $USER;
         $roles = get_user_roles($context, $USER->id, false);
         foreach ($roles as $role) {
+            if ($role->shortname == 'student') {
+                $hasaccess = true;
+                break;
+            }
+        }
+        
+        if (!$hasaccess && !isguestuser()) {
+            $hasaccess = true; // Временно разрешаем всем залогиненным пользователям
+        }
+    }
+    
+    if (!$hasaccess) {
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'error' => 'Access denied']);
+        exit;
+    }
+    
+    // Для этого действия не нужна дальнейшая проверка доступа
+    header('Content-Type: application/json');
+} else {
+    // Для остальных действий проверяем админский доступ
+    $context = context_system::instance();
+    $hasaccess = false;
+    
+    if (has_capability('local/deanpromoodle:viewadmin', $context)) {
+        $hasaccess = true;
+    } else {
+        if (has_capability('moodle/site:config', $context)) {
+            $hasaccess = true;
+        } else {
+            global $USER;
+            $roles = get_user_roles($context, $USER->id, false);
+            foreach ($roles as $role) {
             if ($role->shortname == 'manager') {
                 $hasaccess = true;
                 break;
@@ -56,24 +92,27 @@ if (has_capability('local/deanpromoodle:viewadmin', $context)) {
     }
 }
 
-if (!$hasaccess) {
+    if (!$hasaccess) {
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'error' => 'Access denied']);
+        exit;
+    }
+    
     header('Content-Type: application/json');
-    echo json_encode(['success' => false, 'error' => 'Access denied']);
-    exit;
 }
 
-// Получение параметров
-$action = optional_param('action', '', PARAM_ALPHA);
-$teacherid = optional_param('teacherid', 0, PARAM_INT);
-$categoryid = optional_param('categoryid', 0, PARAM_INT);
-// Параметры для предметов и программ
-$subjectid = optional_param('subjectid', 0, PARAM_INT);
-$courseid = optional_param('courseid', 0, PARAM_INT);
-$programid = optional_param('programid', 0, PARAM_INT);
-$cohortid = optional_param('cohortid', 0, PARAM_INT);
-$search = optional_param('search', '', PARAM_TEXT);
-
-header('Content-Type: application/json');
+// Получение остальных параметров (только для админских действий)
+if ($action != 'getprogramsubjectsforstudent') {
+    $teacherid = optional_param('teacherid', 0, PARAM_INT);
+    $categoryid = optional_param('categoryid', 0, PARAM_INT);
+    // Параметры для предметов и программ
+    $subjectid = optional_param('subjectid', 0, PARAM_INT);
+    $courseid = optional_param('courseid', 0, PARAM_INT);
+    $cohortid = optional_param('cohortid', 0, PARAM_INT);
+    $search = optional_param('search', '', PARAM_TEXT);
+    
+    header('Content-Type: application/json');
+}
 
 if ($action == 'getteachercourses' && $teacherid > 0) {
     global $DB;
@@ -905,6 +944,69 @@ if ($action == 'getteachercourses' && $teacherid > 0) {
     } catch (Exception $e) {
         echo json_encode(['success' => false, 'error' => 'Ошибка: ' . $e->getMessage()]);
     }
+} elseif ($action == 'getprogramsubjectsforstudent' && $programid > 0) {
+    // Получение предметов программы для студента с проверкой статуса прохождения
+    global $DB, $USER;
+    
+    require_once($CFG->libdir . '/enrollib.php');
+    
+    // Получаем предметы программы
+    $subjects = $DB->get_records_sql(
+        "SELECT s.id, s.name, s.code, s.shortdescription, ps.sortorder
+         FROM {local_deanpromoodle_program_subjects} ps
+         JOIN {local_deanpromoodle_subjects} s ON s.id = ps.subjectid
+         WHERE ps.programid = ?
+         ORDER BY ps.sortorder ASC",
+        [$programid]
+    );
+    
+    // Получаем все курсы студента
+    $mycourses = enrol_get_my_courses(['id']);
+    $mycourseids = array_keys($mycourses);
+    
+    $formattedsubjects = [];
+    foreach ($subjects as $subject) {
+        // Получаем курсы предмета
+        $subjectcourses = $DB->get_records_sql(
+            "SELECT c.id, c.fullname, c.shortname
+             FROM {local_deanpromoodle_subject_courses} sc
+             JOIN {course} c ON c.id = sc.courseid
+             WHERE sc.subjectid = ?
+             ORDER BY sc.sortorder ASC, c.fullname ASC",
+            [$subject->id]
+        );
+        
+        $courses = [];
+        $subjectstarted = false;
+        
+        foreach ($subjectcourses as $course) {
+            $isenrolled = in_array($course->id, $mycourseids);
+            if ($isenrolled) {
+                $subjectstarted = true; // Если хотя бы один курс начат, предмет считается начатым
+            }
+            
+            $courses[] = [
+                'id' => $course->id,
+                'name' => $course->fullname,
+                'shortname' => $course->shortname,
+                'enrolled' => $isenrolled
+            ];
+        }
+        
+        $formattedsubjects[] = [
+            'id' => $subject->id,
+            'name' => $subject->name,
+            'code' => $subject->code ?: '',
+            'shortdescription' => $subject->shortdescription ?: '',
+            'started' => $subjectstarted,
+            'courses' => $courses
+        ];
+    }
+    
+    echo json_encode([
+        'success' => true,
+        'subjects' => $formattedsubjects
+    ]);
 } else {
     echo json_encode(['success' => false, 'error' => 'Invalid action or parameters']);
 }

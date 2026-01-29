@@ -337,10 +337,16 @@ switch ($tab) {
                     foreach ($programs as $program) {
                         echo html_writer::start_tag('tr');
                         
-                        // Название программы
-                        echo html_writer::tag('td', htmlspecialchars($program->name, ENT_QUOTES, 'UTF-8'), [
-                            'style' => 'font-weight: 500;'
+                        // Название программы (кликабельное)
+                        $programname = htmlspecialchars($program->name, ENT_QUOTES, 'UTF-8');
+                        echo html_writer::start_tag('td');
+                        echo html_writer::link('#', $programname, [
+                            'class' => 'view-program-subjects',
+                            'data-program-id' => $program->id,
+                            'data-program-name' => $programname,
+                            'style' => 'font-weight: 500; color: #007bff; text-decoration: none; cursor: pointer;'
                         ]);
+                        echo html_writer::end_tag('td');
                         
                         // Код
                         $code = is_string($program->code) ? $program->code : '';
@@ -387,6 +393,162 @@ switch ($tab) {
                     echo html_writer::end_tag('tbody');
                     echo html_writer::end_tag('table');
                     echo html_writer::end_div();
+                    
+                    // Модальное окно для просмотра предметов программы
+                    echo html_writer::start_div('modal fade', [
+                        'id' => 'programSubjectsModal',
+                        'tabindex' => '-1',
+                        'role' => 'dialog'
+                    ]);
+                    echo html_writer::start_div('modal-dialog modal-lg', ['role' => 'document']);
+                    echo html_writer::start_div('modal-content');
+                    echo html_writer::start_div('modal-header');
+                    echo html_writer::tag('h5', 'Предметы программы', ['class' => 'modal-title', 'id' => 'programSubjectsModalTitle']);
+                    echo html_writer::start_tag('button', [
+                        'type' => 'button',
+                        'class' => 'close',
+                        'data-dismiss' => 'modal',
+                        'aria-label' => 'Закрыть'
+                    ]);
+                    echo html_writer::tag('span', '×', ['aria-hidden' => 'true']);
+                    echo html_writer::end_tag('button');
+                    echo html_writer::end_div();
+                    echo html_writer::start_div('modal-body', ['id' => 'programSubjectsModalBody']);
+                    echo html_writer::div('Загрузка предметов...', 'text-muted text-center');
+                    echo html_writer::end_div();
+                    echo html_writer::start_div('modal-footer');
+                    echo html_writer::start_tag('button', [
+                        'type' => 'button',
+                        'class' => 'btn btn-secondary',
+                        'data-dismiss' => 'modal'
+                    ]);
+                    echo 'Закрыть';
+                    echo html_writer::end_tag('button');
+                    echo html_writer::end_div();
+                    echo html_writer::end_div();
+                    echo html_writer::end_div();
+                    echo html_writer::end_div();
+                    
+                    // Стили для модального окна
+                    echo html_writer::start_tag('style');
+                    echo "
+                        #programSubjectsModal .modal-header {
+                            position: relative;
+                            padding: 15px 20px;
+                            border-bottom: 1px solid #dee2e6;
+                        }
+                        #programSubjectsModal .modal-header .close {
+                            position: absolute;
+                            top: 10px;
+                            right: 15px;
+                            padding: 0;
+                            margin: 0;
+                            background: transparent;
+                            border: none;
+                            font-size: 28px;
+                            font-weight: 700;
+                            line-height: 1;
+                            color: #000;
+                            text-shadow: 0 1px 0 #fff;
+                            opacity: 0.5;
+                            cursor: pointer;
+                            z-index: 10;
+                        }
+                        #programSubjectsModal .modal-header .close:hover {
+                            opacity: 0.75;
+                        }
+                        .subject-status-started {
+                            color: #28a745;
+                            font-weight: 500;
+                        }
+                        .subject-status-not-started {
+                            color: #6c757d;
+                        }
+                        .subject-courses-list {
+                            margin-top: 8px;
+                            padding-left: 20px;
+                            font-size: 0.9em;
+                            color: #6c757d;
+                        }
+                        .subject-courses-list li {
+                            margin: 4px 0;
+                        }
+                    ";
+                    echo html_writer::end_tag('style');
+                    
+                    // JavaScript для открытия модального окна и загрузки предметов
+                    $PAGE->requires->js_init_code("
+                        (function() {
+                            document.querySelectorAll('.view-program-subjects').forEach(function(link) {
+                                link.addEventListener('click', function(e) {
+                                    e.preventDefault();
+                                    var programId = this.getAttribute('data-program-id');
+                                    var programName = this.getAttribute('data-program-name');
+                                    
+                                    // Устанавливаем заголовок модального окна
+                                    document.getElementById('programSubjectsModalTitle').textContent = 'Предметы программы: ' + programName;
+                                    
+                                    // Показываем загрузку
+                                    document.getElementById('programSubjectsModalBody').innerHTML = '<div class=\"text-muted text-center\">Загрузка предметов...</div>';
+                                    
+                                    // Показываем модальное окно
+                                    if (typeof jQuery !== 'undefined' && jQuery.fn.modal) {
+                                        jQuery('#programSubjectsModal').modal('show');
+                                    } else if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                                        var modal = new bootstrap.Modal(document.getElementById('programSubjectsModal'));
+                                        modal.show();
+                                    }
+                                    
+                                    // Загружаем предметы через AJAX
+                                    var xhr = new XMLHttpRequest();
+                                    xhr.open('GET', '/local/deanpromoodle/pages/admin_ajax.php?action=getprogramsubjectsforstudent&programid=' + programId, true);
+                                    xhr.onreadystatechange = function() {
+                                        if (xhr.readyState === 4 && xhr.status === 200) {
+                                            try {
+                                                var response = JSON.parse(xhr.responseText);
+                                                if (response.success && response.subjects) {
+                                                    var html = '<table class=\"table table-striped\"><thead><tr><th style=\"width: 60px;\">№</th><th>Название предмета</th><th>Код</th><th>Статус</th><th>Курсы</th></tr></thead><tbody>';
+                                                    response.subjects.forEach(function(subject, index) {
+                                                        html += '<tr>';
+                                                        html += '<td>' + (index + 1) + '</td>';
+                                                        html += '<td>' + (subject.name || '-') + '</td>';
+                                                        html += '<td>' + (subject.code || '-') + '</td>';
+                                                        if (subject.started) {
+                                                            html += '<td><span class=\"subject-status-started\"><i class=\"fas fa-check-circle\"></i> Начат</span></td>';
+                                                        } else {
+                                                            html += '<td><span class=\"subject-status-not-started\">Не начат</span></td>';
+                                                        }
+                                                        html += '<td>';
+                                                        if (subject.courses && subject.courses.length > 0) {
+                                                            html += '<ul class=\"subject-courses-list\">';
+                                                            subject.courses.forEach(function(course) {
+                                                                var courseLink = course.enrolled ? 
+                                                                    '<a href=\"/course/view.php?id=' + course.id + '\" target=\"_blank\" style=\"color: #28a745; font-weight: 500;\"><i class=\"fas fa-check\"></i> ' + course.name + '</a>' :
+                                                                    '<span style=\"color: #6c757d;\">' + course.name + '</span>';
+                                                                html += '<li>' + courseLink + '</li>';
+                                                            });
+                                                            html += '</ul>';
+                                                        } else {
+                                                            html += '<span class=\"text-muted\">Нет курсов</span>';
+                                                        }
+                                                        html += '</td>';
+                                                        html += '</tr>';
+                                                    });
+                                                    html += '</tbody></table>';
+                                                    document.getElementById('programSubjectsModalBody').innerHTML = html;
+                                                } else {
+                                                    document.getElementById('programSubjectsModalBody').innerHTML = '<div class=\"alert alert-info\">Предметы не найдены</div>';
+                                                }
+                                            } catch (e) {
+                                                document.getElementById('programSubjectsModalBody').innerHTML = '<div class=\"alert alert-danger\">Ошибка при обработке ответа</div>';
+                                            }
+                                        }
+                                    };
+                                    xhr.send();
+                                });
+                            });
+                        })();
+                    ");
                 }
             }
         } catch (\Exception $e) {
