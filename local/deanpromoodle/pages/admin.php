@@ -1021,9 +1021,23 @@ switch ($tab) {
                     }
                 }
                 
+                // Безопасное преобразование имени категории в строку для programs
+                $safename = '';
+                if (is_string($category->name)) {
+                    $safename = $category->name;
+                } elseif (is_array($category->name)) {
+                    $safename = implode(', ', array_filter($category->name, 'is_string'));
+                } elseif (is_object($category->name) && method_exists($category->name, '__toString')) {
+                    $safename = (string)$category->name;
+                } elseif (isset($category->name)) {
+                    $safename = (string)$category->name;
+                } else {
+                    $safename = 'Без названия';
+                }
+                
                 $programsdata[] = (object)[
                     'id' => $category->id,
-                    'name' => $category->name,
+                    'name' => $safename,
                     'description' => $category->description,
                     'coursescount' => $coursescount,
                     'studentscount' => $studentscount,
@@ -1049,7 +1063,20 @@ switch ($tab) {
             foreach ($programsdata as $program) {
                 echo html_writer::start_tag('tr');
                 echo html_writer::tag('td', $program->id);
-                echo html_writer::tag('td', htmlspecialchars($program->name));
+                // Безопасное преобразование имени программы в строку
+                $programname = '';
+                if (is_string($program->name)) {
+                    $programname = $program->name;
+                } elseif (is_array($program->name)) {
+                    $programname = implode(', ', array_filter($program->name, 'is_string'));
+                } elseif (is_object($program->name) && method_exists($program->name, '__toString')) {
+                    $programname = (string)$program->name;
+                } elseif (isset($program->name)) {
+                    $programname = (string)$program->name;
+                } else {
+                    $programname = 'Без названия';
+                }
+                echo html_writer::tag('td', htmlspecialchars($programname, ENT_QUOTES, 'UTF-8'));
                 echo html_writer::tag('td', html_writer::tag('strong', $program->coursescount, ['style' => 'color: #007bff;']));
                 echo html_writer::tag('td', html_writer::tag('span', $program->studentscount, ['style' => 'color: green; font-weight: bold;']));
                 echo html_writer::tag('td', html_writer::tag('span', $program->teacherscount, ['style' => 'color: orange; font-weight: bold;']));
@@ -1188,9 +1215,11 @@ switch ($tab) {
                     }
                 }
                 
-                // Сортируем по имени
+                // Сортируем по имени с безопасным преобразованием
                 usort($children, function($a, $b) {
-                    return strcmp($a->name, $b->name);
+                    $nameA = is_string($a->name) ? $a->name : (is_array($a->name) ? implode(', ', array_filter($a->name, 'is_string')) : (string)$a->name);
+                    $nameB = is_string($b->name) ? $b->name : (is_array($b->name) ? implode(', ', array_filter($b->name, 'is_string')) : (string)$b->name);
+                    return strcmp($nameA, $nameB);
                 });
                 
                 // Отображаем каждую категорию
@@ -1244,8 +1273,19 @@ switch ($tab) {
                         $namecell .= html_writer::span('', ['style' => 'display: inline-block; width: 15px;']);
                     }
                     // Безопасное преобразование имени категории в строку
-                    $categoryname = is_string($category->name) ? $category->name : (is_array($category->name) ? implode(', ', $category->name) : (string)$category->name);
-                    $namecell .= htmlspecialchars($categoryname);
+                    $categoryname = '';
+                    if (is_string($category->name)) {
+                        $categoryname = $category->name;
+                    } elseif (is_array($category->name)) {
+                        $categoryname = implode(', ', array_filter($category->name, 'is_string'));
+                    } elseif (is_object($category->name) && method_exists($category->name, '__toString')) {
+                        $categoryname = (string)$category->name;
+                    } elseif (isset($category->name)) {
+                        $categoryname = (string)$category->name;
+                    } else {
+                        $categoryname = 'Без названия';
+                    }
+                    $namecell .= htmlspecialchars($categoryname, ENT_QUOTES, 'UTF-8');
                     echo html_writer::tag('td', $namecell, ['style' => $indentstyle]);
                     
                     // Количество курсов - ссылка если > 0
@@ -1255,7 +1295,7 @@ switch ($tab) {
                             'class' => 'category-link',
                             'data-category-id' => $category->id,
                             'data-type' => 'courses',
-                            'data-category-name' => htmlspecialchars($categoryname),
+                            'data-category-name' => htmlspecialchars($categoryname, ENT_QUOTES, 'UTF-8'),
                             'style' => 'color: #007bff; font-weight: bold; text-decoration: none; cursor: pointer;'
                         ]);
                     }
@@ -1268,7 +1308,7 @@ switch ($tab) {
                             'class' => 'category-link',
                             'data-category-id' => $category->id,
                             'data-type' => 'students',
-                            'data-category-name' => htmlspecialchars($categoryname),
+                            'data-category-name' => htmlspecialchars($categoryname, ENT_QUOTES, 'UTF-8'),
                             'style' => 'color: green; font-weight: bold; text-decoration: none; cursor: pointer;'
                         ]);
                     }
@@ -1281,7 +1321,7 @@ switch ($tab) {
                             'class' => 'category-link',
                             'data-category-id' => $category->id,
                             'data-type' => 'teachers',
-                            'data-category-name' => htmlspecialchars($categoryname),
+                            'data-category-name' => htmlspecialchars($categoryname, ENT_QUOTES, 'UTF-8'),
                             'style' => 'color: orange; font-weight: bold; text-decoration: none; cursor: pointer;'
                         ]);
                     }
