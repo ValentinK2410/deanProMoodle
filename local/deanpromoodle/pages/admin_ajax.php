@@ -851,6 +851,33 @@ if ($action == 'getteachercourses' && $teacherid > 0) {
         $transaction->rollback($e);
         echo json_encode(['success' => false, 'error' => 'Ошибка при изменении порядка: ' . $e->getMessage()]);
     }
+} elseif ($action == 'deleteinstitution' && $institutionid > 0) {
+    // Удаление учебного заведения
+    global $DB;
+    
+    if ($institutionid <= 0) {
+        echo json_encode(['success' => false, 'error' => 'Неверный ID учебного заведения']);
+        exit;
+    }
+    
+    try {
+        $institution = $DB->get_record('local_deanpromoodle_institutions', ['id' => $institutionid]);
+        if (!$institution) {
+            echo json_encode(['success' => false, 'error' => 'Учебное заведение не найдено']);
+            exit;
+        }
+        
+        // Удаляем учебное заведение
+        $deleted = $DB->delete_records('local_deanpromoodle_institutions', ['id' => $institutionid]);
+        
+        if ($deleted) {
+            echo json_encode(['success' => true]);
+        } else {
+            echo json_encode(['success' => false, 'error' => 'Ошибка при удалении']);
+        }
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'error' => 'Ошибка: ' . $e->getMessage()]);
+    }
 } else {
     echo json_encode(['success' => false, 'error' => 'Invalid action or parameters']);
 }

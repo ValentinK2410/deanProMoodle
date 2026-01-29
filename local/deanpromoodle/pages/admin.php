@@ -3390,6 +3390,200 @@ switch ($tab) {
             break;
         }
         
+        // Получение параметров
+        $action = optional_param('action', '', PARAM_ALPHA);
+        $institutionid = optional_param('institutionid', 0, PARAM_INT);
+        
+        // Обработка редактирования учебного заведения
+        if ($action == 'edit' && $institutionid > 0) {
+            try {
+                $institution = $DB->get_record('local_deanpromoodle_institutions', ['id' => $institutionid]);
+                if (!$institution) {
+                    echo html_writer::div('Учебное заведение не найдено.', 'alert alert-danger');
+                    echo html_writer::end_div();
+                    break;
+                }
+                
+                // Обработка отправки формы
+                $formsubmitted = optional_param('submit', 0, PARAM_INT);
+                if ($formsubmitted) {
+                    $name = optional_param('name', '', PARAM_TEXT);
+                    $description = optional_param('description', '', PARAM_RAW);
+                    $address = optional_param('address', '', PARAM_TEXT);
+                    $phone = optional_param('phone', '', PARAM_TEXT);
+                    $email = optional_param('email', '', PARAM_TEXT);
+                    $website = optional_param('website', '', PARAM_TEXT);
+                    $logo = optional_param('logo', '', PARAM_TEXT);
+                    $visible = optional_param('visible', 1, PARAM_INT);
+                    
+                    if (empty($name)) {
+                        echo html_writer::div('Название учебного заведения обязательно для заполнения.', 'alert alert-danger');
+                    } else {
+                        try {
+                            $data = new stdClass();
+                            $data->id = $institutionid;
+                            $data->name = $name;
+                            $data->description = $description;
+                            $data->address = $address;
+                            $data->phone = $phone;
+                            $data->email = $email;
+                            $data->website = $website;
+                            $data->logo = $logo;
+                            $data->visible = $visible;
+                            $data->timemodified = time();
+                            
+                            $DB->update_record('local_deanpromoodle_institutions', $data);
+                            
+                            // Редирект на список учебных заведений
+                            redirect(new moodle_url('/local/deanpromoodle/pages/admin.php', ['tab' => 'institutions']), 'Учебное заведение успешно обновлено', null, \core\output\notification::NOTIFY_SUCCESS);
+                        } catch (\Exception $e) {
+                            echo html_writer::div('Ошибка при сохранении: ' . $e->getMessage(), 'alert alert-danger');
+                        }
+                    }
+                }
+                
+                // Отображение формы редактирования
+                echo html_writer::tag('h2', 'Редактировать учебное заведение', ['style' => 'margin-bottom: 20px;']);
+                
+                echo html_writer::start_tag('form', [
+                    'method' => 'post',
+                    'action' => new moodle_url('/local/deanpromoodle/pages/admin.php', [
+                        'tab' => 'institutions',
+                        'action' => 'edit',
+                        'institutionid' => $institutionid
+                    ]),
+                    'style' => 'max-width: 800px;'
+                ]);
+                
+                // Название *
+                echo html_writer::start_div('form-group', ['style' => 'margin-bottom: 15px;']);
+                echo html_writer::label('Название учебного заведения *', 'name');
+                echo html_writer::empty_tag('input', [
+                    'type' => 'text',
+                    'name' => 'name',
+                    'id' => 'name',
+                    'class' => 'form-control',
+                    'value' => htmlspecialchars($institution->name, ENT_QUOTES, 'UTF-8'),
+                    'required' => true
+                ]);
+                echo html_writer::end_div();
+                
+                // Описание
+                echo html_writer::start_div('form-group', ['style' => 'margin-bottom: 15px;']);
+                echo html_writer::label('Описание', 'description');
+                echo html_writer::start_tag('textarea', [
+                    'name' => 'description',
+                    'id' => 'description',
+                    'class' => 'form-control',
+                    'rows' => '5'
+                ]);
+                echo htmlspecialchars($institution->description ?? '', ENT_QUOTES, 'UTF-8');
+                echo html_writer::end_tag('textarea');
+                echo html_writer::end_div();
+                
+                // Адрес
+                echo html_writer::start_div('form-group', ['style' => 'margin-bottom: 15px;']);
+                echo html_writer::label('Адрес', 'address');
+                echo html_writer::empty_tag('input', [
+                    'type' => 'text',
+                    'name' => 'address',
+                    'id' => 'address',
+                    'class' => 'form-control',
+                    'value' => htmlspecialchars($institution->address ?? '', ENT_QUOTES, 'UTF-8')
+                ]);
+                echo html_writer::end_div();
+                
+                // Телефон
+                echo html_writer::start_div('form-group', ['style' => 'margin-bottom: 15px;']);
+                echo html_writer::label('Телефон', 'phone');
+                echo html_writer::empty_tag('input', [
+                    'type' => 'text',
+                    'name' => 'phone',
+                    'id' => 'phone',
+                    'class' => 'form-control',
+                    'value' => htmlspecialchars($institution->phone ?? '', ENT_QUOTES, 'UTF-8')
+                ]);
+                echo html_writer::end_div();
+                
+                // Email
+                echo html_writer::start_div('form-group', ['style' => 'margin-bottom: 15px;']);
+                echo html_writer::label('Email', 'email');
+                echo html_writer::empty_tag('input', [
+                    'type' => 'email',
+                    'name' => 'email',
+                    'id' => 'email',
+                    'class' => 'form-control',
+                    'value' => htmlspecialchars($institution->email ?? '', ENT_QUOTES, 'UTF-8')
+                ]);
+                echo html_writer::end_div();
+                
+                // Сайт
+                echo html_writer::start_div('form-group', ['style' => 'margin-bottom: 15px;']);
+                echo html_writer::label('Сайт', 'website');
+                echo html_writer::empty_tag('input', [
+                    'type' => 'url',
+                    'name' => 'website',
+                    'id' => 'website',
+                    'class' => 'form-control',
+                    'value' => htmlspecialchars($institution->website ?? '', ENT_QUOTES, 'UTF-8')
+                ]);
+                echo html_writer::end_div();
+                
+                // Логотип
+                echo html_writer::start_div('form-group', ['style' => 'margin-bottom: 15px;']);
+                echo html_writer::label('Путь к логотипу', 'logo');
+                echo html_writer::empty_tag('input', [
+                    'type' => 'text',
+                    'name' => 'logo',
+                    'id' => 'logo',
+                    'class' => 'form-control',
+                    'value' => htmlspecialchars($institution->logo ?? '', ENT_QUOTES, 'UTF-8')
+                ]);
+                echo html_writer::end_div();
+                
+                // Статус
+                echo html_writer::start_div('form-group', ['style' => 'margin-bottom: 15px;']);
+                echo html_writer::label('Статус', 'visible');
+                echo html_writer::select(
+                    [1 => 'Активно', 0 => 'Скрыто'],
+                    'visible',
+                    (int)$institution->visible,
+                    false,
+                    ['class' => 'form-control']
+                );
+                echo html_writer::end_div();
+                
+                // Кнопки
+                echo html_writer::start_div('form-group');
+                echo html_writer::empty_tag('input', [
+                    'type' => 'hidden',
+                    'name' => 'submit',
+                    'value' => '1'
+                ]);
+                echo html_writer::empty_tag('input', [
+                    'type' => 'submit',
+                    'value' => 'Сохранить изменения',
+                    'class' => 'btn btn-primary',
+                    'style' => 'margin-right: 10px;'
+                ]);
+                echo html_writer::link(
+                    new moodle_url('/local/deanpromoodle/pages/admin.php', ['tab' => 'institutions']),
+                    'Отмена',
+                    ['class' => 'btn btn-secondary']
+                );
+                echo html_writer::end_div();
+                
+                echo html_writer::end_tag('form');
+                
+                echo html_writer::end_div();
+                break;
+            } catch (\Exception $e) {
+                echo html_writer::div('Ошибка: ' . $e->getMessage(), 'alert alert-danger');
+                echo html_writer::end_div();
+                break;
+            }
+        }
+        
         // Обработка импорта из JSON
         $importaction = optional_param('import', '', PARAM_ALPHA);
         if ($importaction == 'json') {
@@ -3658,6 +3852,7 @@ switch ($tab) {
             echo html_writer::tag('th', 'Контакты', ['style' => 'width: 250px;']);
             echo html_writer::tag('th', 'Сайт', ['style' => 'width: 150px;']);
             echo html_writer::tag('th', 'Статус', ['style' => 'width: 100px;']);
+            echo html_writer::tag('th', 'Действия', ['style' => 'width: 120px; text-align: center;']);
             echo html_writer::end_tag('tr');
             echo html_writer::end_tag('thead');
             echo html_writer::start_tag('tbody');
@@ -3737,6 +3932,26 @@ switch ($tab) {
                 }
                 echo html_writer::end_tag('td');
                 
+                // Действия
+                echo html_writer::start_tag('td', ['style' => 'text-align: center;']);
+                echo html_writer::start_div('action-buttons');
+                echo html_writer::link(
+                    new moodle_url('/local/deanpromoodle/pages/admin.php', ['tab' => 'institutions', 'action' => 'edit', 'institutionid' => $institution->id]),
+                    '<i class="fas fa-edit"></i>',
+                    [
+                        'class' => 'action-btn action-btn-edit',
+                        'title' => 'Редактировать'
+                    ]
+                );
+                echo html_writer::link('#', '<i class="fas fa-times"></i>', [
+                    'class' => 'action-btn action-btn-delete delete-institution',
+                    'title' => 'Удалить',
+                    'data-institution-id' => $institution->id,
+                    'data-institution-name' => htmlspecialchars($institution->name, ENT_QUOTES, 'UTF-8')
+                ]);
+                echo html_writer::end_div();
+                echo html_writer::end_tag('td');
+                
                 echo html_writer::end_tag('tr');
             }
             
@@ -3745,7 +3960,7 @@ switch ($tab) {
             echo html_writer::end_div();
         }
         
-        // JavaScript для модального окна
+        // JavaScript для модального окна и удаления
         echo html_writer::start_tag('script');
         echo "
         document.addEventListener('DOMContentLoaded', function() {
@@ -3756,6 +3971,42 @@ switch ($tab) {
                     jQuery('#importInstitutionsJsonModal').modal('show');
                 });
             }
+            
+            // Обработка удаления учебного заведения
+            document.querySelectorAll('.delete-institution').forEach(function(btn) {
+                btn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    var institutionId = this.getAttribute('data-institution-id');
+                    var institutionName = this.getAttribute('data-institution-name');
+                    
+                    if (!confirm('Вы уверены, что хотите удалить учебное заведение \"' + institutionName + '\"?')) {
+                        return;
+                    }
+                    
+                    var xhr = new XMLHttpRequest();
+                    xhr.open('POST', '/local/deanpromoodle/pages/admin_ajax.php', true);
+                    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                    xhr.onreadystatechange = function() {
+                        if (xhr.readyState === 4) {
+                            if (xhr.status === 200) {
+                                try {
+                                    var response = JSON.parse(xhr.responseText);
+                                    if (response.success) {
+                                        window.location.reload();
+                                    } else {
+                                        alert('Ошибка: ' + (response.error || 'Неизвестная ошибка'));
+                                    }
+                                } catch (e) {
+                                    alert('Ошибка при обработке ответа сервера');
+                                }
+                            } else {
+                                alert('Ошибка при отправке запроса');
+                            }
+                        }
+                    };
+                    xhr.send('action=deleteinstitution&institutionid=' + institutionId);
+                });
+            });
         });
         ";
         echo html_writer::end_tag('script');
