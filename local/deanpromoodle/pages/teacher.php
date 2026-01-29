@@ -435,27 +435,72 @@ switch ($tab) {
                 $cm = get_coursemodule_from_instance('forum', $forum->id, $course->id);
                 $forumcontext = context_module::instance($cm->id);
                 
-                // Get posts without teacher replies
+                // Получение ролей преподавателей
+                $teacherroleids = $DB->get_fieldset_select('role', 'id', "shortname IN ('teacher', 'editingteacher', 'manager')");
+                if (empty($teacherroleids)) {
+                    continue;
+                }
+                
+                // Получение ID пользователей с ролями преподавателей в этом контексте курса
+                $coursecontext = context_course::instance($course->id);
+                $placeholders = implode(',', array_fill(0, count($teacherroleids), '?'));
+                $teacheruserids = $DB->get_fieldset_sql(
+                    "SELECT DISTINCT ra.userid
+                     FROM {role_assignments} ra
+                     WHERE ra.contextid = ? AND ra.roleid IN ($placeholders)",
+                    array_merge([$coursecontext->id], $teacherroleids)
+                );
+                
+                if (empty($teacheruserids)) {
+                    continue;
+                }
+                
+                // Получение ID пользователей с ролью студента в этом контексте курса
+                $studentroleid = $DB->get_field('role', 'id', ['shortname' => 'student']);
+                if (!$studentroleid) {
+                    continue;
+                }
+                
+                $studentuserids = $DB->get_fieldset_sql(
+                    "SELECT DISTINCT ra.userid
+                     FROM {role_assignments} ra
+                     WHERE ra.contextid = ? AND ra.roleid = ?",
+                    [$coursecontext->id, $studentroleid]
+                );
+                
+                if (empty($studentuserids)) {
+                    continue;
+                }
+                
+                $teacherplaceholders = implode(',', array_fill(0, count($teacheruserids), '?'));
+                $studentplaceholders = implode(',', array_fill(0, count($studentuserids), '?'));
+                
+                // Получение сообщений студентов, на которые не ответили преподаватели
                 $posts = $DB->get_records_sql(
                     "SELECT p.*, u.firstname, u.lastname, u.email, u.id as userid, d.name as discussionname
                      FROM {forum_posts} p
                      JOIN {user} u ON u.id = p.userid
                      JOIN {forum_discussions} d ON d.id = p.discussion
-                     WHERE d.forum = ? AND p.parent = 0
+                     WHERE d.forum = ? 
+                     AND p.userid IN ($studentplaceholders)
                      AND NOT EXISTS (
                          SELECT 1 FROM {forum_posts} p2
-                         JOIN {role_assignments} ra ON ra.userid = p2.userid
-                         JOIN {role} r ON r.id = ra.roleid
                          WHERE p2.discussion = p.discussion 
                          AND p2.id > p.id
-                         AND r.shortname IN ('teacher', 'editingteacher', 'manager')
-                         AND ra.contextid = ?
+                         AND p2.userid IN ($teacherplaceholders)
                      )
                      ORDER BY p.created DESC",
-                    [$forum->id, $forumcontext->id]
+                    array_merge([$forum->id], $studentuserids, $teacheruserids)
                 );
                 
                 foreach ($posts as $post) {
+                    // Обрезаем текст сообщения для отображения (первые 200 символов)
+                    $message = strip_tags($post->message);
+                    $message = mb_substr($message, 0, 200);
+                    if (mb_strlen(strip_tags($post->message)) > 200) {
+                        $message .= '...';
+                    }
+                    
                     $unrepliedposts[] = (object)[
                         'id' => $post->id,
                         'forumid' => $forum->id,
@@ -468,6 +513,8 @@ switch ($tab) {
                         'studentname' => fullname($post),
                         'email' => $post->email,
                         'subject' => $post->subject,
+                        'message' => $message,
+                        'fullmessage' => strip_tags($post->message),
                         'posted' => userdate($post->created),
                         'created' => $post->created
                     ];
