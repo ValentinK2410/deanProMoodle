@@ -1537,7 +1537,7 @@ switch ($tab) {
                         $data->is_paid = $is_paid;
                         // Обработка цены: если программа платная и указана цена, сохраняем её, иначе null
                         $pricevalue = trim($price);
-                        if ($is_paid && $pricevalue !== '' && is_numeric($pricevalue)) {
+                        if ($is_paid && $pricevalue !== '' && is_numeric($pricevalue) && (float)$pricevalue > 0) {
                             $data->price = (float)$pricevalue;
                         } else {
                             // Явно устанавливаем NULL для бесплатных программ или если цена не указана
@@ -1548,25 +1548,37 @@ switch ($tab) {
                         
                         if ($isedit) {
                             $data->id = $programid;
-                            $DB->update_record('local_deanpromoodle_programs', $data);
-                            $programid = $data->id;
                             
-                            // Явно обновляем поле price отдельно, чтобы гарантировать обновление
                             // Проверяем, существует ли поле price в таблице
                             $dbman = $DB->get_manager();
                             $table = new xmldb_table('local_deanpromoodle_programs');
                             $field = new xmldb_field('price');
                             
+                            // Если поле существует, обновляем запись с price
                             if ($dbman->field_exists($table, $field)) {
-                                $pricevalue = trim($price);
-                                if ($is_paid && $pricevalue !== '' && is_numeric($pricevalue)) {
-                                    $DB->set_field('local_deanpromoodle_programs', 'price', (float)$pricevalue, ['id' => $programid]);
-                                } else {
-                                    $DB->set_field('local_deanpromoodle_programs', 'price', null, ['id' => $programid]);
-                                }
+                                $DB->update_record('local_deanpromoodle_programs', $data);
+                            } else {
+                                // Если поля нет, обновляем без price
+                                unset($data->price);
+                                unset($data->is_paid);
+                                $DB->update_record('local_deanpromoodle_programs', $data);
                             }
+                            $programid = $data->id;
                         } else {
                             $data->timecreated = time();
+                            // При создании проверяем существование полей
+                            $dbman = $DB->get_manager();
+                            $table = new xmldb_table('local_deanpromoodle_programs');
+                            $field_price = new xmldb_field('price');
+                            $field_is_paid = new xmldb_field('is_paid');
+                            
+                            if (!$dbman->field_exists($table, $field_price)) {
+                                unset($data->price);
+                            }
+                            if (!$dbman->field_exists($table, $field_is_paid)) {
+                                unset($data->is_paid);
+                            }
+                            
                             $programid = $DB->insert_record('local_deanpromoodle_programs', $data);
                         }
                         
