@@ -81,8 +81,11 @@ if (!$hasaccess) {
     require_capability('local/deanpromoodle:viewstudent', $context);
 }
 
+// Получение параметров
+$tab = optional_param('tab', 'courses', PARAM_ALPHA); // courses, programs
+
 // Настройка страницы
-$PAGE->set_url(new moodle_url('/local/deanpromoodle/pages/student.php'));
+$PAGE->set_url(new moodle_url('/local/deanpromoodle/pages/student.php', ['tab' => $tab]));
 $PAGE->set_context(context_system::instance());
 // Получение заголовка с проверкой и fallback на русский
 $pagetitle = get_string('studentpagetitle', 'local_deanpromoodle');
@@ -93,14 +96,311 @@ $PAGE->set_title($pagetitle);
 $PAGE->set_heading($pagetitle);
 $PAGE->set_pagelayout('standard');
 
+// Подключение CSS
+$PAGE->requires->css('/local/deanpromoodle/styles.css');
+
 // Вывод страницы
 echo $OUTPUT->header();
 // Заголовок уже выводится через set_heading(), не нужно дублировать
 
-// Содержимое страницы
-echo html_writer::start_div('local-deanpromoodle-student-content');
-echo html_writer::tag('p', get_string('studentpagecontent', 'local_deanpromoodle'));
-echo html_writer::end_div();
+global $USER, $DB;
+
+// Вкладки
+$tabs = [];
+$tabs[] = new tabobject('courses', 
+    new moodle_url('/local/deanpromoodle/pages/student.php', ['tab' => 'courses']),
+    'Мои курсы');
+$tabs[] = new tabobject('programs', 
+    new moodle_url('/local/deanpromoodle/pages/student.php', ['tab' => 'programs']),
+    'Мои программы');
+
+echo $OUTPUT->tabtree($tabs, $tab);
+
+// Содержимое страницы в зависимости от вкладки
+switch ($tab) {
+    case 'courses':
+        // Вкладка "Мои курсы"
+        echo html_writer::start_div('local-deanpromoodle-student-content', ['style' => 'margin-top: 20px;']);
+        echo html_writer::tag('h2', 'Мои курсы', ['style' => 'margin-bottom: 20px;']);
+        
+        try {
+            // Получаем все курсы, на которые записан студент
+            $mycourses = enrol_get_my_courses(['id', 'fullname', 'shortname', 'summary', 'startdate', 'enddate', 'visible']);
+            
+            if (empty($mycourses)) {
+                echo html_writer::div('Вы не записаны ни на один курс.', 'alert alert-info');
+            } else {
+                // Стили для таблицы курсов
+                echo html_writer::start_tag('style');
+                echo "
+                    .courses-table {
+                        background: white;
+                        border-radius: 8px;
+                        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                        overflow: hidden;
+                    }
+                    .courses-table table {
+                        margin: 0;
+                        width: 100%;
+                    }
+                    .courses-table thead th {
+                        background-color: #f8f9fa;
+                        padding: 12px 16px;
+                        text-align: left;
+                        font-weight: 600;
+                        color: #495057;
+                        border-bottom: 2px solid #dee2e6;
+                    }
+                    .courses-table tbody tr {
+                        border-bottom: 1px solid #f0f0f0;
+                    }
+                    .courses-table tbody tr:hover {
+                        background-color: #f8f9fa;
+                    }
+                    .courses-table tbody td {
+                        padding: 12px 16px;
+                        vertical-align: middle;
+                    }
+                    .course-link {
+                        color: #007bff;
+                        text-decoration: none;
+                        font-weight: 500;
+                    }
+                    .course-link:hover {
+                        text-decoration: underline;
+                    }
+                ";
+                echo html_writer::end_tag('style');
+                
+                echo html_writer::start_div('courses-table');
+                echo html_writer::start_tag('table', ['class' => 'table']);
+                echo html_writer::start_tag('thead');
+                echo html_writer::start_tag('tr');
+                echo html_writer::tag('th', 'Название курса');
+                echo html_writer::tag('th', 'Краткое название', ['style' => 'width: 200px;']);
+                echo html_writer::tag('th', 'Дата начала', ['style' => 'width: 150px;']);
+                echo html_writer::tag('th', 'Дата окончания', ['style' => 'width: 150px;']);
+                echo html_writer::tag('th', 'Действие', ['style' => 'width: 100px; text-align: center;']);
+                echo html_writer::end_tag('tr');
+                echo html_writer::end_tag('thead');
+                echo html_writer::start_tag('tbody');
+                
+                foreach ($mycourses as $course) {
+                    if ($course->id <= 1) continue; // Пропускаем системный курс
+                    
+                    echo html_writer::start_tag('tr');
+                    
+                    // Название курса
+                    $courseurl = new moodle_url('/course/view.php', ['id' => $course->id]);
+                    echo html_writer::tag('td', 
+                        html_writer::link($courseurl, htmlspecialchars($course->fullname, ENT_QUOTES, 'UTF-8'), [
+                            'class' => 'course-link'
+                        ])
+                    );
+                    
+                    // Краткое название
+                    echo html_writer::tag('td', htmlspecialchars($course->shortname, ENT_QUOTES, 'UTF-8'));
+                    
+                    // Дата начала
+                    $startdate = $course->startdate > 0 ? userdate($course->startdate, get_string('strftimedatefullshort')) : '-';
+                    echo html_writer::tag('td', $startdate);
+                    
+                    // Дата окончания
+                    $enddate = $course->enddate > 0 ? userdate($course->enddate, get_string('strftimedatefullshort')) : '-';
+                    echo html_writer::tag('td', $enddate);
+                    
+                    // Действие
+                    echo html_writer::start_tag('td', ['style' => 'text-align: center;']);
+                    echo html_writer::link($courseurl, '<i class="fas fa-external-link-alt"></i>', [
+                        'class' => 'btn btn-sm btn-primary',
+                        'title' => 'Перейти к курсу',
+                        'target' => '_blank'
+                    ]);
+                    echo html_writer::end_tag('td');
+                    
+                    echo html_writer::end_tag('tr');
+                }
+                
+                echo html_writer::end_tag('tbody');
+                echo html_writer::end_tag('table');
+                echo html_writer::end_div();
+            }
+        } catch (\Exception $e) {
+            echo html_writer::div('Ошибка: ' . $e->getMessage(), 'alert alert-danger');
+        }
+        
+        echo html_writer::end_div();
+        break;
+    
+    case 'programs':
+        // Вкладка "Мои программы"
+        echo html_writer::start_div('local-deanpromoodle-student-content', ['style' => 'margin-top: 20px;']);
+        echo html_writer::tag('h2', 'Мои программы', ['style' => 'margin-bottom: 20px;']);
+        
+        try {
+            // Получаем когорты, к которым принадлежит студент
+            $studentcohorts = $DB->get_records_sql(
+                "SELECT c.id, c.name, c.idnumber, c.description
+                 FROM {cohort_members} cm
+                 JOIN {cohort} c ON c.id = cm.cohortid
+                 WHERE cm.userid = ?
+                 ORDER BY c.name ASC",
+                [$USER->id]
+            );
+            
+            if (empty($studentcohorts)) {
+                echo html_writer::div('Вы не состоите ни в одной группе (когорте).', 'alert alert-info');
+            } else {
+                // Получаем программы, связанные с когортами студента
+                $cohortids = array_keys($studentcohorts);
+                $placeholders = implode(',', array_fill(0, count($cohortids), '?'));
+                
+                $programs = $DB->get_records_sql(
+                    "SELECT DISTINCT p.id, p.name, p.code, p.description, p.institution,
+                            GROUP_CONCAT(DISTINCT c.id ORDER BY c.name SEPARATOR ',') as cohortids,
+                            GROUP_CONCAT(DISTINCT c.name ORDER BY c.name SEPARATOR ', ') as cohortnames
+                     FROM {local_deanpromoodle_programs} p
+                     JOIN {local_deanpromoodle_program_cohorts} pc ON pc.programid = p.id
+                     JOIN {cohort} c ON c.id = pc.cohortid
+                     WHERE pc.cohortid IN ($placeholders)
+                     AND p.visible = 1
+                     GROUP BY p.id, p.name, p.code, p.description, p.institution
+                     ORDER BY p.name ASC",
+                    $cohortids
+                );
+                
+                if (empty($programs)) {
+                    echo html_writer::div('Ваши группы не прикреплены ни к одной программе.', 'alert alert-info');
+                } else {
+                    // Стили для таблицы программ
+                    echo html_writer::start_tag('style');
+                    echo "
+                        .programs-table {
+                            background: white;
+                            border-radius: 8px;
+                            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                            overflow: hidden;
+                        }
+                        .programs-table table {
+                            margin: 0;
+                            width: 100%;
+                        }
+                        .programs-table thead th {
+                            background-color: #f8f9fa;
+                            padding: 12px 16px;
+                            text-align: left;
+                            font-weight: 600;
+                            color: #495057;
+                            border-bottom: 2px solid #dee2e6;
+                        }
+                        .programs-table tbody tr {
+                            border-bottom: 1px solid #f0f0f0;
+                        }
+                        .programs-table tbody tr:hover {
+                            background-color: #f8f9fa;
+                        }
+                        .programs-table tbody td {
+                            padding: 12px 16px;
+                            vertical-align: top;
+                        }
+                        .cohort-badge {
+                            display: inline-block;
+                            margin: 2px 4px 2px 0;
+                            padding: 4px 8px;
+                            background-color: #6c757d;
+                            color: white;
+                            border-radius: 4px;
+                            font-size: 0.85em;
+                        }
+                        .program-description {
+                            max-width: 400px;
+                            overflow: hidden;
+                            text-overflow: ellipsis;
+                            white-space: nowrap;
+                        }
+                    ";
+                    echo html_writer::end_tag('style');
+                    
+                    echo html_writer::start_div('programs-table');
+                    echo html_writer::start_tag('table', ['class' => 'table']);
+                    echo html_writer::start_tag('thead');
+                    echo html_writer::start_tag('tr');
+                    echo html_writer::tag('th', 'Название программы');
+                    echo html_writer::tag('th', 'Код', ['style' => 'width: 150px;']);
+                    echo html_writer::tag('th', 'Учебное заведение', ['style' => 'width: 200px;']);
+                    echo html_writer::tag('th', 'Группы', ['style' => 'width: 200px;']);
+                    echo html_writer::tag('th', 'Описание', ['style' => 'width: 300px;']);
+                    echo html_writer::end_tag('tr');
+                    echo html_writer::end_tag('thead');
+                    echo html_writer::start_tag('tbody');
+                    
+                    foreach ($programs as $program) {
+                        echo html_writer::start_tag('tr');
+                        
+                        // Название программы
+                        echo html_writer::tag('td', htmlspecialchars($program->name, ENT_QUOTES, 'UTF-8'), [
+                            'style' => 'font-weight: 500;'
+                        ]);
+                        
+                        // Код
+                        $code = is_string($program->code) ? $program->code : '';
+                        echo html_writer::tag('td', $code ? htmlspecialchars($code, ENT_QUOTES, 'UTF-8') : '-');
+                        
+                        // Учебное заведение
+                        $institution = is_string($program->institution) ? $program->institution : '';
+                        echo html_writer::tag('td', $institution ? htmlspecialchars($institution, ENT_QUOTES, 'UTF-8') : '-');
+                        
+                        // Группы (когорты)
+                        echo html_writer::start_tag('td');
+                        if (!empty($program->cohortnames)) {
+                            $cohortnamesarray = explode(', ', $program->cohortnames);
+                            foreach ($cohortnamesarray as $cohortname) {
+                                echo html_writer::tag('span', htmlspecialchars(trim($cohortname), ENT_QUOTES, 'UTF-8'), [
+                                    'class' => 'cohort-badge',
+                                    'title' => 'Группа: ' . htmlspecialchars(trim($cohortname), ENT_QUOTES, 'UTF-8')
+                                ]);
+                            }
+                        } else {
+                            echo '-';
+                        }
+                        echo html_writer::end_tag('td');
+                        
+                        // Описание
+                        echo html_writer::start_tag('td');
+                        if (!empty($program->description)) {
+                            $description = strip_tags($program->description);
+                            if (mb_strlen($description) > 100) {
+                                $description = mb_substr($description, 0, 100) . '...';
+                            }
+                            echo html_writer::tag('div', htmlspecialchars($description, ENT_QUOTES, 'UTF-8'), [
+                                'class' => 'program-description',
+                                'title' => htmlspecialchars($program->description, ENT_QUOTES, 'UTF-8')
+                            ]);
+                        } else {
+                            echo '-';
+                        }
+                        echo html_writer::end_tag('td');
+                        
+                        echo html_writer::end_tag('tr');
+                    }
+                    
+                    echo html_writer::end_tag('tbody');
+                    echo html_writer::end_tag('table');
+                    echo html_writer::end_div();
+                }
+            }
+        } catch (\Exception $e) {
+            echo html_writer::div('Ошибка: ' . $e->getMessage(), 'alert alert-danger');
+        }
+        
+        echo html_writer::end_div();
+        break;
+    
+    default:
+        // По умолчанию показываем курсы
+        redirect(new moodle_url('/local/deanpromoodle/pages/student.php', ['tab' => 'courses']));
+        break;
+}
 
 // Информация об авторе в футере
 echo html_writer::start_div('local-deanpromoodle-author-footer', ['style' => 'margin-top: 40px; padding-top: 20px; border-top: 1px solid #dee2e6; text-align: center; color: #6c757d; font-size: 0.9em;']);
