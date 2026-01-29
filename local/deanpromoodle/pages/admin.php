@@ -1646,6 +1646,13 @@ switch ($tab) {
                     padding-left: 20px;
                     padding-right: 20px;
                 }
+                .programs-table th:first-child,
+                .programs-table td:first-child {
+                    width: 60px;
+                    min-width: 60px;
+                    max-width: 60px;
+                    text-align: center;
+                }
                 .programs-table th:nth-child(3),
                 .programs-table td:nth-child(3) {
                     width: auto;
@@ -1858,7 +1865,7 @@ switch ($tab) {
                     
                     // ID
                     echo html_writer::start_tag('td');
-                    echo '<span class="program-id-badge">' . htmlspecialchars((string)$programid, ENT_QUOTES, 'UTF-8') . '</span>';
+                    echo htmlspecialchars((string)$programid, ENT_QUOTES, 'UTF-8');
                     echo html_writer::end_tag('td');
                     
                     // Название программы
