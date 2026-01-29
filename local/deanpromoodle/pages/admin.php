@@ -1632,62 +1632,87 @@ switch ($tab) {
                 }
                 .action-buttons {
                     display: flex;
-                    gap: 6px;
+                    gap: 8px;
+                    align-items: center;
                 }
                 .action-btn {
-                    width: 38px;
-                    height: 38px;
-                    border: none;
-                    border-radius: 6px;
+                    width: 44px;
+                    height: 44px;
+                    border: 2px solid transparent;
+                    border-radius: 10px;
                     cursor: pointer;
-                    display: flex;
+                    display: inline-flex;
                     align-items: center;
                     justify-content: center;
-                    font-size: 18px;
-                    font-weight: 500;
+                    font-size: 20px;
+                    font-weight: 600;
                     text-decoration: none;
-                    transition: all 0.2s;
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+                    transition: all 0.25s ease;
+                    box-shadow: 0 3px 10px rgba(0,0,0,0.15);
+                    position: relative;
+                    overflow: hidden;
+                }
+                .action-btn::after {
+                    content: '';
+                    position: absolute;
+                    top: 0;
+                    left: -100%;
+                    width: 100%;
+                    height: 100%;
+                    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+                    transition: left 0.5s;
+                }
+                .action-btn:hover::after {
+                    left: 100%;
                 }
                 .action-btn:hover {
-                    transform: translateY(-1px);
-                    box-shadow: 0 3px 6px rgba(0,0,0,0.2);
-                    opacity: 0.9;
+                    transform: translateY(-3px) scale(1.08);
+                    box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+                    border-color: rgba(255,255,255,0.5);
+                }
+                .action-btn:active {
+                    transform: translateY(-1px) scale(1.02);
+                    box-shadow: 0 3px 10px rgba(0,0,0,0.2);
                 }
                 .action-btn-view {
-                    background-color: #1976d2;
+                    background: #3b82f6;
                     color: white;
                 }
                 .action-btn-view:hover {
-                    background-color: #1565c0;
+                    background: #2563eb;
+                    border-color: rgba(255,255,255,0.3);
                 }
                 .action-btn-edit {
-                    background-color: #f57c00;
+                    background: #f59e0b;
                     color: white;
                 }
                 .action-btn-edit:hover {
-                    background-color: #e65100;
+                    background: #d97706;
+                    border-color: rgba(255,255,255,0.3);
                 }
                 .action-btn-copy {
-                    background-color: #616161;
+                    background: #8b5cf6;
                     color: white;
                 }
                 .action-btn-copy:hover {
-                    background-color: #424242;
+                    background: #7c3aed;
+                    border-color: rgba(255,255,255,0.3);
                 }
                 .action-btn-delete {
-                    background-color: #d32f2f;
+                    background: #ef4444;
                     color: white;
                 }
                 .action-btn-delete:hover {
-                    background-color: #c62828;
+                    background: #dc2626;
+                    border-color: rgba(255,255,255,0.3);
                 }
                 .action-btn-link {
-                    background-color: #7b1fa2;
+                    background: #10b981;
                     color: white;
                 }
                 .action-btn-link:hover {
-                    background-color: #6a1b9a;
+                    background: #059669;
+                    border-color: rgba(255,255,255,0.3);
                 }
             ";
             echo html_writer::end_tag('style');
