@@ -1736,6 +1736,108 @@ switch ($tab) {
         // Вкладка "Предметы"
         echo html_writer::start_div('local-deanpromoodle-admin-content', ['style' => 'margin-bottom: 30px;']);
         
+        // Обработка импорта JSON
+        $importaction = optional_param('import', '', PARAM_ALPHA);
+        if ($importaction == 'json') {
+            $importsubmitted = optional_param('import_submit', 0, PARAM_INT);
+            if ($importsubmitted) {
+                // Проверяем загруженный файл
+                $file = $_FILES['jsonfile'] ?? null;
+                if (!$file || $file['error'] !== UPLOAD_ERR_OK) {
+                    echo html_writer::div('Ошибка загрузки файла. Убедитесь, что файл выбран и не превышает максимальный размер.', 'alert alert-danger');
+                } else {
+                    // Проверяем тип файла
+                    $filetype = mime_content_type($file['tmp_name']);
+                    $fileext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+                    if ($fileext !== 'json' && strpos($filetype, 'json') === false && strpos($filetype, 'text') === false) {
+                        echo html_writer::div('Неверный тип файла. Загрузите файл в формате JSON.', 'alert alert-danger');
+                    } else {
+                        // Читаем содержимое файла
+                        $jsoncontent = file_get_contents($file['tmp_name']);
+                        if ($jsoncontent === false) {
+                            echo html_writer::div('Ошибка чтения файла.', 'alert alert-danger');
+                        } else {
+                            // Парсим JSON
+                            $subjectsdata = json_decode($jsoncontent, true);
+                            if (json_last_error() !== JSON_ERROR_NONE) {
+                                echo html_writer::div('Ошибка парсинга JSON: ' . json_last_error_msg(), 'alert alert-danger');
+                            } else {
+                                if (!is_array($subjectsdata)) {
+                                    echo html_writer::div('JSON файл должен содержать массив предметов.', 'alert alert-danger');
+                                } else {
+                                    // Импортируем предметы
+                                    $imported = 0;
+                                    $skipped = 0;
+                                    $errors = [];
+                                    
+                                    $transaction = $DB->start_delegated_transaction();
+                                    try {
+                                        foreach ($subjectsdata as $index => $subjectdata) {
+                                            // Валидация данных
+                                            if (empty($subjectdata['name'])) {
+                                                $errors[] = 'Предмет #' . ($index + 1) . ': отсутствует название';
+                                                $skipped++;
+                                                continue;
+                                            }
+                                            
+                                            // Проверяем, существует ли предмет с таким названием или кодом
+                                            $existing = null;
+                                            if (!empty($subjectdata['code'])) {
+                                                $existing = $DB->get_record('local_deanpromoodle_subjects', ['code' => $subjectdata['code']]);
+                                            }
+                                            if (!$existing) {
+                                                $existing = $DB->get_record('local_deanpromoodle_subjects', ['name' => $subjectdata['name']]);
+                                            }
+                                            
+                                            if ($existing) {
+                                                $skipped++;
+                                                continue; // Пропускаем существующие предметы
+                                            }
+                                            
+                                            // Создаем новый предмет
+                                            $data = new stdClass();
+                                            $data->name = trim($subjectdata['name']);
+                                            $data->code = !empty($subjectdata['code']) ? trim($subjectdata['code']) : '';
+                                            $data->shortdescription = !empty($subjectdata['shortdescription']) ? $subjectdata['shortdescription'] : '';
+                                            $data->description = !empty($subjectdata['description']) ? $subjectdata['description'] : '';
+                                            $data->sortorder = isset($subjectdata['sortorder']) ? (int)$subjectdata['sortorder'] : 0;
+                                            $data->visible = isset($subjectdata['visible']) ? (int)$subjectdata['visible'] : 1;
+                                            $data->timecreated = time();
+                                            $data->timemodified = time();
+                                            
+                                            $DB->insert_record('local_deanpromoodle_subjects', $data);
+                                            $imported++;
+                                        }
+                                        
+                                        $transaction->allow_commit();
+                                        
+                                        // Сообщение об успехе
+                                        $message = 'Импорт завершен. Импортировано предметов: ' . $imported;
+                                        if ($skipped > 0) {
+                                            $message .= ', пропущено (уже существуют): ' . $skipped;
+                                        }
+                                        if (!empty($errors)) {
+                                            $message .= '. Ошибки: ' . implode('; ', array_slice($errors, 0, 5));
+                                            if (count($errors) > 5) {
+                                                $message .= ' и еще ' . (count($errors) - 5) . ' ошибок';
+                                            }
+                                        }
+                                        echo html_writer::div($message, 'alert alert-success');
+                                        
+                                        // Редирект на список предметов
+                                        redirect(new moodle_url('/local/deanpromoodle/pages/admin.php', ['tab' => 'subjects']), $message, null, \core\output\notification::NOTIFY_SUCCESS);
+                                    } catch (\Exception $e) {
+                                        $transaction->rollback($e);
+                                        echo html_writer::div('Ошибка при импорте: ' . $e->getMessage(), 'alert alert-danger');
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
         // Обработка действий
         if ($action == 'create' || ($action == 'edit' && $subjectid > 0)) {
             // Создание или редактирование предмета
@@ -2122,6 +2224,7 @@ switch ($tab) {
             echo html_writer::tag('span', '📚', ['style' => 'font-size: 24px;']);
             echo html_writer::tag('h2', 'Предметы', ['style' => 'margin: 0; font-size: 24px; font-weight: 600;']);
             echo html_writer::end_div();
+            echo html_writer::start_div('', ['style' => 'display: flex; gap: 10px;']);
             echo html_writer::link(
                 new moodle_url('/local/deanpromoodle/pages/admin.php', ['tab' => 'subjects', 'action' => 'create']),
                 '+ Добавить предмет',
@@ -2130,6 +2233,88 @@ switch ($tab) {
                     'style' => 'background-color: #007bff; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-weight: 500;'
                 ]
             );
+            echo html_writer::link('#', '📥 Импорт из JSON', [
+                'class' => 'btn btn-success',
+                'id' => 'import-json-btn',
+                'style' => 'background-color: #28a745; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-weight: 500;'
+            ]);
+            echo html_writer::end_div();
+            echo html_writer::end_div();
+            
+            // Модальное окно для импорта JSON
+            echo html_writer::start_div('modal fade', [
+                'id' => 'importJsonModal',
+                'tabindex' => '-1',
+                'role' => 'dialog'
+            ]);
+            echo html_writer::start_div('modal-dialog', ['role' => 'document']);
+            echo html_writer::start_div('modal-content');
+            echo html_writer::start_div('modal-header');
+            echo html_writer::tag('h5', 'Импорт предметов из JSON', ['class' => 'modal-title']);
+            echo html_writer::start_tag('button', [
+                'type' => 'button',
+                'class' => 'close',
+                'data-dismiss' => 'modal',
+                'onclick' => 'jQuery(\'#importJsonModal\').modal(\'hide\');'
+            ]);
+            echo html_writer::tag('span', '×', ['aria-hidden' => 'true']);
+            echo html_writer::end_tag('button');
+            echo html_writer::end_div();
+            echo html_writer::start_div('modal-body');
+            echo html_writer::start_tag('form', [
+                'method' => 'post',
+                'action' => new moodle_url('/local/deanpromoodle/pages/admin.php', ['tab' => 'subjects', 'import' => 'json']),
+                'enctype' => 'multipart/form-data'
+            ]);
+            echo html_writer::start_div('form-group');
+            echo html_writer::label('Выберите JSON файл', 'jsonfile');
+            echo html_writer::empty_tag('input', [
+                'type' => 'file',
+                'name' => 'jsonfile',
+                'id' => 'jsonfile',
+                'class' => 'form-control-file',
+                'accept' => '.json,application/json',
+                'required' => true
+            ]);
+            echo html_writer::start_div('form-text text-muted', ['style' => 'margin-top: 5px;']);
+            echo 'Формат JSON файла:<br>';
+            echo '<pre style="background: #f5f5f5; padding: 10px; border-radius: 4px; font-size: 12px; margin-top: 5px;">[<br>';
+            echo '  {<br>';
+            echo '    "name": "Название предмета",<br>';
+            echo '    "code": "КОД",<br>';
+            echo '    "shortdescription": "Краткое описание",<br>';
+            echo '    "description": "Полное описание",<br>';
+            echo '    "sortorder": 0,<br>';
+            echo '    "visible": 1<br>';
+            echo '  }<br>';
+            echo ']</pre>';
+            echo html_writer::end_div();
+            echo html_writer::end_div();
+            echo html_writer::start_div('form-group');
+            echo html_writer::empty_tag('input', [
+                'type' => 'hidden',
+                'name' => 'import_submit',
+                'value' => '1'
+            ]);
+            echo html_writer::empty_tag('input', [
+                'type' => 'submit',
+                'value' => 'Импортировать',
+                'class' => 'btn btn-success',
+                'style' => 'margin-right: 10px;'
+            ]);
+            echo html_writer::start_tag('button', [
+                'type' => 'button',
+                'class' => 'btn btn-secondary',
+                'data-dismiss' => 'modal',
+                'onclick' => 'jQuery(\'#importJsonModal\').modal(\'hide\');'
+            ]);
+            echo 'Отмена';
+            echo html_writer::end_tag('button');
+            echo html_writer::end_div();
+            echo html_writer::end_tag('form');
+            echo html_writer::end_div();
+            echo html_writer::end_div();
+            echo html_writer::end_div();
             echo html_writer::end_div();
             
             // Получаем все предметы
@@ -2381,6 +2566,28 @@ switch ($tab) {
                             xhr.send('action=deletesubject&subjectid=' + subjectId);
                         });
                     });
+                    
+                    // Обработчик кнопки импорта JSON
+                    var importBtn = document.getElementById('import-json-btn');
+                    if (importBtn) {
+                        importBtn.addEventListener('click', function(e) {
+                            e.preventDefault();
+                            if (typeof jQuery !== 'undefined' && jQuery.fn.modal) {
+                                jQuery('#importJsonModal').modal('show');
+                            } else if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                                var modal = new bootstrap.Modal(document.getElementById('importJsonModal'));
+                                modal.show();
+                            } else {
+                                // Fallback: просто показываем модальное окно через CSS
+                                var modal = document.getElementById('importJsonModal');
+                                if (modal) {
+                                    modal.style.display = 'block';
+                                    modal.classList.add('show');
+                                    document.body.classList.add('modal-open');
+                                }
+                            }
+                        });
+                    }
                 })();
             ");
         }
