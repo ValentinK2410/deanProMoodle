@@ -1202,10 +1202,11 @@ switch ($tab) {
                     }
                 }
                 
+                // Убеждаемся, что все значения - числа
                 return [
-                    'coursescount' => $coursescount,
-                    'studentscount' => $studentscount,
-                    'teacherscount' => $teacherscount
+                    'coursescount' => is_scalar($coursescount) ? (int)$coursescount : 0,
+                    'studentscount' => is_scalar($studentscount) ? (int)$studentscount : 0,
+                    'teacherscount' => is_scalar($teacherscount) ? (int)$teacherscount : 0
                 ];
             };
             
@@ -1247,13 +1248,25 @@ switch ($tab) {
                     // Безопасное преобразование ID категории в строку
                     $categoryid = is_scalar($category->id) ? (string)$category->id : (is_array($category->id) ? implode('-', $category->id) : '0');
                     
+                    // Безопасное преобразование parentrowid в строку
+                    $parentrowidstr = '';
+                    if ($parentrowid) {
+                        $parentrowidstr = is_scalar($parentrowid) ? (string)$parentrowid : (is_array($parentrowid) ? implode('-', $parentrowid) : '');
+                    }
+                    
+                    // Убеждаемся, что categoryid - строка
+                    $categoryid = (string)$categoryid;
                     $rowid = 'category-row-' . $categoryid;
+                    
+                    // Убеждаемся, что rowid - строка
+                    $rowid = (string)$rowid;
+                    
                     $rowclass = 'category-row';
                     $rowstyle = '';
                     
                     // Если это дочерняя категория, скрываем по умолчанию
-                    if ($level > 0 && $parentrowid) {
-                        $rowclass .= ' category-child category-child-of-' . $parentrowid;
+                    if ($level > 0 && $parentrowidstr) {
+                        $rowclass .= ' category-child category-child-of-' . $parentrowidstr;
                         $rowstyle = 'display: none;';
                     }
                     
@@ -1264,20 +1277,20 @@ switch ($tab) {
                         'class' => $rowclass,
                         'data-category-id' => $categoryid,
                         'data-level' => (string)$level,
-                        'data-parent-id' => $parentrowid ? (string)$parentrowid : '',
+                        'data-parent-id' => $parentrowidstr,
                         'style' => $rowstyle
                     ]);
                     
-                    // Колонка ID
-                    echo html_writer::tag('td', $categoryid);
+                    // Колонка ID - убеждаемся, что это строка
+                    echo html_writer::tag('td', (string)$categoryid);
                     
                     // Колонка названия с кнопкой раскрытия/сворачивания
                     $namecell = '';
                     if ($haschildren) {
                         $namecell .= html_writer::link('#', '▶', [
                             'class' => 'category-toggle',
-                            'data-category-id' => $categoryid,
-                            'data-row-id' => $rowid,
+                            'data-category-id' => (string)$categoryid,
+                            'data-row-id' => (string)$rowid,
                             'style' => 'text-decoration: none; color: #666; margin-right: 5px; font-size: 12px; display: inline-block; width: 15px;',
                             'title' => 'Раскрыть/свернуть'
                         ]);
@@ -1301,11 +1314,12 @@ switch ($tab) {
                     echo html_writer::tag('td', $namecell, ['style' => $indentstyle]);
                     
                     // Количество курсов - ссылка если > 0
-                    $coursescell = $stats['coursescount'];
-                    if ($stats['coursescount'] > 0) {
-                        $coursescell = html_writer::link('#', (string)$stats['coursescount'], [
+                    $coursescountval = is_scalar($stats['coursescount']) ? (int)$stats['coursescount'] : 0;
+                    $coursescell = (string)$coursescountval;
+                    if ($coursescountval > 0) {
+                        $coursescell = html_writer::link('#', (string)$coursescountval, [
                             'class' => 'category-link',
-                            'data-category-id' => $categoryid,
+                            'data-category-id' => (string)$categoryid,
                             'data-type' => 'courses',
                             'data-category-name' => htmlspecialchars($categoryname, ENT_QUOTES, 'UTF-8'),
                             'style' => 'color: #007bff; font-weight: bold; text-decoration: none; cursor: pointer;'
@@ -1314,11 +1328,12 @@ switch ($tab) {
                     echo html_writer::tag('td', html_writer::tag('strong', $coursescell));
                     
                     // Количество студентов - ссылка если > 0
-                    $studentscell = $stats['studentscount'];
-                    if ($stats['studentscount'] > 0) {
-                        $studentscell = html_writer::link('#', (string)$stats['studentscount'], [
+                    $studentscountval = is_scalar($stats['studentscount']) ? (int)$stats['studentscount'] : 0;
+                    $studentscell = (string)$studentscountval;
+                    if ($studentscountval > 0) {
+                        $studentscell = html_writer::link('#', (string)$studentscountval, [
                             'class' => 'category-link',
-                            'data-category-id' => $categoryid,
+                            'data-category-id' => (string)$categoryid,
                             'data-type' => 'students',
                             'data-category-name' => htmlspecialchars($categoryname, ENT_QUOTES, 'UTF-8'),
                             'style' => 'color: green; font-weight: bold; text-decoration: none; cursor: pointer;'
@@ -1327,11 +1342,12 @@ switch ($tab) {
                     echo html_writer::tag('td', html_writer::tag('span', $studentscell));
                     
                     // Количество преподавателей - ссылка если > 0
-                    $teacherscell = $stats['teacherscount'];
-                    if ($stats['teacherscount'] > 0) {
-                        $teacherscell = html_writer::link('#', (string)$stats['teacherscount'], [
+                    $teacherscountval = is_scalar($stats['teacherscount']) ? (int)$stats['teacherscount'] : 0;
+                    $teacherscell = (string)$teacherscountval;
+                    if ($teacherscountval > 0) {
+                        $teacherscell = html_writer::link('#', (string)$teacherscountval, [
                             'class' => 'category-link',
-                            'data-category-id' => $categoryid,
+                            'data-category-id' => (string)$categoryid,
                             'data-type' => 'teachers',
                             'data-category-name' => htmlspecialchars($categoryname, ENT_QUOTES, 'UTF-8'),
                             'style' => 'color: orange; font-weight: bold; text-decoration: none; cursor: pointer;'
