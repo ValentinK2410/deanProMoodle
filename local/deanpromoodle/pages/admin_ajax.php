@@ -66,6 +66,12 @@ if (!$hasaccess) {
 $action = optional_param('action', '', PARAM_ALPHA);
 $teacherid = optional_param('teacherid', 0, PARAM_INT);
 $categoryid = optional_param('categoryid', 0, PARAM_INT);
+// Параметры для предметов и программ
+$subjectid = optional_param('subjectid', 0, PARAM_INT);
+$courseid = optional_param('courseid', 0, PARAM_INT);
+$programid = optional_param('programid', 0, PARAM_INT);
+$cohortid = optional_param('cohortid', 0, PARAM_INT);
+$search = optional_param('search', '', PARAM_TEXT);
 
 header('Content-Type: application/json');
 
@@ -371,6 +377,432 @@ if ($action == 'getteachercourses' && $teacherid > 0) {
         'teachers' => $teachers,
         'count' => count($teachers)
     ]);
+} elseif ($action == 'getcourses') {
+    // Получение списка курсов с фильтрацией для модального окна
+    global $DB;
+    
+    $courses = [];
+    if (!empty($search) && strlen($search) >= 2) {
+        $searchpattern = '%' . $DB->sql_like_escape($search) . '%';
+        $courses = $DB->get_records_sql(
+            "SELECT c.id, c.fullname, c.shortname
+             FROM {course} c
+             WHERE c.id > 1
+             AND (c.fullname LIKE ? OR c.shortname LIKE ?)
+             ORDER BY c.fullname ASC
+             LIMIT 50",
+            [$searchpattern, $searchpattern]
+        );
+    }
+    
+    // Исключаем курсы, уже прикрепленные к предмету, если указан subjectid
+    if ($subjectid > 0 && !empty($courses)) {
+        $attachedcourseids = $DB->get_fieldset_select(
+            'local_deanpromoodle_subject_courses',
+            'courseid',
+            'subjectid = ?',
+            [$subjectid]
+        );
+        if (!empty($attachedcourseids)) {
+            $courses = array_filter($courses, function($course) use ($attachedcourseids) {
+                return !in_array($course->id, $attachedcourseids);
+            });
+        }
+    }
+    
+    $formattedcourses = [];
+    foreach ($courses as $course) {
+        $formattedcourses[] = [
+            'id' => $course->id,
+            'fullname' => $course->fullname,
+            'shortname' => $course->shortname ?: '-'
+        ];
+    }
+    
+    echo json_encode([
+        'success' => true,
+        'courses' => $formattedcourses
+    ]);
+} elseif ($action == 'attachcoursetosubject' && $subjectid > 0 && $courseid > 0) {
+    // Прикрепление курса к предмету
+    global $DB;
+    
+    // Проверяем существование предмета и курса
+    $subject = $DB->get_record('local_deanpromoodle_subjects', ['id' => $subjectid]);
+    $course = $DB->get_record('course', ['id' => $courseid]);
+    
+    if (!$subject) {
+        echo json_encode(['success' => false, 'error' => 'Предмет не найден']);
+        exit;
+    }
+    
+    if (!$course) {
+        echo json_encode(['success' => false, 'error' => 'Курс не найден']);
+        exit;
+    }
+    
+    // Проверяем, не прикреплен ли уже курс
+    $existing = $DB->get_record('local_deanpromoodle_subject_courses', [
+        'subjectid' => $subjectid,
+        'courseid' => $courseid
+    ]);
+    
+    if ($existing) {
+        echo json_encode(['success' => false, 'error' => 'Курс уже прикреплен к этому предмету']);
+        exit;
+    }
+    
+    // Получаем максимальный порядок для этого предмета
+    $maxsortorder = $DB->get_field_sql(
+        "SELECT MAX(sortorder) FROM {local_deanpromoodle_subject_courses} WHERE subjectid = ?",
+        [$subjectid]
+    );
+    $newsortorder = ($maxsortorder !== false) ? $maxsortorder + 1 : 0;
+    
+    // Добавляем связь
+    $data = new stdClass();
+    $data->subjectid = $subjectid;
+    $data->courseid = $courseid;
+    $data->sortorder = $newsortorder;
+    $data->timecreated = time();
+    $data->timemodified = time();
+    
+    $id = $DB->insert_record('local_deanpromoodle_subject_courses', $data);
+    
+    if ($id) {
+        echo json_encode(['success' => true, 'id' => $id]);
+    } else {
+        echo json_encode(['success' => false, 'error' => 'Ошибка при сохранении']);
+    }
+} elseif ($action == 'detachcoursefromsubject' && $subjectid > 0 && $courseid > 0) {
+    // Открепление курса от предмета
+    global $DB;
+    
+    $deleted = $DB->delete_records('local_deanpromoodle_subject_courses', [
+        'subjectid' => $subjectid,
+        'courseid' => $courseid
+    ]);
+    
+    if ($deleted) {
+        echo json_encode(['success' => true]);
+    } else {
+        echo json_encode(['success' => false, 'error' => 'Связь не найдена']);
+    }
+} elseif ($action == 'getcohorts') {
+    // Получение списка когорт (глобальных групп) с фильтрацией
+    global $DB;
+    
+    $cohorts = [];
+    if (!empty($search) && strlen($search) >= 2) {
+        $searchpattern = '%' . $DB->sql_like_escape($search) . '%';
+        $cohorts = $DB->get_records_sql(
+            "SELECT c.id, c.name, c.idnumber, c.description
+             FROM {cohort} c
+             WHERE c.name LIKE ? OR c.idnumber LIKE ?
+             ORDER BY c.name ASC
+             LIMIT 50",
+            [$searchpattern, $searchpattern]
+        );
+    }
+    
+    // Исключаем когорты, уже прикрепленные к программе, если указан programid
+    if ($programid > 0 && !empty($cohorts)) {
+        $attachedcohortids = $DB->get_fieldset_select(
+            'local_deanpromoodle_program_cohorts',
+            'cohortid',
+            'programid = ?',
+            [$programid]
+        );
+        if (!empty($attachedcohortids)) {
+            $cohorts = array_filter($cohorts, function($cohort) use ($attachedcohortids) {
+                return !in_array($cohort->id, $attachedcohortids);
+            });
+        }
+    }
+    
+    $formattedcohorts = [];
+    foreach ($cohorts as $cohort) {
+        $formattedcohorts[] = [
+            'id' => $cohort->id,
+            'name' => $cohort->name,
+            'idnumber' => $cohort->idnumber ?: '-',
+            'description' => $cohort->description ?: '-'
+        ];
+    }
+    
+    echo json_encode([
+        'success' => true,
+        'cohorts' => $formattedcohorts
+    ]);
+} elseif ($action == 'attachcohorttoprogram' && $programid > 0 && $cohortid > 0) {
+    // Прикрепление когорты к программе
+    global $DB;
+    
+    // Проверяем существование программы и когорты
+    $program = $DB->get_record('local_deanpromoodle_programs', ['id' => $programid]);
+    $cohort = $DB->get_record('cohort', ['id' => $cohortid]);
+    
+    if (!$program) {
+        echo json_encode(['success' => false, 'error' => 'Программа не найдена']);
+        exit;
+    }
+    
+    if (!$cohort) {
+        echo json_encode(['success' => false, 'error' => 'Когорта не найдена']);
+        exit;
+    }
+    
+    // Проверяем, не прикреплена ли уже когорта
+    $existing = $DB->get_record('local_deanpromoodle_program_cohorts', [
+        'programid' => $programid,
+        'cohortid' => $cohortid
+    ]);
+    
+    if ($existing) {
+        echo json_encode(['success' => false, 'error' => 'Когорта уже прикреплена к этой программе']);
+        exit;
+    }
+    
+    // Добавляем связь
+    $data = new stdClass();
+    $data->programid = $programid;
+    $data->cohortid = $cohortid;
+    $data->timecreated = time();
+    $data->timemodified = time();
+    
+    $id = $DB->insert_record('local_deanpromoodle_program_cohorts', $data);
+    
+    if ($id) {
+        echo json_encode(['success' => true, 'id' => $id]);
+    } else {
+        echo json_encode(['success' => false, 'error' => 'Ошибка при сохранении']);
+    }
+} elseif ($action == 'detachcohortfromprogram' && $programid > 0 && $cohortid > 0) {
+    // Открепление когорты от программы
+    global $DB;
+    
+    $deleted = $DB->delete_records('local_deanpromoodle_program_cohorts', [
+        'programid' => $programid,
+        'cohortid' => $cohortid
+    ]);
+    
+    if ($deleted) {
+        echo json_encode(['success' => true]);
+    } else {
+        echo json_encode(['success' => false, 'error' => 'Связь не найдена']);
+    }
+} elseif ($action == 'getsubjects') {
+    // Получение списка предметов для выбора
+    global $DB;
+    
+    $subjects = [];
+    if (!empty($search) && strlen($search) >= 2) {
+        $searchpattern = '%' . $DB->sql_like_escape($search) . '%';
+        $subjects = $DB->get_records_sql(
+            "SELECT s.id, s.name, s.code, s.shortdescription
+             FROM {local_deanpromoodle_subjects} s
+             WHERE s.visible = 1
+             AND (s.name LIKE ? OR s.code LIKE ?)
+             ORDER BY s.sortorder ASC, s.name ASC
+             LIMIT 50",
+            [$searchpattern, $searchpattern]
+        );
+    } else {
+        // Если поиск не указан, возвращаем все видимые предметы
+        $subjects = $DB->get_records_select(
+            'local_deanpromoodle_subjects',
+            'visible = 1',
+            null,
+            'sortorder ASC, name ASC',
+            'id, name, code, shortdescription',
+            0,
+            50
+        );
+    }
+    
+    // Исключаем предметы, уже прикрепленные к программе, если указан programid
+    if ($programid > 0 && !empty($subjects)) {
+        $attachedsubjectids = $DB->get_fieldset_select(
+            'local_deanpromoodle_program_subjects',
+            'subjectid',
+            'programid = ?',
+            [$programid]
+        );
+        if (!empty($attachedsubjectids)) {
+            $subjects = array_filter($subjects, function($subject) use ($attachedsubjectids) {
+                return !in_array($subject->id, $attachedsubjectids);
+            });
+        }
+    }
+    
+    $formattedsubjects = [];
+    foreach ($subjects as $subject) {
+        $formattedsubjects[] = [
+            'id' => $subject->id,
+            'name' => $subject->name,
+            'code' => $subject->code ?: '-',
+            'shortdescription' => $subject->shortdescription ?: '-'
+        ];
+    }
+    
+    echo json_encode([
+        'success' => true,
+        'subjects' => $formattedsubjects
+    ]);
+} elseif ($action == 'getprograms') {
+    // Получение списка программ с фильтрацией
+    global $DB;
+    
+    $programs = [];
+    if (!empty($search) && strlen($search) >= 2) {
+        $searchpattern = '%' . $DB->sql_like_escape($search) . '%';
+        $programs = $DB->get_records_sql(
+            "SELECT p.id, p.name, p.code, p.description
+             FROM {local_deanpromoodle_programs} p
+             WHERE p.visible = 1
+             AND (p.name LIKE ? OR p.code LIKE ?)
+             ORDER BY p.name ASC
+             LIMIT 50",
+            [$searchpattern, $searchpattern]
+        );
+    } else {
+        // Если поиск не указан, возвращаем все видимые программы
+        $programs = $DB->get_records_select(
+            'local_deanpromoodle_programs',
+            'visible = 1',
+            null,
+            'name ASC',
+            'id, name, code, description',
+            0,
+            50
+        );
+    }
+    
+    $formattedprograms = [];
+    foreach ($programs as $program) {
+        $formattedprograms[] = [
+            'id' => $program->id,
+            'name' => $program->name,
+            'code' => $program->code ?: '-',
+            'description' => $program->description ?: '-'
+        ];
+    }
+    
+    echo json_encode([
+        'success' => true,
+        'programs' => $formattedprograms
+    ]);
+} elseif ($action == 'attachsubjecttoprogram' && $subjectid > 0 && $programid > 0) {
+    // Прикрепление предмета к программе
+    global $DB;
+    
+    // Проверяем существование предмета и программы
+    $subject = $DB->get_record('local_deanpromoodle_subjects', ['id' => $subjectid]);
+    $program = $DB->get_record('local_deanpromoodle_programs', ['id' => $programid]);
+    
+    if (!$subject) {
+        echo json_encode(['success' => false, 'error' => 'Предмет не найден']);
+        exit;
+    }
+    
+    if (!$program) {
+        echo json_encode(['success' => false, 'error' => 'Программа не найдена']);
+        exit;
+    }
+    
+    // Проверяем, не прикреплен ли уже предмет
+    $existing = $DB->get_record('local_deanpromoodle_program_subjects', [
+        'programid' => $programid,
+        'subjectid' => $subjectid
+    ]);
+    
+    if ($existing) {
+        echo json_encode(['success' => false, 'error' => 'Предмет уже прикреплен к этой программе']);
+        exit;
+    }
+    
+    // Получаем максимальный порядок для этой программы
+    $maxsortorder = $DB->get_field_sql(
+        "SELECT MAX(sortorder) FROM {local_deanpromoodle_program_subjects} WHERE programid = ?",
+        [$programid]
+    );
+    $newsortorder = ($maxsortorder !== false) ? $maxsortorder + 1 : 0;
+    
+    // Добавляем связь
+    $data = new stdClass();
+    $data->programid = $programid;
+    $data->subjectid = $subjectid;
+    $data->sortorder = $newsortorder;
+    $data->timecreated = time();
+    $data->timemodified = time();
+    
+    $id = $DB->insert_record('local_deanpromoodle_program_subjects', $data);
+    
+    if ($id) {
+        echo json_encode(['success' => true, 'id' => $id]);
+    } else {
+        echo json_encode(['success' => false, 'error' => 'Ошибка при сохранении']);
+    }
+} elseif ($action == 'detachsubjectfromprogram' && $programid > 0 && $subjectid > 0) {
+    // Открепление предмета от программы
+    global $DB;
+    
+    $deleted = $DB->delete_records('local_deanpromoodle_program_subjects', [
+        'programid' => $programid,
+        'subjectid' => $subjectid
+    ]);
+    
+    if ($deleted) {
+        echo json_encode(['success' => true]);
+    } else {
+        echo json_encode(['success' => false, 'error' => 'Связь не найдена']);
+    }
+} elseif ($action == 'deletesubject' && $subjectid > 0) {
+    // Удаление предмета и всех его связей
+    global $DB;
+    
+    $transaction = $DB->start_delegated_transaction();
+    
+    try {
+        // Удаляем связи с курсами
+        $DB->delete_records('local_deanpromoodle_subject_courses', ['subjectid' => $subjectid]);
+        
+        // Удаляем связи с программами
+        $DB->delete_records('local_deanpromoodle_program_subjects', ['subjectid' => $subjectid]);
+        
+        // Удаляем сам предмет
+        $DB->delete_records('local_deanpromoodle_subjects', ['id' => $subjectid]);
+        
+        $transaction->allow_commit();
+        
+        echo json_encode(['success' => true]);
+    } catch (Exception $e) {
+        $transaction->rollback($e);
+        echo json_encode(['success' => false, 'error' => 'Ошибка при удалении: ' . $e->getMessage()]);
+    }
+} elseif ($action == 'deleteprogram' && $programid > 0) {
+    // Удаление программы и всех её связей
+    global $DB;
+    
+    $transaction = $DB->start_delegated_transaction();
+    
+    try {
+        // Удаляем связи с предметами
+        $DB->delete_records('local_deanpromoodle_program_subjects', ['programid' => $programid]);
+        
+        // Удаляем связи с когортами
+        $DB->delete_records('local_deanpromoodle_program_cohorts', ['programid' => $programid]);
+        
+        // Удаляем саму программу
+        $DB->delete_records('local_deanpromoodle_programs', ['id' => $programid]);
+        
+        $transaction->allow_commit();
+        
+        echo json_encode(['success' => true]);
+    } catch (Exception $e) {
+        $transaction->rollback($e);
+        echo json_encode(['success' => false, 'error' => 'Ошибка при удалении: ' . $e->getMessage()]);
+    }
 } else {
     echo json_encode(['success' => false, 'error' => 'Invalid action or parameters']);
 }

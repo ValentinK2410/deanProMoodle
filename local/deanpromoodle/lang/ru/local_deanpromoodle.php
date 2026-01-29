@@ -93,3 +93,37 @@ $string['posted'] = 'Опубликовано';
 $string['gradeaction'] = 'Оценить';
 $string['reviewaction'] = 'Просмотр';
 $string['replyaction'] = 'Ответить';
+
+// Предметы
+$string['subjects'] = 'Предметы';
+$string['addsubject'] = 'Добавить предмет';
+$string['createsubject'] = 'Создать предмет';
+$string['editsubject'] = 'Редактировать предмет';
+$string['subjectname'] = 'Название предмета';
+$string['subjectcode'] = 'Код предмета';
+$string['shortdescription'] = 'Краткое описание';
+$string['description'] = 'Описание предмета';
+$string['sortorder'] = 'Порядок отображения';
+$string['subjectcourses'] = 'Курсы предмета';
+$string['addcoursetosubject'] = 'Добавить курс';
+$string['attachcoursetosubject'] = 'Прикрепить курс к предмету';
+$string['detachcoursefromsubject'] = 'Удалить курс из предмета';
+$string['attachsubjecttoprogram'] = 'Прикрепить предмет к программе';
+
+// Программы
+$string['programs'] = 'Программы';
+$string['addprogram'] = 'Добавить программу';
+$string['createprogram'] = 'Создать программу';
+$string['editprogram'] = 'Редактировать программу';
+$string['programname'] = 'Название программы';
+$string['programcode'] = 'Код программы';
+$string['programdescription'] = 'Описание программы';
+$string['programsubjects'] = 'Предметы программы';
+$string['attachcohorttoprogram'] = 'Прикрепить глобальную группу';
+$string['attachcohort'] = 'Прикрепить группу';
+$string['detachcohortfromprogram'] = 'Открепить группу от программы';
+$string['selectprogram'] = 'Выберите программу';
+$string['searchcohort'] = 'Поиск когорты';
+$string['searchcourse'] = 'Поиск курса';
+$string['searchprogram'] = 'Поиск программы';
+$string['searchsubject'] = 'Поиск предмета';

@@ -82,3 +82,37 @@ $string['forums'] = 'Forums';
 $string['noassignmentsfound'] = 'No ungraded assignments found';
 $string['noquizzesfound'] = 'No failed quiz attempts found';
 $string['noforumspostsfound'] = 'No unreplied forum posts found';
+
+// Subjects
+$string['subjects'] = 'Subjects';
+$string['addsubject'] = 'Add subject';
+$string['createsubject'] = 'Create subject';
+$string['editsubject'] = 'Edit subject';
+$string['subjectname'] = 'Subject name';
+$string['subjectcode'] = 'Subject code';
+$string['shortdescription'] = 'Short description';
+$string['description'] = 'Description';
+$string['sortorder'] = 'Sort order';
+$string['subjectcourses'] = 'Subject courses';
+$string['addcoursetosubject'] = 'Add course';
+$string['attachcoursetosubject'] = 'Attach course to subject';
+$string['detachcoursefromsubject'] = 'Detach course from subject';
+$string['attachsubjecttoprogram'] = 'Attach subject to program';
+
+// Programs
+$string['programs'] = 'Programs';
+$string['addprogram'] = 'Add program';
+$string['createprogram'] = 'Create program';
+$string['editprogram'] = 'Edit program';
+$string['programname'] = 'Program name';
+$string['programcode'] = 'Program code';
+$string['programdescription'] = 'Program description';
+$string['programsubjects'] = 'Program subjects';
+$string['attachcohorttoprogram'] = 'Attach global group';
+$string['attachcohort'] = 'Attach group';
+$string['detachcohortfromprogram'] = 'Detach group from program';
+$string['selectprogram'] = 'Select program';
+$string['searchcohort'] = 'Search cohort';
+$string['searchcourse'] = 'Search course';
+$string['searchprogram'] = 'Search program';
+$string['searchsubject'] = 'Search subject';

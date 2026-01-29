@@ -294,13 +294,9 @@ if (count($teachercourses) > 1) {
     foreach ($teachercourses as $cid => $c) {
         $courseoptions[$cid] = $c->fullname;
     }
-    echo html_writer::label('Курс: ', 'courseid');
+    echo html_writer::label('Поиск: ', 'courseid');
     echo html_writer::select($courseoptions, 'courseid', $courseid, false, ['class' => 'form-control', 'style' => 'display: inline-block; margin-left: 5px;']);
-    $filterstr = get_string('filterbycourse', 'local_deanpromoodle');
-    if (strpos($filterstr, '[[') !== false) {
-        $filterstr = 'Фильтр'; // Резервное значение
-    }
-    echo html_writer::empty_tag('input', ['type' => 'submit', 'value' => $filterstr, 'class' => 'btn btn-primary', 'style' => 'margin-left: 10px;']);
+    echo html_writer::empty_tag('input', ['type' => 'submit', 'value' => 'Поиск', 'class' => 'btn btn-primary', 'style' => 'margin-left: 10px;']);
     echo html_writer::end_tag('form');
     echo html_writer::end_div();
 }
