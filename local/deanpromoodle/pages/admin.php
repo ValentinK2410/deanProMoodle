@@ -1639,6 +1639,7 @@ switch ($tab) {
             
             // Получаем предметы программы с порядком
             $programsubjects = [];
+            $maxrelationid = 0;
             if ($isedit && $program) {
                 try {
                     $programsubjects = $DB->get_records_sql(
@@ -1649,8 +1650,17 @@ switch ($tab) {
                          ORDER BY ps.sortorder ASC",
                         [$programid]
                     );
+                    // Вычисляем максимальный relation_id
+                    if (!empty($programsubjects)) {
+                        $relationids = [];
+                        foreach ($programsubjects as $ps) {
+                            $relationids[] = (int)$ps->relation_id;
+                        }
+                        $maxrelationid = !empty($relationids) ? max($relationids) : 0;
+                    }
                 } catch (\Exception $e) {
                     $programsubjects = [];
+                    $maxrelationid = 0;
                 }
             }
             
@@ -1926,7 +1936,7 @@ switch ($tab) {
             (function() {
                 var programId = " . ($isedit ? $programid : 0) . ";
                 var isEdit = " . ($isedit ? 'true' : 'false') . ";
-                var nextRelationId = " . ($isedit && !empty($programsubjects) ? (max(array_map(function($s) { return $s->relation_id; }, $programsubjects)) + 1) : 1) . ";
+                var nextRelationId = " . ($maxrelationid + 1) . ";
                 
                 // Функция обновления скрытого поля с порядком предметов
                 function updateSubjectsOrder() {
