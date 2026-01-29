@@ -147,24 +147,47 @@ if (!empty($teacherroleids)) {
     $allcontextids = array_merge([$systemcontext->id], $coursecontextids);
     $contextplaceholders = implode(',', array_fill(0, count($allcontextids), '?'));
     
-    $teacheruserids = $DB->get_fieldset_sql(
-        "SELECT DISTINCT ra.userid
+    // Получаем преподавателей с их ролями
+    $teacherrecords = $DB->get_records_sql(
+        "SELECT DISTINCT ra.userid, r.shortname as roleshortname, r.name as rolename
          FROM {role_assignments} ra
+         JOIN {role} r ON r.id = ra.roleid
          WHERE ra.contextid IN ($contextplaceholders) 
-         AND ra.roleid IN ($placeholders)",
+         AND ra.roleid IN ($placeholders)
+         ORDER BY ra.userid, r.shortname",
         array_merge($allcontextids, $teacherroleids)
     );
     
-    if (!empty($teacheruserids)) {
-        $userplaceholders = implode(',', array_fill(0, count($teacheruserids), '?'));
-        $teachers = $DB->get_records_sql(
+    // Группируем по пользователям и собираем роли
+    $teachersdata = [];
+    foreach ($teacherrecords as $record) {
+        if (!isset($teachersdata[$record->userid])) {
+            $teachersdata[$record->userid] = [
+                'userid' => $record->userid,
+                'roles' => []
+            ];
+        }
+        $teachersdata[$record->userid]['roles'][] = $record->roleshortname;
+    }
+    
+    if (!empty($teachersdata)) {
+        $userids = array_keys($teachersdata);
+        $userplaceholders = implode(',', array_fill(0, count($userids), '?'));
+        $userrecords = $DB->get_records_sql(
             "SELECT DISTINCT u.id, u.firstname, u.lastname, u.email
              FROM {user} u
              WHERE u.id IN ($userplaceholders)
              AND u.deleted = 0
              ORDER BY u.lastname, u.firstname",
-            $teacheruserids
+            $userids
         );
+        
+        // Объединяем данные пользователей с ролями
+        foreach ($userrecords as $user) {
+            $roles = isset($teachersdata[$user->id]) ? $teachersdata[$user->id]['roles'] : [];
+            $user->roles = array_unique($roles);
+            $teachers[$user->id] = $user;
+        }
     }
 }
 
@@ -475,6 +498,7 @@ switch ($tab) {
             echo html_writer::tag('th', 'ID');
             echo html_writer::tag('th', 'ФИО');
             echo html_writer::tag('th', 'Email');
+            echo html_writer::tag('th', 'Роль');
             echo html_writer::tag('th', 'Дата регистрации');
             echo html_writer::tag('th', 'Последний вход');
             echo html_writer::end_tag('tr');
@@ -483,10 +507,28 @@ switch ($tab) {
             
             foreach ($teachers as $teacher) {
                 $userrecord = $DB->get_record('user', ['id' => $teacher->id]);
+                
+                // Формируем список ролей
+                $rolenames = [];
+                if (isset($teacher->roles) && !empty($teacher->roles)) {
+                    $roletranslations = [
+                        'teacher' => 'Преподаватель',
+                        'editingteacher' => 'Редактор курса',
+                        'manager' => 'Менеджер'
+                    ];
+                    foreach ($teacher->roles as $roleshortname) {
+                        $rolenames[] = isset($roletranslations[$roleshortname]) 
+                            ? $roletranslations[$roleshortname] 
+                            : $roleshortname;
+                    }
+                }
+                $rolesdisplay = !empty($rolenames) ? implode(', ', $rolenames) : '-';
+                
                 echo html_writer::start_tag('tr');
                 echo html_writer::tag('td', $teacher->id);
                 echo html_writer::tag('td', htmlspecialchars(fullname($teacher)));
                 echo html_writer::tag('td', htmlspecialchars($teacher->email));
+                echo html_writer::tag('td', htmlspecialchars($rolesdisplay));
                 echo html_writer::tag('td', $userrecord ? userdate($userrecord->timecreated) : '-');
                 echo html_writer::tag('td', $userrecord && $userrecord->lastaccess > 0 ? userdate($userrecord->lastaccess) : 'Никогда');
                 echo html_writer::end_tag('tr');
