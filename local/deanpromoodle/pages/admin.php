@@ -136,6 +136,9 @@ $tabs[] = new tabobject('institutions',
 $tabs[] = new tabobject('categories', 
     new moodle_url('/local/deanpromoodle/pages/admin.php', ['tab' => 'categories']),
     'Категории курсов');
+$tabs[] = new tabobject('cohorts', 
+    new moodle_url('/local/deanpromoodle/pages/admin.php', ['tab' => 'cohorts']),
+    'Когорты');
 
 echo $OUTPUT->tabtree($tabs, $tab);
 
@@ -5297,6 +5300,306 @@ switch ($tab) {
                 }
             })();
         ");
+        
+        echo html_writer::end_div();
+        break;
+    
+    case 'cohorts':
+        // Вкладка "Когорты" - список когорт, студентов и их связь с программами
+        echo html_writer::start_div('local-deanpromoodle-admin-content', ['style' => 'margin-bottom: 30px;']);
+        echo html_writer::tag('h2', 'Когорты (Глобальные группы)', ['style' => 'margin-bottom: 20px;']);
+        
+        try {
+            // Получаем все когорты
+            $cohorts = $DB->get_records('cohort', null, 'name ASC', 'id, name, idnumber, description');
+            
+            if (empty($cohorts)) {
+                echo html_writer::div('Когорты не найдены.', 'alert alert-info');
+            } else {
+                // Получаем все программы для проверки связи
+                $allprograms = $DB->get_records('local_deanpromoodle_programs', null, 'name ASC', 'id, name');
+                $programsmap = [];
+                foreach ($allprograms as $program) {
+                    $programsmap[$program->id] = $program->name;
+                }
+                
+                // Получаем связи когорт с программами
+                $cohortprograms = [];
+                if (!empty($cohorts)) {
+                    $cohortids = array_keys($cohorts);
+                    $placeholders = implode(',', array_fill(0, count($cohortids), '?'));
+                    $programcohorts = $DB->get_records_sql(
+                        "SELECT pc.cohortid, pc.programid, p.name as programname
+                         FROM {local_deanpromoodle_program_cohorts} pc
+                         JOIN {local_deanpromoodle_programs} p ON p.id = pc.programid
+                         WHERE pc.cohortid IN ($placeholders)",
+                        $cohortids
+                    );
+                    
+                    foreach ($programcohorts as $pc) {
+                        if (!isset($cohortprograms[$pc->cohortid])) {
+                            $cohortprograms[$pc->cohortid] = [];
+                        }
+                        $cohortprograms[$pc->cohortid][] = [
+                            'id' => $pc->programid,
+                            'name' => $pc->programname
+                        ];
+                    }
+                }
+                
+                // Стили для таблицы когорт
+                echo html_writer::start_tag('style');
+                echo "
+                    .cohorts-table {
+                        background: white;
+                        border-radius: 8px;
+                        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                        overflow: hidden;
+                    }
+                    .cohorts-table table {
+                        margin: 0;
+                        width: 100%;
+                    }
+                    .cohorts-table thead th {
+                        background-color: #f8f9fa;
+                        padding: 12px 16px;
+                        text-align: left;
+                        font-weight: 600;
+                        color: #495057;
+                        border-bottom: 2px solid #dee2e6;
+                    }
+                    .cohorts-table tbody tr {
+                        border-bottom: 1px solid #f0f0f0;
+                    }
+                    .cohorts-table tbody tr:hover {
+                        background-color: #f8f9fa;
+                    }
+                    .cohorts-table tbody td {
+                        padding: 12px 16px;
+                        vertical-align: top;
+                    }
+                    .cohort-students {
+                        max-height: 300px;
+                        overflow-y: auto;
+                    }
+                    .cohort-students table {
+                        font-size: 0.9em;
+                        margin: 0;
+                    }
+                    .cohort-students table th {
+                        background-color: #e9ecef;
+                        padding: 8px 12px;
+                        font-weight: 600;
+                        font-size: 0.85em;
+                    }
+                    .cohort-students table td {
+                        padding: 8px 12px;
+                    }
+                    .program-badge {
+                        display: inline-block;
+                        margin: 2px 4px 2px 0;
+                        padding: 4px 8px;
+                        background-color: #007bff;
+                        color: white;
+                        border-radius: 4px;
+                        font-size: 0.85em;
+                    }
+                    .no-program {
+                        color: #6c757d;
+                        font-style: italic;
+                    }
+                    .cohort-toggle {
+                        cursor: pointer;
+                        color: #007bff;
+                        text-decoration: none;
+                    }
+                    .cohort-toggle:hover {
+                        text-decoration: underline;
+                    }
+                ";
+                echo html_writer::end_tag('style');
+                
+                echo html_writer::start_div('cohorts-table');
+                echo html_writer::start_tag('table', ['class' => 'table']);
+                echo html_writer::start_tag('thead');
+                echo html_writer::start_tag('tr');
+                echo html_writer::tag('th', 'ID', ['style' => 'width: 60px;']);
+                echo html_writer::tag('th', 'Название');
+                echo html_writer::tag('th', 'ID Number', ['style' => 'width: 150px;']);
+                echo html_writer::tag('th', 'Описание', ['style' => 'width: 200px;']);
+                echo html_writer::tag('th', 'Программы', ['style' => 'width: 200px;']);
+                echo html_writer::tag('th', 'Студенты', ['style' => 'width: 100px; text-align: center;']);
+                echo html_writer::end_tag('tr');
+                echo html_writer::end_tag('thead');
+                echo html_writer::start_tag('tbody');
+                
+                foreach ($cohorts as $cohort) {
+                    $cohortid = (int)$cohort->id;
+                    $cohortname = is_string($cohort->name) ? $cohort->name : '';
+                    $cohortidnumber = is_string($cohort->idnumber) ? $cohort->idnumber : '';
+                    $cohortdescription = is_string($cohort->description) ? $cohort->description : '';
+                    
+                    // Получаем студентов когорты
+                    $cohortmembers = $DB->get_records_sql(
+                        "SELECT u.id, u.firstname, u.lastname, u.email, u.timecreated, u.lastaccess
+                         FROM {cohort_members} cm
+                         JOIN {user} u ON u.id = cm.userid
+                         WHERE cm.cohortid = ? AND u.deleted = 0
+                         ORDER BY u.lastname, u.firstname",
+                        [$cohortid]
+                    );
+                    
+                    // Получаем программы, связанные с этой когортой
+                    $linkedprograms = isset($cohortprograms[$cohortid]) ? $cohortprograms[$cohortid] : [];
+                    
+                    echo html_writer::start_tag('tr', ['data-cohort-id' => $cohortid]);
+                    
+                    // ID
+                    echo html_writer::tag('td', $cohortid);
+                    
+                    // Название
+                    echo html_writer::tag('td', htmlspecialchars($cohortname, ENT_QUOTES, 'UTF-8'));
+                    
+                    // ID Number
+                    echo html_writer::tag('td', $cohortidnumber ? htmlspecialchars($cohortidnumber, ENT_QUOTES, 'UTF-8') : '-');
+                    
+                    // Описание
+                    $descriptiontext = $cohortdescription ? mb_substr(strip_tags($cohortdescription), 0, 100) : '-';
+                    if ($cohortdescription && mb_strlen(strip_tags($cohortdescription)) > 100) {
+                        $descriptiontext .= '...';
+                    }
+                    echo html_writer::tag('td', htmlspecialchars($descriptiontext, ENT_QUOTES, 'UTF-8'));
+                    
+                    // Программы
+                    echo html_writer::start_tag('td');
+                    if (!empty($linkedprograms)) {
+                        foreach ($linkedprograms as $program) {
+                            echo html_writer::tag('span', htmlspecialchars($program['name'], ENT_QUOTES, 'UTF-8'), [
+                                'class' => 'program-badge',
+                                'title' => 'Программа: ' . htmlspecialchars($program['name'], ENT_QUOTES, 'UTF-8')
+                            ]);
+                        }
+                    } else {
+                        echo html_writer::tag('span', 'Не прикреплена', ['class' => 'no-program']);
+                    }
+                    echo html_writer::end_tag('td');
+                    
+                    // Студенты
+                    echo html_writer::start_tag('td', ['style' => 'text-align: center;']);
+                    $studentscount = count($cohortmembers);
+                    if ($studentscount > 0) {
+                        echo html_writer::link('#', '<i class="fas fa-users"></i> ' . $studentscount, [
+                            'class' => 'cohort-toggle',
+                            'data-cohort-id' => $cohortid,
+                            'title' => 'Показать студентов'
+                        ]);
+                    } else {
+                        echo html_writer::tag('span', '0', ['class' => 'text-muted']);
+                    }
+                    echo html_writer::end_tag('td');
+                    
+                    echo html_writer::end_tag('tr');
+                    
+                    // Скрытая строка со списком студентов
+                    echo html_writer::start_tag('tr', [
+                        'class' => 'cohort-students-row',
+                        'data-cohort-id' => $cohortid,
+                        'style' => 'display: none;'
+                    ]);
+                    echo html_writer::start_tag('td', ['colspan' => '6', 'style' => 'padding: 0;']);
+                    echo html_writer::start_div('cohort-students', ['style' => 'padding: 15px; background-color: #f8f9fa;']);
+                    
+                    if (!empty($cohortmembers)) {
+                        echo html_writer::start_tag('table', ['class' => 'table table-sm table-bordered']);
+                        echo html_writer::start_tag('thead');
+                        echo html_writer::start_tag('tr');
+                        echo html_writer::tag('th', 'ID');
+                        echo html_writer::tag('th', 'ФИО');
+                        echo html_writer::tag('th', 'Email');
+                        echo html_writer::tag('th', 'Связан с программой');
+                        echo html_writer::tag('th', 'Дата регистрации');
+                        echo html_writer::end_tag('tr');
+                        echo html_writer::end_tag('thead');
+                        echo html_writer::start_tag('tbody');
+                        
+                        foreach ($cohortmembers as $member) {
+                            // Проверяем, связан ли студент с программой через когорту
+                            $islinkedtoprogram = !empty($linkedprograms);
+                            $programnames = [];
+                            if ($islinkedtoprogram) {
+                                foreach ($linkedprograms as $program) {
+                                    $programnames[] = htmlspecialchars($program['name'], ENT_QUOTES, 'UTF-8');
+                                }
+                            }
+                            
+                            echo html_writer::start_tag('tr');
+                            echo html_writer::tag('td', $member->id);
+                            echo html_writer::tag('td', htmlspecialchars(trim($member->firstname . ' ' . $member->lastname), ENT_QUOTES, 'UTF-8'));
+                            echo html_writer::tag('td', htmlspecialchars($member->email, ENT_QUOTES, 'UTF-8'));
+                            
+                            // Связь с программой
+                            echo html_writer::start_tag('td');
+                            if ($islinkedtoprogram) {
+                                foreach ($linkedprograms as $program) {
+                                    echo html_writer::tag('span', htmlspecialchars($program['name'], ENT_QUOTES, 'UTF-8'), [
+                                        'class' => 'program-badge',
+                                        'style' => 'font-size: 0.8em;'
+                                    ]);
+                                }
+                            } else {
+                                echo html_writer::tag('span', 'Нет', ['class' => 'no-program']);
+                            }
+                            echo html_writer::end_tag('td');
+                            
+                            // Дата регистрации
+                            $timecreated = $member->timecreated ? date('d.m.Y', $member->timecreated) : '-';
+                            echo html_writer::tag('td', $timecreated);
+                            
+                            echo html_writer::end_tag('tr');
+                        }
+                        
+                        echo html_writer::end_tag('tbody');
+                        echo html_writer::end_tag('table');
+                    } else {
+                        echo html_writer::div('В когорте нет студентов.', 'alert alert-info');
+                    }
+                    
+                    echo html_writer::end_div();
+                    echo html_writer::end_tag('td');
+                    echo html_writer::end_tag('tr');
+                }
+                
+                echo html_writer::end_tag('tbody');
+                echo html_writer::end_tag('table');
+                echo html_writer::end_div();
+                
+                // JavaScript для раскрытия/сворачивания списка студентов
+                $PAGE->requires->js_init_code("
+                    (function() {
+                        document.querySelectorAll('.cohort-toggle').forEach(function(toggle) {
+                            toggle.addEventListener('click', function(e) {
+                                e.preventDefault();
+                                var cohortId = this.getAttribute('data-cohort-id');
+                                var row = document.querySelector('tr.cohort-students-row[data-cohort-id=\"' + cohortId + '\"]');
+                                if (row) {
+                                    if (row.style.display === 'none') {
+                                        row.style.display = '';
+                                        this.innerHTML = '<i class=\"fas fa-chevron-up\"></i> ' + this.textContent.replace(/[^0-9]/g, '');
+                                        this.title = 'Скрыть студентов';
+                                    } else {
+                                        row.style.display = 'none';
+                                        this.innerHTML = '<i class=\"fas fa-users\"></i> ' + this.textContent.replace(/[^0-9]/g, '');
+                                        this.title = 'Показать студентов';
+                                    }
+                                }
+                            });
+                        });
+                    })();
+                ");
+            }
+        } catch (\Exception $e) {
+            echo html_writer::div('Ошибка: ' . $e->getMessage(), 'alert alert-danger');
+        }
         
         echo html_writer::end_div();
         break;
