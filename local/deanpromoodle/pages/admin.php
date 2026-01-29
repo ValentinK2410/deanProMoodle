@@ -129,16 +129,30 @@ if (empty($teacherroleids)) {
     $teacherroleids = [];
 }
 
-// Получение списка преподавателей
+// Получение списка преподавателей из всех контекстов (системный + все курсы)
 $teachers = [];
 if (!empty($teacherroleids)) {
-    $systemcontext = context_system::instance();
     $placeholders = implode(',', array_fill(0, count($teacherroleids), '?'));
+    
+    // Получаем преподавателей из системного контекста и всех контекстов курсов
+    $systemcontext = context_system::instance();
+    
+    // Получаем все контексты курсов
+    $coursecontexts = $DB->get_records_sql(
+        "SELECT id FROM {context} WHERE contextlevel = 50"
+    );
+    $coursecontextids = array_keys($coursecontexts);
+    
+    // Объединяем системный контекст и контексты курсов
+    $allcontextids = array_merge([$systemcontext->id], $coursecontextids);
+    $contextplaceholders = implode(',', array_fill(0, count($allcontextids), '?'));
+    
     $teacheruserids = $DB->get_fieldset_sql(
         "SELECT DISTINCT ra.userid
          FROM {role_assignments} ra
-         WHERE ra.contextid = ? AND ra.roleid IN ($placeholders)",
-        array_merge([$systemcontext->id], $teacherroleids)
+         WHERE ra.contextid IN ($contextplaceholders) 
+         AND ra.roleid IN ($placeholders)",
+        array_merge($allcontextids, $teacherroleids)
     );
     
     if (!empty($teacheruserids)) {
