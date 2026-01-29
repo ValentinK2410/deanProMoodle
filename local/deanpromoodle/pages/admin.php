@@ -1063,6 +1063,7 @@ switch ($tab) {
                                                 $data->name = trim($programdata['name']);
                                                 $data->code = $programcode;
                                                 $data->description = isset($programdata['description']) ? ($programdata['description'] ?: '') : '';
+                                                $data->institution = isset($programdata['institution']['name']) ? trim($programdata['institution']['name']) : (isset($programdata['institution']) && is_string($programdata['institution']) ? trim($programdata['institution']) : '');
                                                 $data->visible = isset($programdata['is_active']) ? ($programdata['is_active'] ? 1 : 0) : 1;
                                                 $data->timemodified = time();
                                                 $DB->update_record('local_deanpromoodle_programs', $data);
@@ -1075,6 +1076,7 @@ switch ($tab) {
                                                 $data->name = trim($programdata['name']);
                                                 $data->code = $programcode;
                                                 $data->description = isset($programdata['description']) ? ($programdata['description'] ?: '') : '';
+                                                $data->institution = isset($programdata['institution']['name']) ? trim($programdata['institution']['name']) : (isset($programdata['institution']) && is_string($programdata['institution']) ? trim($programdata['institution']) : '');
                                                 $data->visible = isset($programdata['is_active']) ? ($programdata['is_active'] ? 1 : 0) : 1;
                                                 $data->timecreated = time();
                                                 $data->timemodified = time();
@@ -1176,6 +1178,7 @@ switch ($tab) {
                         $newprogram->name = $copyname;
                         $newprogram->code = ''; // Код не копируем
                         $newprogram->description = $sourceprogram->description;
+                        $newprogram->institution = $sourceprogram->institution ?? '';
                         $newprogram->visible = $sourceprogram->visible;
                         $newprogram->timecreated = time();
                         $newprogram->timemodified = time();
@@ -1232,6 +1235,7 @@ switch ($tab) {
                 $name = optional_param('name', '', PARAM_TEXT);
                 $code = optional_param('code', '', PARAM_TEXT);
                 $description = optional_param('description', '', PARAM_RAW);
+                $institution = optional_param('institution', '', PARAM_TEXT);
                 $visible = optional_param('visible', 1, PARAM_INT);
                 $selectedsubjects = optional_param_array('subjects', [], PARAM_INT);
                 
@@ -1244,6 +1248,7 @@ switch ($tab) {
                         $data->name = $name;
                         $data->code = $code;
                         $data->description = $description;
+                        $data->institution = $institution;
                         $data->visible = $visible;
                         $data->timemodified = time();
                         
@@ -1356,6 +1361,26 @@ switch ($tab) {
             ]);
             echo $program ? htmlspecialchars($program->description ?? '', ENT_QUOTES, 'UTF-8') : '';
             echo html_writer::end_tag('textarea');
+            echo html_writer::end_div();
+            
+            // Учебное заведение
+            echo html_writer::start_div('form-group', ['style' => 'margin-bottom: 15px;']);
+            echo html_writer::label('Учебное заведение', 'institution');
+            $institutionvalue = '';
+            if ($program && isset($program->institution)) {
+                $institutionvalue = htmlspecialchars($program->institution, ENT_QUOTES, 'UTF-8');
+            } elseif (!$program) {
+                // По умолчанию берем название сайта
+                global $CFG;
+                $institutionvalue = $CFG->fullname ?: 'Московская богословская семинария';
+            }
+            echo html_writer::empty_tag('input', [
+                'type' => 'text',
+                'name' => 'institution',
+                'id' => 'institution',
+                'class' => 'form-control',
+                'value' => $institutionvalue
+            ]);
             echo html_writer::end_div();
             
             // Выбор предметов
@@ -1600,11 +1625,14 @@ switch ($tab) {
                         $subjectslist[] = '...';
                     }
                     
+                    // Получаем учебное заведение из БД или используем название сайта по умолчанию
+                    $institution = !empty($program->institution) ? $program->institution : $sitename;
+                    
                     $programsdata[] = (object)[
                         'id' => $program->id,
                         'name' => $program->name,
                         'code' => $program->code ?? '',
-                        'categoryname' => $sitename,
+                        'categoryname' => $institution,
                         'subjectscount' => $subjectscount,
                         'cohortscount' => $cohortscount,
                         'subjectslist' => implode(', ', $subjectslist),

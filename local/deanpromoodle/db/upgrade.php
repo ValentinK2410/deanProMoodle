@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Version details for local_deanpromoodle plugin.
+ * Upgrade script for local_deanpromoodle plugin.
  *
  * @package    local_deanpromoodle
  * @copyright  2026
@@ -25,8 +25,28 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->component = 'local_deanpromoodle';
-$plugin->version = 2026013001; // YYYYMMDDXX format - добавлено поле institution
-$plugin->requires = 2022041900; // Moodle 4.0+
-$plugin->maturity = MATURITY_ALPHA;
-$plugin->release = 'v1.0.0-alpha';
+/**
+ * Upgrade function for adding institution field to programs table.
+ *
+ * @param int $oldversion The old version number
+ * @return bool True on success
+ */
+function xmldb_local_deanpromoodle_upgrade($oldversion) {
+    global $DB;
+    
+    $dbman = $DB->get_manager();
+    
+    // Добавляем поле institution в таблицу local_deanpromoodle_programs
+    if ($oldversion < 2026013001) {
+        $table = new xmldb_table('local_deanpromoodle_programs');
+        $field = new xmldb_field('institution', XMLDB_TYPE_CHAR, '255', null, null, null, null, 'description');
+        
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+        
+        upgrade_plugin_savepoint(true, 2026013001, 'local', 'deanpromoodle');
+    }
+    
+    return true;
+}
