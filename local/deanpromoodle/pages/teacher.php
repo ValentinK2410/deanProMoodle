@@ -173,7 +173,7 @@ if (count($teachercourses) > 1) {
     echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'tab', 'value' => $tab]);
     $allcoursesstr = get_string('allcourses', 'local_deanpromoodle');
     if (strpos($allcoursesstr, '[[') !== false) {
-        $allcoursesstr = 'Все курсы'; // Резервное значение
+        $allcoursesstr = 'Все курсы'; // Резервное значение на русском
     }
     $courseoptions = [0 => $allcoursesstr];
     foreach ($teachercourses as $cid => $c) {
