@@ -956,137 +956,331 @@ switch ($tab) {
         break;
     
     case 'programs':
-        // Вкладка "Программы" - категории курсов (программы обучения)
+        // Вкладка "Программы" - курсы как программы обучения
         echo html_writer::start_div('local-deanpromoodle-admin-content', ['style' => 'margin-bottom: 30px;']);
-        echo html_writer::tag('h2', 'Программы обучения', ['style' => 'margin-bottom: 20px;']);
         
-        // Получение всех категорий курсов
-        $categories = $DB->get_records('course_categories', null, 'name ASC');
+        // Заголовок с кнопкой добавления
+        echo html_writer::start_div('', ['style' => 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;']);
+        echo html_writer::start_div('', ['style' => 'display: flex; align-items: center; gap: 10px;']);
+        echo html_writer::tag('span', '📋', ['style' => 'font-size: 24px;']);
+        echo html_writer::tag('h2', 'Программы', ['style' => 'margin: 0; font-size: 24px; font-weight: 600;']);
+        echo html_writer::end_div();
+        echo html_writer::link('#', '+ Добавить программу', [
+            'class' => 'btn btn-primary',
+            'style' => 'background-color: #007bff; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-weight: 500;'
+        ]);
+        echo html_writer::end_div();
         
-        if (empty($categories)) {
-            echo html_writer::div('Категории курсов не найдены.', 'alert alert-info');
+        // Получение всех курсов (исключаем системный курс с id=1)
+        $courses = $DB->get_records_select('course', 'id > 1', null, 'fullname ASC', 'id, fullname, shortname, category, visible');
+        
+        if (empty($courses)) {
+            echo html_writer::div('Курсы не найдены.', 'alert alert-info');
         } else {
-            // Подготовка данных для каждой категории
+            // Получаем информацию о категориях и группах
+            $categories = $DB->get_records('course_categories', null, '', 'id, name');
+            $studentroleid = $DB->get_field('role', 'id', ['shortname' => 'student']);
+            
+            // Получаем название сайта как учебное заведение
+            $sitename = $CFG->fullname ?: 'Московская богословская семинария';
+            
+            // Подготовка данных для каждого курса
             $programsdata = [];
-            foreach ($categories as $category) {
-                // Количество курсов в категории (исключаем системный курс с id=1)
-                $coursescount = $DB->count_records_sql(
-                    "SELECT COUNT(*) FROM {course} WHERE category = ? AND id > 1",
-                    [$category->id]
-                );
+            foreach ($courses as $course) {
+                // Безопасное преобразование имени курса
+                $coursename = '';
+                if (is_string($course->fullname)) {
+                    $coursename = $course->fullname;
+                } elseif (is_array($course->fullname)) {
+                    $coursename = implode(', ', array_filter($course->fullname, 'is_string'));
+                } elseif (is_object($course->fullname) && method_exists($course->fullname, '__toString')) {
+                    $coursename = (string)$course->fullname;
+                } elseif (isset($course->fullname)) {
+                    $coursename = (string)$course->fullname;
+                } else {
+                    $coursename = 'Без названия';
+                }
                 
-                // Получаем курсы категории для подсчета студентов и преподавателей
-                $categorycourses = $DB->get_records('course', ['category' => $category->id], '', 'id');
-                $courseids = array_keys($categorycourses);
+                $courseshortname = '';
+                if (is_string($course->shortname)) {
+                    $courseshortname = $course->shortname;
+                } elseif (is_array($course->shortname)) {
+                    $courseshortname = implode(', ', array_filter($course->shortname, 'is_string'));
+                } elseif (is_object($course->shortname) && method_exists($course->shortname, '__toString')) {
+                    $courseshortname = (string)$course->shortname;
+                } elseif (isset($course->shortname)) {
+                    $courseshortname = (string)$course->shortname;
+                } else {
+                    $courseshortname = '';
+                }
                 
-                $studentscount = 0;
-                $teacherscount = 0;
-                
-                if (!empty($courseids)) {
-                    // Подсчет студентов
-                    $studentroleid = $DB->get_field('role', 'id', ['shortname' => 'student']);
-                    if ($studentroleid) {
-                        $courseids_placeholders = implode(',', array_fill(0, count($courseids), '?'));
-                        $coursecontextids = $DB->get_fieldset_sql(
-                            "SELECT id FROM {context} WHERE instanceid IN ($courseids_placeholders) AND contextlevel = 50",
-                            $courseids
-                        );
-                        
-                        if (!empty($coursecontextids)) {
-                            $contextplaceholders = implode(',', array_fill(0, count($coursecontextids), '?'));
-                            $studentscount = $DB->count_records_sql(
-                                "SELECT COUNT(DISTINCT ra.userid)
-                                 FROM {role_assignments} ra
-                                 WHERE ra.contextid IN ($contextplaceholders)
-                                 AND ra.roleid = ?",
-                                array_merge($coursecontextids, [$studentroleid])
-                            );
-                        }
-                    }
-                    
-                    // Подсчет преподавателей
-                    $teacherroleids = $DB->get_fieldset_select('role', 'id', "shortname IN ('teacher', 'editingteacher', 'manager')");
-                    if (!empty($teacherroleids)) {
-                        if (!empty($coursecontextids)) {
-                            $contextplaceholders = implode(',', array_fill(0, count($coursecontextids), '?'));
-                            $roleplaceholders = implode(',', array_fill(0, count($teacherroleids), '?'));
-                            $teacherscount = $DB->count_records_sql(
-                                "SELECT COUNT(DISTINCT ra.userid)
-                                 FROM {role_assignments} ra
-                                 WHERE ra.contextid IN ($contextplaceholders)
-                                 AND ra.roleid IN ($roleplaceholders)",
-                                array_merge($coursecontextids, $teacherroleids)
-                            );
-                        }
+                // Получаем название категории
+                $categoryname = $sitename;
+                if (isset($categories[$course->category])) {
+                    $cat = $categories[$course->category];
+                    if (is_string($cat->name)) {
+                        $categoryname = $cat->name;
+                    } elseif (is_object($cat->name) && method_exists($cat->name, '__toString')) {
+                        $categoryname = (string)$cat->name;
                     }
                 }
                 
-                // Безопасное преобразование имени категории в строку для programs
-                $safename = '';
-                if (is_string($category->name)) {
-                    $safename = $category->name;
-                } elseif (is_array($category->name)) {
-                    $safename = implode(', ', array_filter($category->name, 'is_string'));
-                } elseif (is_object($category->name) && method_exists($category->name, '__toString')) {
-                    $safename = (string)$category->name;
-                } elseif (isset($category->name)) {
-                    $safename = (string)$category->name;
-                } else {
-                    $safename = 'Без названия';
+                // Подсчет групп
+                $groupscount = $DB->count_records('groups', ['courseid' => $course->id]);
+                
+                // Подсчет студентов
+                $studentscount = 0;
+                if ($studentroleid) {
+                    $coursecontext = context_course::instance($course->id);
+                    $studentscount = $DB->count_records_sql(
+                        "SELECT COUNT(DISTINCT ra.userid)
+                         FROM {role_assignments} ra
+                         WHERE ra.contextid = ?
+                         AND ra.roleid = ?",
+                        [$coursecontext->id, $studentroleid]
+                    );
                 }
                 
                 $programsdata[] = (object)[
-                    'id' => $category->id,
-                    'name' => $safename,
-                    'description' => $category->description,
-                    'coursescount' => $coursescount,
+                    'id' => $course->id,
+                    'fullname' => $coursename,
+                    'shortname' => $courseshortname,
+                    'categoryname' => $categoryname,
+                    'groupscount' => $groupscount,
                     'studentscount' => $studentscount,
-                    'teacherscount' => $teacherscount,
-                    'visible' => $category->visible
+                    'visible' => $course->visible
                 ];
             }
             
+            // Стили для таблицы
+            echo html_writer::start_tag('style');
+            echo "
+                .programs-table {
+                    background: white;
+                    border-radius: 8px;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                    overflow: hidden;
+                }
+                .programs-table table {
+                    width: 100%;
+                    border-collapse: collapse;
+                }
+                .programs-table th {
+                    background-color: #f8f9fa;
+                    padding: 12px 16px;
+                    text-align: left;
+                    font-weight: 600;
+                    color: #495057;
+                    border-bottom: 1px solid #dee2e6;
+                    font-size: 14px;
+                }
+                .programs-table td {
+                    padding: 16px;
+                    border-bottom: 1px solid #f0f0f0;
+                    vertical-align: middle;
+                }
+                .programs-table tr:hover {
+                    background-color: #f8f9fa;
+                }
+                .program-id-badge {
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    width: 32px;
+                    height: 32px;
+                    border-radius: 50%;
+                    background-color: #6c757d;
+                    color: white;
+                    font-weight: 600;
+                    font-size: 14px;
+                }
+                .course-name-cell {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 4px;
+                }
+                .course-name-full {
+                    font-weight: 500;
+                    color: #212529;
+                }
+                .course-name-short {
+                    font-size: 13px;
+                    color: #6c757d;
+                }
+                .badge {
+                    display: inline-block;
+                    padding: 4px 12px;
+                    border-radius: 12px;
+                    font-size: 12px;
+                    font-weight: 500;
+                    white-space: nowrap;
+                }
+                .badge-institution {
+                    background-color: #e3f2fd;
+                    color: #1976d2;
+                }
+                .badge-group {
+                    background-color: #2196f3;
+                    color: white;
+                    margin-right: 6px;
+                }
+                .badge-student {
+                    background-color: #424242;
+                    color: white;
+                }
+                .badge-free {
+                    background-color: #4caf50;
+                    color: white;
+                }
+                .badge-active {
+                    background-color: #4caf50;
+                    color: white;
+                }
+                .action-buttons {
+                    display: flex;
+                    gap: 4px;
+                }
+                .action-btn {
+                    width: 32px;
+                    height: 32px;
+                    border: none;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 14px;
+                    transition: opacity 0.2s;
+                }
+                .action-btn:hover {
+                    opacity: 0.8;
+                }
+                .action-btn-view {
+                    background-color: #2196f3;
+                    color: white;
+                }
+                .action-btn-edit {
+                    background-color: #ffc107;
+                    color: white;
+                }
+                .action-btn-copy {
+                    background-color: #9e9e9e;
+                    color: white;
+                }
+                .action-btn-delete {
+                    background-color: #f44336;
+                    color: white;
+                }
+            ";
+            echo html_writer::end_tag('style');
+            
             // Отображение таблицы
-            echo html_writer::start_tag('table', ['class' => 'table table-striped table-hover', 'style' => 'width: 100%;']);
+            echo html_writer::start_div('programs-table');
+            echo html_writer::start_tag('table');
             echo html_writer::start_tag('thead');
             echo html_writer::start_tag('tr');
             echo html_writer::tag('th', 'ID');
-            echo html_writer::tag('th', 'Название программы');
-            echo html_writer::tag('th', 'Количество курсов');
-            echo html_writer::tag('th', 'Количество студентов');
-            echo html_writer::tag('th', 'Количество преподавателей');
+            echo html_writer::tag('th', 'Название курса');
+            echo html_writer::tag('th', 'Учебное заведение');
+            echo html_writer::tag('th', 'Связи');
+            echo html_writer::tag('th', 'Тип оплаты');
+            echo html_writer::tag('th', 'Цена');
             echo html_writer::tag('th', 'Статус');
+            echo html_writer::tag('th', 'Действия');
             echo html_writer::end_tag('tr');
             echo html_writer::end_tag('thead');
             echo html_writer::start_tag('tbody');
             
             foreach ($programsdata as $program) {
                 echo html_writer::start_tag('tr');
-                echo html_writer::tag('td', $program->id);
-                // Безопасное преобразование имени программы в строку
-                $programname = '';
-                if (is_string($program->name)) {
-                    $programname = $program->name;
-                } elseif (is_array($program->name)) {
-                    $programname = implode(', ', array_filter($program->name, 'is_string'));
-                } elseif (is_object($program->name) && method_exists($program->name, '__toString')) {
-                    $programname = (string)$program->name;
-                } elseif (isset($program->name)) {
-                    $programname = (string)$program->name;
-                } else {
-                    $programname = 'Без названия';
+                
+                // ID
+                echo html_writer::start_tag('td');
+                echo html_writer::span($program->id, ['class' => 'program-id-badge']);
+                echo html_writer::end_tag('td');
+                
+                // Название курса
+                echo html_writer::start_tag('td');
+                echo html_writer::start_div('course-name-cell');
+                echo html_writer::div(htmlspecialchars($program->fullname, ENT_QUOTES, 'UTF-8'), ['class' => 'course-name-full']);
+                if ($program->shortname) {
+                    echo html_writer::div(htmlspecialchars($program->shortname, ENT_QUOTES, 'UTF-8'), ['class' => 'course-name-short']);
                 }
-                echo html_writer::tag('td', htmlspecialchars($programname, ENT_QUOTES, 'UTF-8'));
-                echo html_writer::tag('td', html_writer::tag('strong', $program->coursescount, ['style' => 'color: #007bff;']));
-                echo html_writer::tag('td', html_writer::tag('span', $program->studentscount, ['style' => 'color: green; font-weight: bold;']));
-                echo html_writer::tag('td', html_writer::tag('span', $program->teacherscount, ['style' => 'color: orange; font-weight: bold;']));
-                $status = $program->visible ? html_writer::tag('span', 'Активна', ['style' => 'color: green;']) : html_writer::tag('span', 'Скрыта', ['style' => 'color: red;']);
-                echo html_writer::tag('td', $status);
+                echo html_writer::end_div();
+                echo html_writer::end_tag('td');
+                
+                // Учебное заведение
+                echo html_writer::start_tag('td');
+                echo html_writer::span(htmlspecialchars($program->categoryname, ENT_QUOTES, 'UTF-8'), ['class' => 'badge badge-institution']);
+                echo html_writer::end_tag('td');
+                
+                // Связи
+                echo html_writer::start_tag('td');
+                if ($program->groupscount > 0 || $program->studentscount > 0) {
+                    if ($program->groupscount > 0) {
+                        echo html_writer::span('👥 ' . $program->groupscount . ' группа' . ($program->groupscount > 1 ? 'ы' : ''), ['class' => 'badge badge-group']);
+                    }
+                    if ($program->studentscount > 0) {
+                        echo html_writer::span('👤 ' . $program->studentscount . ' студент' . ($program->studentscount > 1 ? 'ов' : ''), ['class' => 'badge badge-student']);
+                    }
+                } else {
+                    echo '-';
+                }
+                echo html_writer::end_tag('td');
+                
+                // Тип оплаты
+                echo html_writer::start_tag('td');
+                echo html_writer::span('🎁 Бесплатный', ['class' => 'badge badge-free']);
+                echo html_writer::end_tag('td');
+                
+                // Цена
+                echo html_writer::start_tag('td');
+                echo '-';
+                echo html_writer::end_tag('td');
+                
+                // Статус
+                echo html_writer::start_tag('td');
+                if ($program->visible) {
+                    echo html_writer::span('✓ Активный', ['class' => 'badge badge-active']);
+                } else {
+                    echo html_writer::span('Скрыт', ['class' => 'badge', 'style' => 'background-color: #9e9e9e; color: white;']);
+                }
+                echo html_writer::end_tag('td');
+                
+                // Действия
+                echo html_writer::start_tag('td');
+                echo html_writer::start_div('action-buttons');
+                $courseurl = new moodle_url('/course/view.php', ['id' => $program->id]);
+                $editurl = new moodle_url('/course/edit.php', ['id' => $program->id]);
+                echo html_writer::link($courseurl, '👁', [
+                    'class' => 'action-btn action-btn-view',
+                    'title' => 'Просмотр',
+                    'target' => '_blank'
+                ]);
+                echo html_writer::link($editurl, '✏', [
+                    'class' => 'action-btn action-btn-edit',
+                    'title' => 'Редактировать',
+                    'target' => '_blank'
+                ]);
+                echo html_writer::link('#', '📋', [
+                    'class' => 'action-btn action-btn-copy',
+                    'title' => 'Копировать',
+                    'onclick' => 'return false;'
+                ]);
+                echo html_writer::link('#', '🗑', [
+                    'class' => 'action-btn action-btn-delete',
+                    'title' => 'Удалить',
+                    'onclick' => 'return false;'
+                ]);
+                echo html_writer::end_div();
+                echo html_writer::end_tag('td');
+                
                 echo html_writer::end_tag('tr');
             }
             
             echo html_writer::end_tag('tbody');
             echo html_writer::end_tag('table');
+            echo html_writer::end_div();
         }
         
         echo html_writer::end_div();
