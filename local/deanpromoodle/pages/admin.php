@@ -1227,13 +1227,27 @@ switch ($tab) {
                 echo html_writer::start_div('course-name-cell');
                 // Безопасное преобразование названий перед использованием
                 $fullnametext = is_string($programfullname) ? $programfullname : (is_scalar($programfullname) ? (string)$programfullname : 'Без названия');
+                // Убеждаемся, что это строка перед htmlspecialchars
+                if (!is_string($fullnametext)) {
+                    $fullnametext = (string)$fullnametext;
+                }
                 $fullnametext = htmlspecialchars($fullnametext, ENT_QUOTES, 'UTF-8');
+                // Финальная проверка перед использованием в html_writer::div
+                $fullnametext = is_string($fullnametext) ? $fullnametext : 'Без названия';
                 echo html_writer::div($fullnametext, ['class' => 'course-name-full']);
                 if ($programshortname) {
                     $shortnametext = is_string($programshortname) ? $programshortname : (is_scalar($programshortname) ? (string)$programshortname : '');
                     if ($shortnametext) {
+                        // Убеждаемся, что это строка перед htmlspecialchars
+                        if (!is_string($shortnametext)) {
+                            $shortnametext = (string)$shortnametext;
+                        }
                         $shortnametext = htmlspecialchars($shortnametext, ENT_QUOTES, 'UTF-8');
-                        echo html_writer::div($shortnametext, ['class' => 'course-name-short']);
+                        // Финальная проверка перед использованием в html_writer::div
+                        $shortnametext = is_string($shortnametext) ? $shortnametext : '';
+                        if ($shortnametext) {
+                            echo html_writer::div($shortnametext, ['class' => 'course-name-short']);
+                        }
                     }
                 }
                 echo html_writer::end_div();
