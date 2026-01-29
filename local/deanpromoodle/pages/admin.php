@@ -1192,36 +1192,45 @@ switch ($tab) {
             echo html_writer::start_tag('tbody');
             
             foreach ($programsdata as $program) {
+                // Безопасное преобразование всех значений
+                $programid = is_scalar($program->id) ? (int)$program->id : (is_array($program->id) ? (int)($program->id[0] ?? 0) : 0);
+                $programfullname = is_string($program->fullname) ? $program->fullname : (is_array($program->fullname) ? implode(', ', array_filter($program->fullname, 'is_string')) : (string)$program->fullname);
+                $programshortname = is_string($program->shortname) ? $program->shortname : (is_array($program->shortname) ? implode(', ', array_filter($program->shortname, 'is_string')) : (isset($program->shortname) ? (string)$program->shortname : ''));
+                $programcategoryname = is_string($program->categoryname) ? $program->categoryname : (is_array($program->categoryname) ? implode(', ', array_filter($program->categoryname, 'is_string')) : (string)$program->categoryname);
+                $programgroupscount = is_scalar($program->groupscount) ? (int)$program->groupscount : 0;
+                $programstudentscount = is_scalar($program->studentscount) ? (int)$program->studentscount : 0;
+                $programvisible = is_bool($program->visible) ? $program->visible : (is_numeric($program->visible) ? (bool)$program->visible : false);
+                
                 echo html_writer::start_tag('tr');
                 
                 // ID
                 echo html_writer::start_tag('td');
-                echo html_writer::span($program->id, ['class' => 'program-id-badge']);
+                echo html_writer::span((string)$programid, ['class' => 'program-id-badge']);
                 echo html_writer::end_tag('td');
                 
                 // Название курса
                 echo html_writer::start_tag('td');
                 echo html_writer::start_div('course-name-cell');
-                echo html_writer::div(htmlspecialchars($program->fullname, ENT_QUOTES, 'UTF-8'), ['class' => 'course-name-full']);
-                if ($program->shortname) {
-                    echo html_writer::div(htmlspecialchars($program->shortname, ENT_QUOTES, 'UTF-8'), ['class' => 'course-name-short']);
+                echo html_writer::div(htmlspecialchars($programfullname, ENT_QUOTES, 'UTF-8'), ['class' => 'course-name-full']);
+                if ($programshortname) {
+                    echo html_writer::div(htmlspecialchars($programshortname, ENT_QUOTES, 'UTF-8'), ['class' => 'course-name-short']);
                 }
                 echo html_writer::end_div();
                 echo html_writer::end_tag('td');
                 
                 // Учебное заведение
                 echo html_writer::start_tag('td');
-                echo html_writer::span(htmlspecialchars($program->categoryname, ENT_QUOTES, 'UTF-8'), ['class' => 'badge badge-institution']);
+                echo html_writer::span(htmlspecialchars($programcategoryname, ENT_QUOTES, 'UTF-8'), ['class' => 'badge badge-institution']);
                 echo html_writer::end_tag('td');
                 
                 // Связи
                 echo html_writer::start_tag('td');
-                if ($program->groupscount > 0 || $program->studentscount > 0) {
-                    if ($program->groupscount > 0) {
-                        echo html_writer::span('👥 ' . $program->groupscount . ' группа' . ($program->groupscount > 1 ? 'ы' : ''), ['class' => 'badge badge-group']);
+                if ($programgroupscount > 0 || $programstudentscount > 0) {
+                    if ($programgroupscount > 0) {
+                        echo html_writer::span('👥 ' . $programgroupscount . ' группа' . ($programgroupscount > 1 ? 'ы' : ''), ['class' => 'badge badge-group']);
                     }
-                    if ($program->studentscount > 0) {
-                        echo html_writer::span('👤 ' . $program->studentscount . ' студент' . ($program->studentscount > 1 ? 'ов' : ''), ['class' => 'badge badge-student']);
+                    if ($programstudentscount > 0) {
+                        echo html_writer::span('👤 ' . $programstudentscount . ' студент' . ($programstudentscount > 1 ? 'ов' : ''), ['class' => 'badge badge-student']);
                     }
                 } else {
                     echo '-';
@@ -1240,7 +1249,7 @@ switch ($tab) {
                 
                 // Статус
                 echo html_writer::start_tag('td');
-                if ($program->visible) {
+                if ($programvisible) {
                     echo html_writer::span('✓ Активный', ['class' => 'badge badge-active']);
                 } else {
                     echo html_writer::span('Скрыт', ['class' => 'badge', 'style' => 'background-color: #9e9e9e; color: white;']);
@@ -1250,8 +1259,8 @@ switch ($tab) {
                 // Действия
                 echo html_writer::start_tag('td');
                 echo html_writer::start_div('action-buttons');
-                $courseurl = new moodle_url('/course/view.php', ['id' => $program->id]);
-                $editurl = new moodle_url('/course/edit.php', ['id' => $program->id]);
+                $courseurl = new moodle_url('/course/view.php', ['id' => $programid]);
+                $editurl = new moodle_url('/course/edit.php', ['id' => $programid]);
                 echo html_writer::link($courseurl, '👁', [
                     'class' => 'action-btn action-btn-view',
                     'title' => 'Просмотр',
