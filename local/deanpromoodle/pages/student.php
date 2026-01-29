@@ -101,4 +101,9 @@ echo html_writer::start_div('local-deanpromoodle-student-content');
 echo html_writer::tag('p', get_string('studentpagecontent', 'local_deanpromoodle'));
 echo html_writer::end_div();
 
+// Информация об авторе в футере
+echo html_writer::start_div('local-deanpromoodle-author-footer', ['style' => 'margin-top: 40px; padding-top: 20px; border-top: 1px solid #dee2e6; text-align: center; color: #6c757d; font-size: 0.9em;']);
+echo html_writer::tag('p', 'Автор: ' . html_writer::link('https://github.com/ValentinK2410', 'ValentinK2410', ['target' => '_blank', 'style' => 'color: #007bff; text-decoration: none;']));
+echo html_writer::end_div();
+
 echo $OUTPUT->footer();
