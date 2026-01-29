@@ -1428,7 +1428,7 @@ switch ($tab) {
             // Заголовок с кнопками
             echo html_writer::start_div('', ['style' => 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;']);
             echo html_writer::start_div('', ['style' => 'display: flex; align-items: center; gap: 10px;']);
-            echo html_writer::tag('span', '📋', ['style' => 'font-size: 24px;']);
+            echo html_writer::tag('i', '', ['class' => 'fas fa-clipboard-list', 'style' => 'font-size: 24px;']);
             echo html_writer::tag('h2', 'Программы', ['style' => 'margin: 0; font-size: 24px; font-weight: 600;']);
             echo html_writer::end_div();
             echo html_writer::start_div('', ['style' => 'display: flex; gap: 10px;']);
@@ -1440,12 +1440,12 @@ switch ($tab) {
                     'style' => 'background-color: #007bff; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-weight: 500;'
                 ]
             );
-            echo html_writer::link('#', '📥 Импорт из JSON', [
+            echo html_writer::link('#', '<i class="fas fa-file-import"></i> Импорт из JSON', [
                 'class' => 'btn btn-success',
                 'id' => 'import-programs-json-btn',
                 'style' => 'background-color: #28a745; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-weight: 500;'
             ]);
-            echo html_writer::link('#', '🔗 Прикрепить глобальную группу', [
+            echo html_writer::link('#', '<i class="fas fa-link"></i> Прикрепить глобальную группу', [
                 'class' => 'btn btn-secondary',
                 'id' => 'attach-cohort-btn',
                 'style' => 'background-color: #6c757d; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-weight: 500;'
@@ -1739,6 +1739,16 @@ switch ($tab) {
                     color: white;
                     font-size: 18px;
                 }
+                .badge i.fas,
+                .badge i.far,
+                .badge i.fab {
+                    margin-right: 4px;
+                }
+                .btn i.fas,
+                .btn i.far,
+                .btn i.fab {
+                    margin-right: 6px;
+                }
                 .action-btn::after {
                     content: '';
                     position: absolute;
@@ -1861,7 +1871,7 @@ switch ($tab) {
                     echo html_writer::start_tag('td');
                     $relations = [];
                     if ($programsubjectscount > 0) {
-                        $relations[] = '<span class="badge badge-group">📚 ' . $programsubjectscount . ' предмет' . ($programsubjectscount > 1 ? 'ов' : '') . '</span>';
+                        $relations[] = '<span class="badge badge-group"><i class="fas fa-book"></i> ' . $programsubjectscount . ' предмет' . ($programsubjectscount > 1 ? 'ов' : '') . '</span>';
                     }
                     if ($programcohortscount > 0) {
                         $relations[] = '<span class="badge badge-student">👥 ' . $programcohortscount . ' группа' . ($programcohortscount > 1 ? '' : 'а') . '</span>';
@@ -1875,7 +1885,7 @@ switch ($tab) {
                     
                     // Тип оплаты
                     echo html_writer::start_tag('td');
-                    echo '<span class="badge badge-free">🎁 Бесплатный</span>';
+                    echo '<span class="badge badge-free"><i class="fas fa-gift"></i> Бесплатный</span>';
                     echo html_writer::end_tag('td');
                     
                     // Цена
@@ -1886,7 +1896,7 @@ switch ($tab) {
                     // Статус
                     echo html_writer::start_tag('td');
                     if ($programvisible) {
-                        echo '<span class="badge badge-active">✓ Активный</span>';
+                        echo '<span class="badge badge-active"><i class="fas fa-check"></i> Активный</span>';
                     } else {
                         echo '<span class="badge" style="background-color: #9e9e9e; color: white;">Скрыт</span>';
                     }
@@ -1897,7 +1907,7 @@ switch ($tab) {
                     echo html_writer::start_div('action-buttons');
                     echo html_writer::link(
                         new moodle_url('/local/deanpromoodle/pages/admin.php', ['tab' => 'programs', 'action' => 'edit', 'programid' => $programid]),
-                        '<span>✎</span>',
+                        '<i class="fas fa-edit"></i>',
                         [
                             'class' => 'action-btn action-btn-edit',
                             'title' => 'Редактировать'
@@ -1911,7 +1921,7 @@ switch ($tab) {
                             'title' => 'Копировать'
                         ]
                     );
-                    echo html_writer::link('#', '<span>✕</span>', [
+                    echo html_writer::link('#', '<i class="fas fa-times"></i>', [
                         'class' => 'action-btn action-btn-delete delete-program',
                         'title' => 'Удалить',
                         'data-program-id' => $programid
@@ -2511,7 +2521,7 @@ switch ($tab) {
                     $courseshortname = is_string($sc->shortname) ? htmlspecialchars($sc->shortname, ENT_QUOTES, 'UTF-8') : '-';
                     echo html_writer::tag('td', $courseshortname);
                     echo html_writer::start_tag('td');
-                    echo html_writer::link('#', '🗑 Удалить', [
+                    echo html_writer::link('#', '<i class="fas fa-trash"></i> Удалить', [
                         'class' => 'btn btn-sm btn-danger detach-course-btn',
                         'data-subject-id' => $subjectid,
                         'data-course-id' => $sc->courseid,
@@ -2677,7 +2687,7 @@ switch ($tab) {
             // Список предметов
             echo html_writer::start_div('', ['style' => 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;']);
             echo html_writer::start_div('', ['style' => 'display: flex; align-items: center; gap: 10px;']);
-            echo html_writer::tag('span', '📚', ['style' => 'font-size: 24px;']);
+            echo html_writer::tag('i', '', ['class' => 'fas fa-book', 'style' => 'font-size: 24px;']);
             echo html_writer::tag('h2', 'Предметы', ['style' => 'margin: 0; font-size: 24px; font-weight: 600;']);
             echo html_writer::end_div();
             echo html_writer::start_div('', ['style' => 'display: flex; gap: 10px;']);
@@ -2689,7 +2699,7 @@ switch ($tab) {
                     'style' => 'background-color: #007bff; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-weight: 500;'
                 ]
             );
-            echo html_writer::link('#', '📥 Импорт из JSON', [
+            echo html_writer::link('#', '<i class="fas fa-file-import"></i> Импорт из JSON', [
                 'class' => 'btn btn-success',
                 'id' => 'import-json-btn',
                 'style' => 'background-color: #28a745; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-weight: 500;'
@@ -2848,24 +2858,24 @@ switch ($tab) {
                     // Просмотр
                     echo html_writer::link(
                         new moodle_url('/local/deanpromoodle/pages/admin.php', ['tab' => 'subjects', 'action' => 'view', 'subjectid' => $subject->id]),
-                        '<span>👁</span>',
+                        '<i class="fas fa-eye"></i>',
                         ['class' => 'action-btn action-btn-view', 'title' => 'Просмотр']
                     );
                     // Редактирование
                     echo html_writer::link(
                         new moodle_url('/local/deanpromoodle/pages/admin.php', ['tab' => 'subjects', 'action' => 'edit', 'subjectid' => $subject->id]),
-                        '<span>✎</span>',
+                        '<i class="fas fa-edit"></i>',
                         ['class' => 'action-btn action-btn-edit', 'title' => 'Редактировать']
                     );
                     // Прикрепить к программе
-                    echo html_writer::link('#', '<span>⛓</span>', [
+                    echo html_writer::link('#', '<i class="fas fa-link"></i>', [
                         'class' => 'action-btn action-btn-link attach-subject-to-program',
                         'title' => 'Прикрепить к программе',
                         'data-subject-id' => $subject->id,
                         'data-subject-name' => htmlspecialchars($subjectname, ENT_QUOTES, 'UTF-8')
                     ]);
                     // Удаление
-                    echo html_writer::link('#', '<span>✕</span>', [
+                    echo html_writer::link('#', '<i class="fas fa-times"></i>', [
                         'class' => 'action-btn action-btn-delete delete-subject',
                         'title' => 'Удалить',
                         'data-subject-id' => $subject->id
