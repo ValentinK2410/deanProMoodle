@@ -161,67 +161,67 @@ switch ($tab) {
         echo html_writer::start_div('local-deanpromoodle-admin-content', ['style' => 'margin-bottom: 30px;']);
         echo html_writer::tag('h2', 'История преподавателя', ['style' => 'margin-bottom: 20px;']);
 
-echo html_writer::start_tag('form', [
-    'method' => 'get',
-    'action' => new moodle_url('/local/deanpromoodle/pages/admin.php'),
-    'class' => 'form-inline',
-    'style' => 'background-color: #f5f5f5; padding: 20px; border-radius: 5px; margin-bottom: 20px;'
-]);
+        echo html_writer::start_tag('form', [
+            'method' => 'get',
+            'action' => new moodle_url('/local/deanpromoodle/pages/admin.php'),
+            'class' => 'form-inline',
+            'style' => 'background-color: #f5f5f5; padding: 20px; border-radius: 5px; margin-bottom: 20px;'
+        ]);
+        echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'tab', 'value' => 'history']);
 
-// Выбор преподавателя
-echo html_writer::label('Преподаватель: ', 'teacherid');
-$teacheroptions = [0 => 'Все преподаватели'];
-foreach ($teachers as $tid => $teacher) {
-    $teacheroptions[$tid] = fullname($teacher);
-}
-echo html_writer::select($teacheroptions, 'teacherid', $teacherid, false, ['class' => 'form-control', 'style' => 'margin-left: 5px; margin-right: 15px;']);
+        // Выбор преподавателя
+        echo html_writer::label('Преподаватель: ', 'teacherid');
+        $teacheroptions = [0 => 'Все преподаватели'];
+        foreach ($teachers as $tid => $teacher) {
+            $teacheroptions[$tid] = fullname($teacher);
+        }
+        echo html_writer::select($teacheroptions, 'teacherid', $teacherid, false, ['class' => 'form-control', 'style' => 'margin-left: 5px; margin-right: 15px;']);
 
-// Выбор периода
-echo html_writer::label('Период: ', 'period');
-$periodoptions = [
-    'day' => 'День',
-    'week' => 'Неделя',
-    'month' => 'Месяц',
-    'year' => 'Год'
-];
-echo html_writer::select($periodoptions, 'period', $period, false, ['class' => 'form-control', 'style' => 'margin-left: 5px; margin-right: 15px;']);
+        // Выбор периода
+        echo html_writer::label('Период: ', 'period');
+        $periodoptions = [
+            'day' => 'День',
+            'week' => 'Неделя',
+            'month' => 'Месяц',
+            'year' => 'Год'
+        ];
+        echo html_writer::select($periodoptions, 'period', $period, false, ['class' => 'form-control', 'style' => 'margin-left: 5px; margin-right: 15px;']);
 
-// Даты (опционально)
-echo html_writer::label('С: ', 'datefrom');
-echo html_writer::empty_tag('input', [
-    'type' => 'date',
-    'name' => 'datefrom',
-    'value' => $datefrom,
-    'class' => 'form-control',
-    'style' => 'margin-left: 5px; margin-right: 15px;'
-]);
+        // Даты (опционально)
+        echo html_writer::label('С: ', 'datefrom');
+        echo html_writer::empty_tag('input', [
+            'type' => 'date',
+            'name' => 'datefrom',
+            'value' => $datefrom,
+            'class' => 'form-control',
+            'style' => 'margin-left: 5px; margin-right: 15px;'
+        ]);
 
-echo html_writer::label('По: ', 'dateto');
-echo html_writer::empty_tag('input', [
-    'type' => 'date',
-    'name' => 'dateto',
-    'value' => $dateto,
-    'class' => 'form-control',
-    'style' => 'margin-left: 5px; margin-right: 15px;'
-]);
+        echo html_writer::label('По: ', 'dateto');
+        echo html_writer::empty_tag('input', [
+            'type' => 'date',
+            'name' => 'dateto',
+            'value' => $dateto,
+            'class' => 'form-control',
+            'style' => 'margin-left: 5px; margin-right: 15px;'
+        ]);
 
-echo html_writer::empty_tag('input', [
-    'type' => 'submit',
-    'value' => 'Показать',
-    'class' => 'btn btn-primary',
-    'style' => 'margin-left: 10px;'
-]);
+        echo html_writer::empty_tag('input', [
+            'type' => 'submit',
+            'value' => 'Показать',
+            'class' => 'btn btn-primary',
+            'style' => 'margin-left: 10px;'
+        ]);
 
-echo html_writer::end_tag('form');
+        echo html_writer::end_tag('form');
 
-// Получение данных истории
-$history = [];
-if ($teacherid > 0 || $teacherid == 0) {
-    $teacherfilter = $teacherid > 0 ? "AND g.grader = $teacherid" : "";
-    
-    // Определение диапазона дат
-    $now = time();
-    switch ($period) {
+        // Получение данных истории
+        $history = [];
+        $teacherfilter = $teacherid > 0 ? "AND g.grader = $teacherid" : "";
+        
+        // Определение диапазона дат
+        $now = time();
+        switch ($period) {
         case 'day':
             $startdate = $datefrom ? strtotime($datefrom) : mktime(0, 0, 0, date('n', $now), date('j', $now), date('Y', $now));
             $enddate = $dateto ? strtotime($dateto . ' 23:59:59') : mktime(23, 59, 59, date('n', $now), date('j', $now), date('Y', $now));
@@ -242,10 +242,10 @@ if ($teacherid > 0 || $teacherid == 0) {
             $enddate = $dateto ? strtotime($dateto . ' 23:59:59') : mktime(23, 59, 59, 12, 31, date('Y', $now));
             $dateformat = 'Y';
             break;
-    }
-    
-    // Получение проверенных заданий
-    $assignmentshistory = $DB->get_records_sql(
+        }
+        
+        // Получение проверенных заданий
+        $assignmentshistory = $DB->get_records_sql(
         "SELECT g.id, g.grader, g.timemodified, g.grade,
                 a.name as assignmentname, c.fullname as coursename, c.id as courseid,
                 u.firstname, u.lastname, u.id as studentid
@@ -256,13 +256,13 @@ if ($teacherid > 0 || $teacherid == 0) {
          WHERE g.timemodified >= ? AND g.timemodified <= ?
          $teacherfilter
          ORDER BY g.timemodified DESC",
-        [$startdate, $enddate]
-    );
-    
-    // Получение проверенных тестов
-    // Для тестов определяем преподавателя по курсу, где он имеет роль преподавателя
-    $quizzeshistory = [];
-    if (!empty($teacherroleids)) {
+            [$startdate, $enddate]
+        );
+        
+        // Получение проверенных тестов
+        // Для тестов определяем преподавателя по курсу, где он имеет роль преподавателя
+        $quizzeshistory = [];
+        if (!empty($teacherroleids)) {
         $placeholders = implode(',', array_fill(0, count($teacherroleids), '?'));
         
         // Получаем все проверенные тесты
@@ -281,39 +281,39 @@ if ($teacherid > 0 || $teacherid == 0) {
         
         // Определяем преподавателя для каждого теста по курсу
         foreach ($allquizzes as $item) {
-            $coursecontext = context_course::instance($item->courseid);
-            $teachers_in_course = $DB->get_fieldset_sql(
-                "SELECT DISTINCT ra.userid
-                 FROM {role_assignments} ra
-                 WHERE ra.contextid = ? AND ra.roleid IN ($placeholders)",
-                array_merge([$coursecontext->id], $teacherroleids)
-            );
-            
-            // Если выбран конкретный преподаватель, проверяем его наличие в курсе
-            if ($teacherid > 0) {
-                if (!in_array($teacherid, $teachers_in_course)) {
-                    continue;
+                $coursecontext = context_course::instance($item->courseid);
+                $teachers_in_course = $DB->get_fieldset_sql(
+                    "SELECT DISTINCT ra.userid
+                     FROM {role_assignments} ra
+                     WHERE ra.contextid = ? AND ra.roleid IN ($placeholders)",
+                    array_merge([$coursecontext->id], $teacherroleids)
+                );
+                
+                // Если выбран конкретный преподаватель, проверяем его наличие в курсе
+                if ($teacherid > 0) {
+                    if (!in_array($teacherid, $teachers_in_course)) {
+                        continue;
+                    }
+                    $item->grader = $teacherid;
+                } else {
+                    // Берем первого преподавателя из курса
+                    if (empty($teachers_in_course)) {
+                        continue;
+                    }
+                    $item->grader = $teachers_in_course[0];
                 }
-                $item->grader = $teacherid;
-            } else {
-                // Берем первого преподавателя из курса
-                if (empty($teachers_in_course)) {
-                    continue;
-                }
-                $item->grader = $teachers_in_course[0];
+                
+                $quizzeshistory[] = $item;
             }
-            
-            $quizzeshistory[] = $item;
         }
-    }
-    
-    // Получение ответов на форумах от преподавателей
-    $forumshistory = [];
-    if (!empty($teacherroleids)) {
-        $placeholders_forum = implode(',', array_fill(0, count($teacherroleids), '?'));
-        $teacherfilter_forum = $teacherid > 0 ? "AND p.userid = $teacherid" : "";
         
-        $forumshistory = $DB->get_records_sql(
+        // Получение ответов на форумах от преподавателей
+        $forumshistory = [];
+        if (!empty($teacherroleids)) {
+            $placeholders_forum = implode(',', array_fill(0, count($teacherroleids), '?'));
+            $teacherfilter_forum = $teacherid > 0 ? "AND p.userid = $teacherid" : "";
+            
+            $forumshistory = $DB->get_records_sql(
             "SELECT p.id, p.userid as grader, p.created as timemodified,
                     f.name as forumname, c.fullname as coursename, c.id as courseid,
                     d.name as discussionname, p.subject
@@ -331,15 +331,15 @@ if ($teacherid > 0 || $teacherid == 0) {
                  AND ra.roleid IN ($placeholders_forum)
              )
              ORDER BY p.created DESC",
-            array_merge([$startdate, $enddate], $teacherroleids)
-        );
-    }
-    
-    // Группировка данных по периоду
-    $groupedhistory = [];
-    
-    // Группировка заданий
-    foreach ($assignmentshistory as $item) {
+                array_merge([$startdate, $enddate], $teacherroleids)
+            );
+        }
+        
+        // Группировка данных по периоду
+        $groupedhistory = [];
+        
+        // Группировка заданий
+        foreach ($assignmentshistory as $item) {
         $teacherid_item = $item->grader;
         $teachername = $DB->get_field('user', 'CONCAT(firstname, " ", lastname)', ['id' => $teacherid_item]);
         if (!$teachername) {
@@ -407,45 +407,45 @@ if ($teacherid > 0 || $teacherid == 0) {
                 'forums' => 0
             ];
         }
-        $groupedhistory[$teacherid_item]['periods'][$datekey]['forums']++;
-    }
-    
-    // Отображение результатов
-    if (empty($groupedhistory)) {
-        echo html_writer::div('Данные не найдены за выбранный период.', 'alert alert-info');
-    } else {
-        echo html_writer::start_tag('table', ['class' => 'table table-striped table-hover', 'style' => 'width: 100%; margin-top: 20px;']);
-        echo html_writer::start_tag('thead');
-        echo html_writer::start_tag('tr');
-        echo html_writer::tag('th', 'Преподаватель');
-        echo html_writer::tag('th', 'Период');
-        echo html_writer::tag('th', 'Задания');
-        echo html_writer::tag('th', 'Тесты');
-        echo html_writer::tag('th', 'Форумы');
-        echo html_writer::tag('th', 'Всего');
-        echo html_writer::end_tag('tr');
-        echo html_writer::end_tag('thead');
-        echo html_writer::start_tag('tbody');
-        
-        foreach ($groupedhistory as $tid => $teacherdata) {
-            foreach ($teacherdata['periods'] as $periodkey => $data) {
-                $total = $data['assignments'] + $data['quizzes'] + $data['forums'];
-                echo html_writer::start_tag('tr');
-                echo html_writer::tag('td', htmlspecialchars($teacherdata['teachername']));
-                echo html_writer::tag('td', htmlspecialchars($periodkey));
-                echo html_writer::tag('td', $data['assignments']);
-                echo html_writer::tag('td', $data['quizzes']);
-                echo html_writer::tag('td', $data['forums']);
-                echo html_writer::tag('td', html_writer::tag('strong', $total));
-                echo html_writer::end_tag('tr');
-            }
+            $groupedhistory[$teacherid_item]['periods'][$datekey]['forums']++;
         }
         
-        echo html_writer::end_tag('tbody');
-        echo html_writer::end_tag('table');
-    }
-    echo html_writer::end_div();
-    break;
+        // Отображение результатов
+        if (empty($groupedhistory)) {
+            echo html_writer::div('Данные не найдены за выбранный период.', 'alert alert-info');
+        } else {
+            echo html_writer::start_tag('table', ['class' => 'table table-striped table-hover', 'style' => 'width: 100%; margin-top: 20px;']);
+            echo html_writer::start_tag('thead');
+            echo html_writer::start_tag('tr');
+            echo html_writer::tag('th', 'Преподаватель');
+            echo html_writer::tag('th', 'Период');
+            echo html_writer::tag('th', 'Задания');
+            echo html_writer::tag('th', 'Тесты');
+            echo html_writer::tag('th', 'Форумы');
+            echo html_writer::tag('th', 'Всего');
+            echo html_writer::end_tag('tr');
+            echo html_writer::end_tag('thead');
+            echo html_writer::start_tag('tbody');
+            
+            foreach ($groupedhistory as $tid => $teacherdata) {
+                foreach ($teacherdata['periods'] as $periodkey => $data) {
+                    $total = $data['assignments'] + $data['quizzes'] + $data['forums'];
+                    echo html_writer::start_tag('tr');
+                    echo html_writer::tag('td', htmlspecialchars($teacherdata['teachername']));
+                    echo html_writer::tag('td', htmlspecialchars($periodkey));
+                    echo html_writer::tag('td', $data['assignments']);
+                    echo html_writer::tag('td', $data['quizzes']);
+                    echo html_writer::tag('td', $data['forums']);
+                    echo html_writer::tag('td', html_writer::tag('strong', $total));
+                    echo html_writer::end_tag('tr');
+                }
+            }
+            
+            echo html_writer::end_tag('tbody');
+            echo html_writer::end_tag('table');
+        }
+        echo html_writer::end_div();
+        break;
     
     case 'teachers':
         // Вкладка "Преподаватели" - список всех преподавателей
@@ -562,67 +562,79 @@ if ($teacherid > 0 || $teacherid == 0) {
         $studentroleid = $DB->get_field('role', 'id', ['shortname' => 'student']);
         
         // Получение статистики по зачислениям
-        $enrolments = $DB->get_records_sql(
-            "SELECT ue.timestart, ue.timeend, ue.status,
-                    u.id as userid, u.firstname, u.lastname, u.email,
-                    c.fullname as coursename, c.id as courseid
-             FROM {user_enrolments} ue
-             JOIN {enrol} e ON e.id = ue.enrolid
-             JOIN {course} c ON c.id = e.courseid
-             JOIN {user} u ON u.id = ue.userid
-             JOIN {role_assignments} ra ON ra.userid = u.id AND ra.contextid = (
-                 SELECT id FROM {context} WHERE instanceid = c.id AND contextlevel = 50 LIMIT 1
-             )
-             WHERE ra.roleid = ?
-             AND ue.timestart >= ? AND ue.timestart <= ?
-             ORDER BY ue.timestart DESC",
-            [$studentroleid, $startdate, $enddate]
-        );
+        $enrolments = [];
+        if ($studentroleid) {
+            $enrolments = $DB->get_records_sql(
+                "SELECT ue.timestart, ue.timeend, ue.status,
+                        u.id as userid, u.firstname, u.lastname, u.email,
+                        c.fullname as coursename, c.id as courseid
+                 FROM {user_enrolments} ue
+                 JOIN {enrol} e ON e.id = ue.enrolid
+                 JOIN {course} c ON c.id = e.courseid
+                 JOIN {user} u ON u.id = ue.userid
+                 JOIN {context} ctx ON ctx.instanceid = c.id AND ctx.contextlevel = 50
+                 JOIN {role_assignments} ra ON ra.userid = u.id AND ra.contextid = ctx.id
+                 WHERE ra.roleid = ?
+                 AND ue.timestart >= ? AND ue.timestart <= ?
+                 ORDER BY ue.timestart DESC",
+                [$studentroleid, $startdate, $enddate]
+            );
+        }
         
         // Получение статистики по отчислениям
-        $unenrolments = $DB->get_records_sql(
-            "SELECT ue.timeend, ue.status,
-                    u.id as userid, u.firstname, u.lastname, u.email,
-                    c.fullname as coursename, c.id as courseid
-             FROM {user_enrolments} ue
-             JOIN {enrol} e ON e.id = ue.enrolid
-             JOIN {course} c ON c.id = e.courseid
-             JOIN {user} u ON u.id = ue.userid
-             JOIN {role_assignments} ra ON ra.userid = u.id AND ra.contextid = (
-                 SELECT id FROM {context} WHERE instanceid = c.id AND contextlevel = 50 LIMIT 1
-             )
-             WHERE ra.roleid = ?
-             AND ue.timeend > 0
-             AND ue.timeend >= ? AND ue.timeend <= ?
-             ORDER BY ue.timeend DESC",
-            [$studentroleid, $startdate, $enddate]
-        );
+        $unenrolments = [];
+        if ($studentroleid) {
+            $unenrolments = $DB->get_records_sql(
+                "SELECT ue.timeend, ue.status,
+                        u.id as userid, u.firstname, u.lastname, u.email,
+                        c.fullname as coursename, c.id as courseid
+                 FROM {user_enrolments} ue
+                 JOIN {enrol} e ON e.id = ue.enrolid
+                 JOIN {course} c ON c.id = e.courseid
+                 JOIN {user} u ON u.id = ue.userid
+                 JOIN {context} ctx ON ctx.instanceid = c.id AND ctx.contextlevel = 50
+                 JOIN {role_assignments} ra ON ra.userid = u.id AND ra.contextid = ctx.id
+                 WHERE ra.roleid = ?
+                 AND ue.timeend > 0
+                 AND ue.timeend >= ? AND ue.timeend <= ?
+                 ORDER BY ue.timeend DESC",
+                [$studentroleid, $startdate, $enddate]
+            );
+        }
         
         // Получение статистики по удаленным студентам
-        $deletedstudents = $DB->get_records_sql(
-            "SELECT u.id, u.firstname, u.lastname, u.email, u.timemodified, u.deleted
-             FROM {user} u
-             JOIN {role_assignments} ra ON ra.userid = u.id
-             WHERE ra.roleid = ?
-             AND u.deleted = 1
-             AND u.timemodified >= ? AND u.timemodified <= ?
-             ORDER BY u.timemodified DESC",
-            [$studentroleid, $startdate, $enddate]
-        );
+        $deletedstudents = [];
+        if ($studentroleid) {
+            $systemcontext = context_system::instance();
+            $deletedstudents = $DB->get_records_sql(
+                "SELECT u.id, u.firstname, u.lastname, u.email, u.timemodified, u.deleted
+                 FROM {user} u
+                 JOIN {role_assignments} ra ON ra.userid = u.id AND ra.contextid = ?
+                 WHERE ra.roleid = ?
+                 AND u.deleted = 1
+                 AND u.timemodified >= ? AND u.timemodified <= ?
+                 ORDER BY u.timemodified DESC",
+                [$systemcontext->id, $studentroleid, $startdate, $enddate]
+            );
+        }
         
         // Получение статистики по обновлению данных студентов
-        $updatedstudents = $DB->get_records_sql(
-            "SELECT DISTINCT u.id, u.firstname, u.lastname, u.email, u.timemodified
-             FROM {user} u
-             JOIN {role_assignments} ra ON ra.userid = u.id
-             WHERE ra.roleid = ?
-             AND u.deleted = 0
-             AND u.timemodified >= ? AND u.timemodified <= ?
-             AND u.timemodified > u.timecreated
-             ORDER BY u.timemodified DESC
-             LIMIT 1000",
-            [$studentroleid, $startdate, $enddate]
-        );
+        $updatedstudents = [];
+        if ($studentroleid) {
+            $systemcontext = context_system::instance();
+            $updatedstudents = $DB->get_records_sql(
+                "SELECT DISTINCT u.id, u.firstname, u.lastname, u.email, u.timemodified
+                 FROM {user} u
+                 JOIN {role_assignments} ra ON ra.userid = u.id AND ra.contextid = ?
+                 WHERE ra.roleid = ?
+                 AND u.deleted = 0
+                 AND u.timemodified >= ? AND u.timemodified <= ?
+                 AND u.timemodified > u.timecreated
+                 ORDER BY u.timemodified DESC
+                 LIMIT 1000",
+                [$systemcontext->id, $studentroleid, $startdate, $enddate]
+            );
+        }
         
         // Группировка данных по периоду
         $groupeddata = [];
