@@ -1042,7 +1042,7 @@ if ($action == 'viewprogram' && $programid > 0) {
         case 'programs':
             // Подвкладка "Программы"
             try {
-            // Получаем когорты, к которым принадлежит студент
+                // Получаем когорты, к которым принадлежит студент
             $studentcohorts = $DB->get_records_sql(
                 "SELECT c.id, c.name, c.idnumber, c.description
                  FROM {cohort_members} cm
