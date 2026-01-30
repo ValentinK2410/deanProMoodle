@@ -197,7 +197,7 @@ if ($action == 'viewprogram' && $programid > 0) {
     echo html_writer::link(
         new moodle_url('/local/deanpromoodle/pages/student.php', ['tab' => 'programs']),
         '<i class="fas fa-arrow-left"></i> Назад к программам',
-        ['class' => 'btn btn-secondary', 'style' => 'text-decoration: none;']
+        ['class' => 'btn btn-secondary', 'style' => 'text-decoration: none;', 'target' => '_blank']
     );
     echo html_writer::end_div();
     
@@ -549,7 +549,8 @@ if ($action == 'viewprogram' && $programid > 0) {
                     $courseurl = new moodle_url('/course/view.php', ['id' => $course->id]);
                     echo html_writer::tag('td', 
                         html_writer::link($courseurl, htmlspecialchars($course->shortname, ENT_QUOTES, 'UTF-8'), [
-                            'class' => 'course-link'
+                            'class' => 'course-link',
+                            'target' => '_blank'
                         ])
                     );
                     
