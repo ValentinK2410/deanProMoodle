@@ -445,8 +445,16 @@ if ($action == 'viewprogram' && $programid > 0) {
                 // Подключаем необходимые функции Moodle
                 require_once($CFG->libdir . '/modinfolib.php');
                 
-                foreach ($mycourses as $course) {
-                    if ($course->id <= 1) continue; // Пропускаем системный курс
+                foreach ($mycourses as $courseobj) {
+                    if ($courseobj->id <= 1) continue; // Пропускаем системный курс
+                    
+                    // Загружаем полный объект курса для корректной работы функций
+                    try {
+                        $course = get_course($courseobj->id);
+                    } catch (\Exception $e) {
+                        // Если не удалось загрузить курс, используем исходный объект
+                        $course = $courseobj;
+                    }
                     
                     echo html_writer::start_tag('tr');
                     
@@ -496,7 +504,14 @@ if ($action == 'viewprogram' && $programid > 0) {
                     $statusitems = [];
                     
                     // Получаем задания курса
-                    $assignments = get_all_instances_in_course('assign', $course, false);
+                    try {
+                        $assignments = get_all_instances_in_course('assign', $course, false);
+                    } catch (\Exception $e) {
+                        $assignments = [];
+                    }
+                    if (!is_array($assignments)) {
+                        $assignments = [];
+                    }
                     
                     // Отслеживаем найденные типы заданий
                     $foundreadingreport = false;
@@ -518,6 +533,9 @@ if ($action == 'viewprogram' && $programid > 0) {
                         if ($assignmenttype) {
                             // Получаем cmid для ссылки
                             $cm = get_coursemodule_from_instance('assign', $assignment->id, $course->id);
+                            if (!$cm) {
+                                continue; // Пропускаем, если модуль не найден
+                            }
                             $assignmenturl = new moodle_url('/mod/assign/view.php', ['id' => $cm->id]);
                             
                             // Проверяем статус задания для студента
@@ -591,7 +609,14 @@ if ($action == 'viewprogram' && $programid > 0) {
                     }
                     
                     // Получаем тесты (экзамены) курса
-                    $quizzes = get_all_instances_in_course('quiz', $course, false);
+                    try {
+                        $quizzes = get_all_instances_in_course('quiz', $course, false);
+                    } catch (\Exception $e) {
+                        $quizzes = [];
+                    }
+                    if (!is_array($quizzes)) {
+                        $quizzes = [];
+                    }
                     $foundexam = false;
                     
                     foreach ($quizzes as $quiz) {
@@ -603,6 +628,9 @@ if ($action == 'viewprogram' && $programid > 0) {
                             
                             // Получаем cmid для ссылки
                             $cm = get_coursemodule_from_instance('quiz', $quiz->id, $course->id);
+                            if (!$cm) {
+                                continue; // Пропускаем, если модуль не найден
+                            }
                             $quizurl = new moodle_url('/mod/quiz/view.php', ['id' => $cm->id]);
                             
                             // Проверяем, есть ли попытка у студента (берем последнюю завершенную попытку)
