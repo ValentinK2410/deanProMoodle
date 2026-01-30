@@ -887,6 +887,52 @@ if ($action == 'viewprogram' && $programid > 0) {
                         }
                     }
                     
+                    // Получаем элементы choice (выбор) курса
+                    try {
+                        $choices = get_all_instances_in_course('choice', $course, false);
+                    } catch (\Exception $e) {
+                        $choices = [];
+                    }
+                    if (!is_array($choices)) {
+                        $choices = [];
+                    }
+                    
+                    foreach ($choices as $choice) {
+                        $choicename = mb_strtolower($choice->name);
+                        
+                        // Проверяем, является ли это нужным choice
+                        if (strpos($choicename, 'отметьте') !== false && 
+                            (strpos($choicename, 'отправили') !== false || strpos($choicename, 'оценк') !== false)) {
+                            // Получаем cmid для ссылки
+                            $cm = get_coursemodule_from_instance('choice', $choice->id, $course->id);
+                            if (!$cm) {
+                                continue; // Пропускаем, если модуль не найден
+                            }
+                            $choiceurl = new moodle_url('/mod/choice/view.php', ['id' => $cm->id]);
+                            
+                            // Проверяем, ответил ли студент на choice
+                            $response = $DB->get_record('choice_answers', [
+                                'choiceid' => $choice->id,
+                                'userid' => $USER->id
+                            ]);
+                            
+                            $statusclass = '';
+                            $statustext = 'Отметьте, что отправили оценку курса';
+                            
+                            if ($response) {
+                                // Есть ответ - зеленый
+                                $statusclass = 'assignment-status-green';
+                            } else {
+                                // Нет ответа - красный
+                                $statusclass = 'assignment-status-red';
+                            }
+                            
+                            $badgecontent = htmlspecialchars($statustext, ENT_QUOTES, 'UTF-8');
+                            $statusitems[] = '<span class="badge assignment-status-item ' . $statusclass . '">' . 
+                                html_writer::link($choiceurl, $badgecontent, ['target' => '_blank']) . '</span>';
+                        }
+                    }
+                    
                     if (!empty($statusitems)) {
                         $statushtml = implode(' ', $statusitems);
                     } else {
