@@ -431,7 +431,7 @@ if ($action == 'viewprogram' && $programid > 0) {
                 echo html_writer::start_tag('table', ['class' => 'table']);
                 echo html_writer::start_tag('thead');
                 echo html_writer::start_tag('tr');
-                echo html_writer::tag('th', 'Название курса');
+                echo html_writer::tag('th', 'Название курса', ['style' => 'width: 500px;']);
                 echo html_writer::tag('th', 'Краткое название', ['style' => 'width: 150px;']);
                 echo html_writer::tag('th', 'Дата начала', ['style' => 'width: 120px;']);
                 echo html_writer::tag('th', 'Дата окончания', ['style' => 'width: 120px;']);
