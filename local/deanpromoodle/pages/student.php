@@ -1082,8 +1082,15 @@ if ($action == 'viewprogram' && $programid > 0) {
         // Фото студента
         $userpicture = $OUTPUT->user_picture($USER, ['size' => 100, 'class' => 'userpicture']);
         echo html_writer::div($userpicture, '', ['style' => 'margin-right: 20px;']);
-        // ФИО студента
-        echo html_writer::tag('h1', fullname($USER), ['style' => 'margin: 0; font-size: 2em;']);
+        // ФИО студента как ссылка на профиль
+        $profileurl = new moodle_url('/user/profile.php', ['id' => $USER->id]);
+        echo html_writer::tag('h1', 
+            html_writer::link($profileurl, fullname($USER), [
+                'style' => 'margin: 0; font-size: 2em; color: #007bff; text-decoration: none;',
+                'target' => '_blank'
+            ]), 
+            ['style' => 'margin: 0;']
+        );
         echo html_writer::end_div();
         
         // Подвкладки
