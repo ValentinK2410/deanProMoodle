@@ -225,54 +225,29 @@ function local_deanpromoodle_before_footer() {
                 return; // Если контейнер не найден, не добавляем кнопки
             }
             
-            // Получаем стили существующих кнопок из контейнера
-            var existingButton = ssoContainer.querySelector('.sso-button');
-            var buttonBaseStyles = '';
-            if (existingButton && window.getComputedStyle) {
-                var computed = window.getComputedStyle(existingButton);
-                buttonBaseStyles = 'display: ' + computed.display + '; ' +
-                    'padding: ' + computed.paddingTop + ' ' + computed.paddingRight + ' ' + computed.paddingBottom + ' ' + computed.paddingLeft + '; ' +
-                    'height: ' + computed.height + '; ' +
-                    'line-height: ' + computed.lineHeight + '; ' +
-                    'font-size: ' + computed.fontSize + '; ' +
-                    'box-sizing: ' + computed.boxSizing + '; ' +
-                    'border-radius: 4px; ' +
-                    'text-decoration: none; ' +
-                    'font-weight: 500; ' +
-                    'transition: all 0.3s ease; ' +
-                    'cursor: pointer; ' +
-                    'border: none; ' +
-                    'white-space: nowrap; ' +
-                    'color: white; ' +
-                    'vertical-align: middle;';
-            } else {
-                // Fallback стили, если не удалось получить вычисленные стили
-                buttonBaseStyles = 'display: inline-block; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 14px; font-weight: 500; transition: all 0.3s ease; cursor: pointer; border: none; white-space: nowrap; color: white;';
-            }
-            
             // Создаем кнопку "ЛК"
             var lkButton = document.createElement('a');
             lkButton.id = 'lk-button-deanpromoodle';
             lkButton.href = '" . $lkurlstring . "';
-            lkButton.className = 'sso-button deanpromoodle-button-lk';
-            lkButton.style.cssText = buttonBaseStyles + ' background-color: #007bff;';
+            lkButton.className = 'deanpromoodle-button deanpromoodle-button-lk';
+            lkButton.style.cssText = 'display: inline-block; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 14px; font-weight: 500; transition: 0.3s; cursor: pointer; border: medium; white-space: nowrap; color: white; margin-left: 10px; margin-right: 10px; background-color: rgb(0, 123, 255);';
             lkButton.textContent = 'ЛК';
             lkButton.title = 'Личный кабинет';
             
             // Добавляем кнопку "ЛК" в контейнер
             ssoContainer.appendChild(lkButton);
             
-            // Создаем кнопку "Преподаватель" для админов
             " . ($isadmin ? "
+            // Создаем кнопку \"Преподаватель\" для админов
             var teacherButton = document.createElement('a');
             teacherButton.id = 'teacher-button-deanpromoodle';
             teacherButton.href = '" . $teacherurlstring . "';
-            teacherButton.className = 'sso-button deanpromoodle-button-teacher';
-            teacherButton.style.cssText = buttonBaseStyles + ' background-color: #6c757d;';
+            teacherButton.className = 'deanpromoodle-button deanpromoodle-button-teacher';
+            teacherButton.style.cssText = 'display: inline-block; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 14px; font-weight: 500; transition: 0.3s; cursor: pointer; border: medium; white-space: nowrap; color: white; margin-left: 5px; margin-right: 10px; background-color: rgb(108, 117, 125);';
             teacherButton.textContent = 'Преподаватель';
             teacherButton.title = 'Панель преподавателя';
             
-            // Добавляем кнопку "Преподаватель" в контейнер
+            // Добавляем кнопку \"Преподаватель\" в контейнер
             ssoContainer.appendChild(teacherButton);
             " : "") . "
         }
