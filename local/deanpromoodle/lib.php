@@ -208,107 +208,144 @@ function local_deanpromoodle_before_footer() {
     
     $js = "
     (function() {
-        // Ждем загрузки DOM
+        // Проверяем, не добавлена ли уже кнопка
+        if (document.getElementById('lk-button-deanpromoodle')) {
+            return;
+        }
+        
+        function addLKButton() {
+            // Проверяем еще раз перед добавлением
+            if (document.getElementById('lk-button-deanpromoodle')) {
+                return;
+            }
+            
+            var lkButton = document.createElement('a');
+            lkButton.id = 'lk-button-deanpromoodle';
+            lkButton.href = '" . $lkurlstring . "';
+            lkButton.className = 'btn btn-primary';
+            lkButton.style.cssText = 'margin-left: 10px; margin-right: 10px; padding: 8px 16px; background-color: #007bff; color: white; text-decoration: none; border-radius: 4px; font-weight: 500; display: inline-block;';
+            lkButton.textContent = 'ЛК';
+            lkButton.title = 'Личный кабинет';
+            
+            var teacherButton = null;
+            " . ($isadmin ? "
+            teacherButton = document.createElement('a');
+            teacherButton.href = '" . $teacherurlstring . "';
+            teacherButton.className = 'btn btn-secondary';
+            teacherButton.style.cssText = 'margin-left: 5px; margin-right: 10px; padding: 8px 16px; background-color: #6c757d; color: white; text-decoration: none; border-radius: 4px; font-weight: 500; display: inline-block;';
+            teacherButton.textContent = 'Преподаватель';
+            teacherButton.title = 'Панель преподавателя';
+            " : "") . "
+            
+            // Стратегия 1: Ищем по тексту существующих кнопок ('Сайт семинарии', 'Деканат')
+            var found = false;
+            var allLinks = document.querySelectorAll('a, button');
+            for (var i = 0; i < allLinks.length; i++) {
+                var text = (allLinks[i].textContent || allLinks[i].innerText || '').trim();
+                if (text.indexOf('Сайт семинарии') !== -1 || text.indexOf('Деканат') !== -1) {
+                    var parent = allLinks[i].parentElement;
+                    // Ищем контейнер с кнопками
+                    while (parent && parent !== document.body) {
+                        if (parent.classList && (parent.classList.contains('navbar-nav') || parent.classList.contains('nav') || parent.tagName === 'NAV' || parent.tagName === 'HEADER')) {
+                            if (parent.tagName === 'UL' || parent.classList.contains('navbar-nav')) {
+                                var li1 = document.createElement('li');
+                                li1.className = 'nav-item';
+                                li1.appendChild(lkButton);
+                                parent.appendChild(li1);
+                                if (teacherButton) {
+                                    var li2 = document.createElement('li');
+                                    li2.className = 'nav-item';
+                                    li2.appendChild(teacherButton);
+                                    parent.appendChild(li2);
+                                }
+                            } else {
+                                parent.appendChild(lkButton);
+                                if (teacherButton) parent.appendChild(teacherButton);
+                            }
+                            found = true;
+                            break;
+                        }
+                        parent = parent.parentElement;
+                    }
+                    if (found) break;
+                    
+                    // Если не нашли контейнер, добавляем рядом с найденной кнопкой
+                    if (!found) {
+                        var nextSibling = allLinks[i].nextSibling;
+                        if (nextSibling) {
+                            allLinks[i].parentElement.insertBefore(lkButton, nextSibling);
+                            if (teacherButton) allLinks[i].parentElement.insertBefore(teacherButton, nextSibling);
+                        } else {
+                            allLinks[i].parentElement.appendChild(lkButton);
+                            if (teacherButton) allLinks[i].parentElement.appendChild(teacherButton);
+                        }
+                        found = true;
+                        break;
+                    }
+                }
+            }
+            
+            // Стратегия 2: Ищем область пользователя или навигации
+            if (!found) {
+                var selectors = [
+                    '.usermenu',
+                    '.user-info',
+                    '[data-region=\"usermenu\"]',
+                    '.navbar-nav',
+                    '.header-actions',
+                    '.custom-nav-buttons',
+                    'header nav',
+                    '.navbar .container'
+                ];
+                
+                for (var s = 0; s < selectors.length; s++) {
+                    var element = document.querySelector(selectors[s]);
+                    if (element) {
+                        if (element.tagName === 'UL' || element.classList.contains('navbar-nav')) {
+                            var li1 = document.createElement('li');
+                            li1.className = 'nav-item';
+                            li1.appendChild(lkButton);
+                            element.appendChild(li1);
+                            if (teacherButton) {
+                                var li2 = document.createElement('li');
+                                li2.className = 'nav-item';
+                                li2.appendChild(teacherButton);
+                                element.appendChild(li2);
+                            }
+                        } else {
+                            element.appendChild(lkButton);
+                            if (teacherButton) element.appendChild(teacherButton);
+                        }
+                        found = true;
+                        break;
+                    }
+                }
+            }
+            
+            // Стратегия 3: Добавляем в фиксированное положение в правом верхнем углу
+            if (!found) {
+                var container = document.createElement('div');
+                container.id = 'lk-button-container-deanpromoodle';
+                container.style.cssText = 'position: fixed; top: 70px; right: 20px; z-index: 9999; background: rgba(255,255,255,0.95); padding: 10px; border-radius: 5px; box-shadow: 0 2px 10px rgba(0,0,0,0.2);';
+                container.appendChild(lkButton);
+                if (teacherButton) {
+                    container.appendChild(document.createTextNode(' '));
+                    container.appendChild(teacherButton);
+                }
+                document.body.appendChild(container);
+            }
+        }
+        
+        // Пытаемся добавить сразу
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', addLKButton);
         } else {
             addLKButton();
         }
         
-        function addLKButton() {
-            // Ищем место для вставки кнопки - обычно это область с кнопками навигации
-            // Пытаемся найти существующие кнопки навигации (например, 'Сайт семинарии', 'Деканат')
-            var headerNav = document.querySelector('.navbar-nav, .usermenu, .header-actions, .custom-nav-buttons');
-            
-            // Если не найдено, ищем по тексту существующих кнопок
-            if (!headerNav) {
-                var buttons = document.querySelectorAll('a, button');
-                for (var i = 0; i < buttons.length; i++) {
-                    var text = buttons[i].textContent || buttons[i].innerText;
-                    if (text.indexOf('Сайт семинарии') !== -1 || text.indexOf('Деканат') !== -1) {
-                        headerNav = buttons[i].parentElement;
-                        break;
-                    }
-                }
-            }
-            
-            // Если все еще не найдено, ищем область пользователя
-            if (!headerNav) {
-                headerNav = document.querySelector('.usermenu, .user-info, [data-region=\"usermenu\"]');
-            }
-            
-            // Если нашли место, добавляем кнопку
-            if (headerNav) {
-                // Проверяем, не добавлена ли уже кнопка
-                if (document.getElementById('lk-button-deanpromoodle')) {
-                    return;
-                }
-                
-                var lkButton = document.createElement('a');
-                lkButton.id = 'lk-button-deanpromoodle';
-                lkButton.href = '" . $lkurlstring . "';
-                lkButton.className = 'btn btn-primary';
-                lkButton.style.cssText = 'margin-left: 10px; margin-right: 10px; padding: 8px 16px; background-color: #007bff; color: white; text-decoration: none; border-radius: 4px; font-weight: 500;';
-                lkButton.textContent = 'ЛК';
-                lkButton.title = 'Личный кабинет';
-                
-                // Если админ, добавляем также ссылку на teacher.php
-                " . ($isadmin ? "
-                var teacherButton = document.createElement('a');
-                teacherButton.href = '" . $teacherurlstring . "';
-                teacherButton.className = 'btn btn-secondary';
-                teacherButton.style.cssText = 'margin-left: 5px; margin-right: 10px; padding: 8px 16px; background-color: #6c757d; color: white; text-decoration: none; border-radius: 4px; font-weight: 500;';
-                teacherButton.textContent = 'Преподаватель';
-                teacherButton.title = 'Панель преподавателя';
-                
-                // Вставляем обе кнопки
-                if (headerNav.tagName === 'UL' || headerNav.classList.contains('navbar-nav')) {
-                    var li1 = document.createElement('li');
-                    li1.className = 'nav-item';
-                    li1.appendChild(lkButton);
-                    var li2 = document.createElement('li');
-                    li2.className = 'nav-item';
-                    li2.appendChild(teacherButton);
-                    headerNav.appendChild(li1);
-                    headerNav.appendChild(li2);
-                } else {
-                    headerNav.appendChild(lkButton);
-                    headerNav.appendChild(teacherButton);
-                }
-                " : "
-                // Вставляем кнопку ЛК
-                if (headerNav.tagName === 'UL' || headerNav.classList.contains('navbar-nav')) {
-                    var li = document.createElement('li');
-                    li.className = 'nav-item';
-                    li.appendChild(lkButton);
-                    headerNav.appendChild(li);
-                } else {
-                    headerNav.appendChild(lkButton);
-                }
-                ") . "
-            } else {
-                // Если не нашли подходящее место, пытаемся добавить в начало body или в существующий контейнер
-                setTimeout(function() {
-                    var body = document.body;
-                    if (body) {
-                        var container = document.createElement('div');
-                        container.id = 'lk-button-container-deanpromoodle';
-                        container.style.cssText = 'position: fixed; top: 10px; right: 10px; z-index: 9999;';
-                        container.appendChild(lkButton);
-                        " . ($isadmin ? "
-                        var teacherButton = document.createElement('a');
-                        teacherButton.href = '" . $teacherurlstring . "';
-                        teacherButton.className = 'btn btn-secondary';
-                        teacherButton.style.cssText = 'margin-left: 5px; padding: 8px 16px; background-color: #6c757d; color: white; text-decoration: none; border-radius: 4px; font-weight: 500;';
-                        teacherButton.textContent = 'Преподаватель';
-                        teacherButton.title = 'Панель преподавателя';
-                        container.appendChild(teacherButton);
-                        " : "") . "
-                        body.appendChild(container);
-                    }
-                }, 500);
-            }
-        }
+        // Также пытаемся добавить после небольшой задержки на случай динамической загрузки
+        setTimeout(addLKButton, 1000);
+        setTimeout(addLKButton, 2000);
     })();
     ";
     
