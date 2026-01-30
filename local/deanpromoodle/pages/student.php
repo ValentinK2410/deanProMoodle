@@ -743,11 +743,29 @@ if ($action == 'viewprogram' && $programid > 0) {
                             $assignmenturl = new moodle_url('/mod/assign/view.php', ['id' => $cm->id]);
                             
                             // Проверяем статус задания для студента
+                            // Получаем любую submission (не только submitted, но и draft и другие статусы)
                             $submission = $DB->get_record('assign_submission', [
                                 'assignment' => $assignment->id,
-                                'userid' => $USER->id,
-                                'status' => 'submitted'
+                                'userid' => $USER->id
                             ]);
+                            
+                            // Проверяем, есть ли файлы или текст в submission
+                            $hasfiles = false;
+                            if ($submission) {
+                                // Проверяем наличие файлов через assignsubmission_file (плагин file)
+                                $filecount = $DB->count_records_sql(
+                                    "SELECT COUNT(*) FROM {assignsubmission_file} WHERE submission = ?",
+                                    [$submission->id]
+                                );
+                                
+                                // Проверяем наличие текста через assignsubmission_onlinetext (плагин onlinetext)
+                                $textcount = $DB->count_records_sql(
+                                    "SELECT COUNT(*) FROM {assignsubmission_onlinetext} WHERE submission = ? AND onlinetext IS NOT NULL AND onlinetext != ''",
+                                    [$submission->id]
+                                );
+                                
+                                $hasfiles = ($filecount > 0 || $textcount > 0);
+                            }
                             
                             $grade = $DB->get_record('assign_grades', [
                                 'assignment' => $assignment->id,
@@ -757,17 +775,17 @@ if ($action == 'viewprogram' && $programid > 0) {
                             $statusclass = '';
                             $statustext = '';
                             
-                            // Новая логика: приоритет оценке
+                            // Логика согласно требованиям:
+                            // 1. Если есть оценка - зеленый "Чтение – сдано" (даже если файл не загружен)
                             if ($grade && $grade->grade !== null && $grade->grade >= 0) {
-                                // Есть оценка - зеленый "Чтение – сдано" (даже если файл не загружен)
                                 $statusclass = 'assignment-status-green';
                                 $statustext = 'Чтение – сдано';
-                            } elseif ($submission) {
-                                // Файл загружен, но нет оценки - желтый "Чтение – не проверено"
+                            } elseif ($hasfiles) {
+                                // 2. Если файл загружен, но нет оценки - желтый "Чтение – не проверено"
                                 $statusclass = 'assignment-status-yellow';
                                 $statustext = 'Чтение – не проверено';
                             } else {
-                                // Файл не загружен и нет оценки - красный "Чтение – не сдано"
+                                // 3. Если файл не загружен и нет оценки - красный "Чтение – не сдано"
                                 $statusclass = 'assignment-status-red';
                                 $statustext = 'Чтение – не сдано';
                             }
