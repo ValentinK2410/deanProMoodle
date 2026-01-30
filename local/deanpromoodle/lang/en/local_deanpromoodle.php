@@ -122,3 +122,7 @@ $string['lkbutton'] = 'LK';
 $string['lkbuttontitle'] = 'Personal cabinet';
 $string['teacherbutton'] = 'Teacher';
 $string['teacherbuttontitle'] = 'Teacher panel';
+
+// Student messages
+$string['noprogramsfound'] = 'Unfortunately, no programs assigned to you were found. Please contact your teacher or the dean\'s office.';
+$string['nocohortsfound'] = 'You are not a member of any study group. Please contact your teacher or the dean\'s office for enrollment.';

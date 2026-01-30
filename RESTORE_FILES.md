@@ -83,6 +83,7 @@ rm -rf temp-repo
    - Нажмите "Обновить базу данных Moodle" (Upgrade Moodle database now)
 
 2. **Проверьте права доступа:**
+
    ```bash
    sudo chown -R www-data:www-data /var/www/www-root/data/www/class.russianseminary.org/local/deanpromoodle
    sudo chmod -R 755 /var/www/www-root/data/www/class.russianseminary.org/local/deanpromoodle

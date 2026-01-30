@@ -771,7 +771,7 @@ if ($action == 'viewprogram' && $programid > 0) {
             );
             
             if (empty($studentcohorts)) {
-                echo html_writer::div('Вы не состоите ни в одной группе (когорте).', 'alert alert-info');
+                echo html_writer::div(get_string('nocohortsfound', 'local_deanpromoodle'), 'alert alert-warning');
             } else {
                 // Получаем программы, связанные с когортами студента
                 $cohortids = array_keys($studentcohorts);
@@ -792,7 +792,7 @@ if ($action == 'viewprogram' && $programid > 0) {
                 );
                 
                 if (empty($programs)) {
-                    echo html_writer::div('Ваши группы не прикреплены ни к одной программе.', 'alert alert-info');
+                    echo html_writer::div(get_string('noprogramsfound', 'local_deanpromoodle'), 'alert alert-warning');
                 } else {
                     // Стили для таблицы программ
                     echo html_writer::start_tag('style');
