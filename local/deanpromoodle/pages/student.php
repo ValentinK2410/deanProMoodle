@@ -143,10 +143,7 @@ $tab = optional_param('tab', 'courses', PARAM_ALPHA); // courses, programs
 $action = optional_param('action', '', PARAM_ALPHA); // viewprogram
 $programid = optional_param('programid', 0, PARAM_INT);
 
-// Студент может заходить только на tab=courses, редирект при попытке зайти на другие вкладки
-if ($tab != 'courses' && $action != 'viewprogram') {
-    redirect(new moodle_url('/local/deanpromoodle/pages/student.php', ['tab' => 'courses']));
-}
+// Студент может заходить на любые вкладки страницы student.php
 
 // Настройка страницы
 $urlparams = ['tab' => $tab];
