@@ -403,9 +403,9 @@ if ($action == 'viewprogram' && $programid > 0) {
     // Обычные вкладки
     switch ($tab) {
     case 'courses':
-        // Вкладка "Мои курсы"
+        // Вкладка "Мои оценки"
         echo html_writer::start_div('local-deanpromoodle-student-content', ['style' => 'margin-top: 20px;']);
-        echo html_writer::tag('h2', 'Мои курсы', ['style' => 'margin-bottom: 20px;']);
+        echo html_writer::tag('h2', 'Мои оценки', ['style' => 'margin-bottom: 20px;']);
         
         try {
             // Получаем все курсы, на которые записан студент
@@ -1013,9 +1013,9 @@ if ($action == 'viewprogram' && $programid > 0) {
         break;
     
     case 'programs':
-        // Вкладка "Мои программы"
+        // Вкладка "Личная информация и статус"
         echo html_writer::start_div('local-deanpromoodle-student-content', ['style' => 'margin-top: 20px;']);
-        echo html_writer::tag('h2', 'Мои программы', ['style' => 'margin-bottom: 20px;']);
+        echo html_writer::tag('h2', 'Личная информация и статус', ['style' => 'margin-bottom: 20px;']);
         
         try {
             // Получаем когорты, к которым принадлежит студент
