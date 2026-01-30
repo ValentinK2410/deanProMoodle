@@ -91,13 +91,17 @@ $tab = optional_param('tab', 'assignments', PARAM_ALPHA); // assignments, quizze
 $courseid = optional_param('courseid', 0, PARAM_INT);
 $page = optional_param('page', 0, PARAM_INT);
 $perpage = optional_param('perpage', 25, PARAM_INT);
+$selectedmonth = optional_param('statmonth', date('n'), PARAM_INT); // Месяц для статистики (1-12)
+$selectedyear = optional_param('statyear', date('Y'), PARAM_INT); // Год для статистики
 
 // Настройка страницы
 $PAGE->set_url(new moodle_url('/local/deanpromoodle/pages/teacher.php', [
     'tab' => $tab,
     'courseid' => $courseid,
     'page' => $page,
-    'perpage' => $perpage
+    'perpage' => $perpage,
+    'statmonth' => $selectedmonth,
+    'statyear' => $selectedyear
 ]));
 $PAGE->set_context(context_system::instance());
 // Получение заголовка с проверкой и fallback на русский
@@ -247,9 +251,13 @@ if (!empty($teacherroleids) && $studentroleid) {
     }
 }
 
-// Подсчет проверенных заданий, тестов и форумов за текущий календарный месяц
-$currentmonthstart = mktime(0, 0, 0, date('n'), 1, date('Y')); // Первый день текущего месяца
-$currentmonthend = mktime(23, 59, 59, date('n'), date('t'), date('Y')); // Последний день текущего месяца
+// Подсчет проверенных заданий, тестов и форумов за выбранный календарный месяц
+// Валидация выбранных месяца и года
+$selectedmonth = max(1, min(12, $selectedmonth)); // Ограничиваем 1-12
+$selectedyear = max(2000, min(2100, $selectedyear)); // Ограничиваем разумными значениями
+
+$selectedmonthstart = mktime(0, 0, 0, $selectedmonth, 1, $selectedyear); // Первый день выбранного месяца
+$selectedmonthend = mktime(23, 59, 59, $selectedmonth, date('t', $selectedmonthstart), $selectedyear); // Последний день выбранного месяца
 
 // Подсчет проверенных заданий за текущий месяц
 $gradedassignmentscount = 0;
@@ -282,7 +290,7 @@ if (!empty($teachercourses)) {
              WHERE ag.assignment IN ($assignmentids_placeholders)
              AND ag.timemodified >= ? AND ag.timemodified <= ?
              AND ag.grader = ?",
-            array_merge($allassignments, [$currentmonthstart, $currentmonthend, $USER->id])
+            array_merge($allassignments, [$selectedmonthstart, $selectedmonthend, $USER->id])
         );
     }
 }
@@ -314,7 +322,7 @@ if (!empty($teachercourses)) {
              WHERE qg.quiz IN ($quizids_placeholders)
              AND qg.timemodified >= ? AND qg.timemodified <= ?
              AND qa.state = 'finished'",
-            array_merge($allquizzes, [$currentmonthstart, $currentmonthend])
+            array_merge($allquizzes, [$selectedmonthstart, $selectedmonthend])
         );
     }
 }
@@ -345,7 +353,7 @@ if (!empty($teachercourses)) {
              AND p.userid = ?
              AND p.created >= ? AND p.created <= ?
              AND p.parent > 0", // Только ответы, не начальные сообщения
-            array_merge($allforums, [$USER->id, $currentmonthstart, $currentmonthend])
+            array_merge($allforums, [$USER->id, $selectedmonthstart, $selectedmonthend])
         );
     }
 }
@@ -380,21 +388,53 @@ $tabs[] = new tabobject('forums',
 
 echo $OUTPUT->tabtree($tabs, $tab);
 
-// Блок со статистикой за текущий месяц
-$monthname = strftime('%B %Y', $currentmonthstart);
+// Блок со статистикой за выбранный месяц
 $monthnameru = [
-    'January' => 'Январь', 'February' => 'Февраль', 'March' => 'Март', 'April' => 'Апрель',
-    'May' => 'Май', 'June' => 'Июнь', 'July' => 'Июль', 'August' => 'Август',
-    'September' => 'Сентябрь', 'October' => 'Октябрь', 'November' => 'Ноябрь', 'December' => 'Декабрь'
+    1 => 'Январь', 2 => 'Февраль', 3 => 'Март', 4 => 'Апрель',
+    5 => 'Май', 6 => 'Июнь', 7 => 'Июль', 8 => 'Август',
+    9 => 'Сентябрь', 10 => 'Октябрь', 11 => 'Ноябрь', 12 => 'Декабрь'
 ];
-$monthnameru_key = date('F', $currentmonthstart);
-$monthdisplay = isset($monthnameru[$monthnameru_key]) ? $monthnameru[$monthnameru_key] . ' ' . date('Y', $currentmonthstart) : $monthname;
+$monthdisplay = isset($monthnameru[$selectedmonth]) ? $monthnameru[$selectedmonth] . ' ' . $selectedyear : date('F Y', $selectedmonthstart);
 
+// Форма выбора месяца и года
 echo html_writer::start_div('alert alert-info', ['style' => 'margin-top: 20px; margin-bottom: 20px; padding: 15px;']);
-echo html_writer::tag('strong', 'Статистика за ' . $monthdisplay . ': ', ['style' => 'margin-right: 15px;']);
+echo html_writer::start_tag('form', [
+    'method' => 'get',
+    'action' => new moodle_url('/local/deanpromoodle/pages/teacher.php'),
+    'class' => 'form-inline',
+    'style' => 'margin-bottom: 10px;'
+]);
+echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'tab', 'value' => $tab]);
+echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'courseid', 'value' => $courseid]);
+
+echo html_writer::tag('strong', 'Статистика за: ', ['style' => 'margin-right: 10px;']);
+
+// Выбор месяца
+$monthoptions = [];
+foreach ($monthnameru as $num => $name) {
+    $monthoptions[$num] = $name;
+}
+echo html_writer::label('Месяц: ', 'statmonth');
+echo html_writer::select($monthoptions, 'statmonth', $selectedmonth, false, ['class' => 'form-control', 'style' => 'display: inline-block; margin-left: 5px; margin-right: 10px;']);
+
+// Выбор года
+$yearoptions = [];
+$currentyear = date('Y');
+for ($y = $currentyear - 5; $y <= $currentyear + 1; $y++) {
+    $yearoptions[$y] = $y;
+}
+echo html_writer::label('Год: ', 'statyear');
+echo html_writer::select($yearoptions, 'statyear', $selectedyear, false, ['class' => 'form-control', 'style' => 'display: inline-block; margin-left: 5px; margin-right: 10px;']);
+
+echo html_writer::empty_tag('input', ['type' => 'submit', 'value' => 'Показать', 'class' => 'btn btn-primary', 'style' => 'margin-left: 10px;']);
+echo html_writer::end_tag('form');
+
+// Отображение статистики
+echo html_writer::start_div('', ['style' => 'margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(0,0,0,0.1);']);
 echo html_writer::tag('span', 'Проверено заданий: ' . $gradedassignmentscount, ['style' => 'margin-right: 20px; color: #28a745; font-weight: 500;']);
 echo html_writer::tag('span', 'Проверено тестов: ' . $gradedquizzescount, ['style' => 'margin-right: 20px; color: #007bff; font-weight: 500;']);
 echo html_writer::tag('span', 'Ответов на форумах: ' . $forumrepliescount, ['style' => 'color: #17a2b8; font-weight: 500;']);
+echo html_writer::end_div();
 echo html_writer::end_div();
 
 // Фильтр по курсам
