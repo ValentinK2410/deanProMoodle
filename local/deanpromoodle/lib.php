@@ -276,50 +276,109 @@ function local_deanpromoodle_before_footer() {
             teacherButton.title = 'Панель преподавателя';
             " : "") . "
             
-            // Стратегия 1: Ищем по тексту существующих кнопок ('Сайт семинарии', 'Деканат')
+            // Стратегия 1: Ищем контейнер moodle-sso-buttons-container и добавляем кнопки сразу после него
             var found = false;
-            var allLinks = document.querySelectorAll('a, button');
-            for (var i = 0; i < allLinks.length; i++) {
-                var text = (allLinks[i].textContent || allLinks[i].innerText || '').trim();
-                if (text.indexOf('Сайт семинарии') !== -1 || text.indexOf('Деканат') !== -1) {
-                    var parent = allLinks[i].parentElement;
-                    // Ищем контейнер с кнопками
-                    while (parent && parent !== document.body) {
-                        if (parent.classList && (parent.classList.contains('navbar-nav') || parent.classList.contains('nav') || parent.tagName === 'NAV' || parent.tagName === 'HEADER')) {
-                            if (parent.tagName === 'UL' || parent.classList.contains('navbar-nav')) {
-                                var li1 = document.createElement('li');
-                                li1.className = 'nav-item';
-                                li1.appendChild(lkButton);
-                                parent.appendChild(li1);
-                                if (teacherButton) {
-                                    var li2 = document.createElement('li');
-                                    li2.className = 'nav-item';
-                                    li2.appendChild(teacherButton);
-                                    parent.appendChild(li2);
+            var ssoContainer = document.querySelector('.moodle-sso-buttons-container');
+            if (ssoContainer) {
+                // Копируем стили с кнопок внутри контейнера
+                var ssoButtons = ssoContainer.querySelectorAll('a.sso-button');
+                if (ssoButtons.length > 0) {
+                    var firstButton = ssoButtons[0];
+                    var computed = window.getComputedStyle(firstButton);
+                    // Применяем стили к нашим кнопкам
+                    lkButton.style.paddingTop = computed.paddingTop;
+                    lkButton.style.paddingRight = computed.paddingRight;
+                    lkButton.style.paddingBottom = computed.paddingBottom;
+                    lkButton.style.paddingLeft = computed.paddingLeft;
+                    lkButton.style.height = computed.height;
+                    lkButton.style.minHeight = computed.minHeight;
+                    lkButton.style.maxHeight = computed.maxHeight;
+                    lkButton.style.lineHeight = computed.lineHeight;
+                    lkButton.style.fontSize = computed.fontSize;
+                    lkButton.style.boxSizing = computed.boxSizing;
+                    lkButton.style.display = computed.display;
+                    lkButton.style.verticalAlign = computed.verticalAlign;
+                    lkButton.style.marginLeft = '10px';
+                    lkButton.style.marginRight = '10px';
+                    
+                    if (teacherButton) {
+                        teacherButton.style.paddingTop = computed.paddingTop;
+                        teacherButton.style.paddingRight = computed.paddingRight;
+                        teacherButton.style.paddingBottom = computed.paddingBottom;
+                        teacherButton.style.paddingLeft = computed.paddingLeft;
+                        teacherButton.style.height = computed.height;
+                        teacherButton.style.minHeight = computed.minHeight;
+                        teacherButton.style.maxHeight = computed.maxHeight;
+                        teacherButton.style.lineHeight = computed.lineHeight;
+                        teacherButton.style.fontSize = computed.fontSize;
+                        teacherButton.style.boxSizing = computed.boxSizing;
+                        teacherButton.style.display = computed.display;
+                        teacherButton.style.verticalAlign = computed.verticalAlign;
+                        teacherButton.style.marginLeft = '5px';
+                        teacherButton.style.marginRight = '10px';
+                    }
+                }
+                
+                // Добавляем кнопки сразу после контейнера
+                if (ssoContainer.nextSibling) {
+                    ssoContainer.parentElement.insertBefore(lkButton, ssoContainer.nextSibling);
+                    if (teacherButton) {
+                        ssoContainer.parentElement.insertBefore(teacherButton, ssoContainer.nextSibling);
+                    }
+                } else {
+                    ssoContainer.parentElement.appendChild(lkButton);
+                    if (teacherButton) {
+                        ssoContainer.parentElement.appendChild(teacherButton);
+                    }
+                }
+                found = true;
+            }
+            
+            // Стратегия 2: Если контейнер не найден, ищем по тексту существующих кнопок
+            if (!found) {
+                var allLinks = document.querySelectorAll('a, button');
+                for (var i = 0; i < allLinks.length; i++) {
+                    var text = (allLinks[i].textContent || allLinks[i].innerText || '').trim();
+                    if (text.indexOf('Сайт семинарии') !== -1 || text.indexOf('Деканат') !== -1) {
+                        var parent = allLinks[i].parentElement;
+                        // Ищем контейнер с кнопками
+                        while (parent && parent !== document.body) {
+                            if (parent.classList && (parent.classList.contains('navbar-nav') || parent.classList.contains('nav') || parent.tagName === 'NAV' || parent.tagName === 'HEADER')) {
+                                if (parent.tagName === 'UL' || parent.classList.contains('navbar-nav')) {
+                                    var li1 = document.createElement('li');
+                                    li1.className = 'nav-item';
+                                    li1.appendChild(lkButton);
+                                    parent.appendChild(li1);
+                                    if (teacherButton) {
+                                        var li2 = document.createElement('li');
+                                        li2.className = 'nav-item';
+                                        li2.appendChild(teacherButton);
+                                        parent.appendChild(li2);
+                                    }
+                                } else {
+                                    parent.appendChild(lkButton);
+                                    if (teacherButton) parent.appendChild(teacherButton);
                                 }
+                                found = true;
+                                break;
+                            }
+                            parent = parent.parentElement;
+                        }
+                        if (found) break;
+                        
+                        // Если не нашли контейнер, добавляем рядом с найденной кнопкой
+                        if (!found) {
+                            var nextSibling = allLinks[i].nextSibling;
+                            if (nextSibling) {
+                                allLinks[i].parentElement.insertBefore(lkButton, nextSibling);
+                                if (teacherButton) allLinks[i].parentElement.insertBefore(teacherButton, nextSibling);
                             } else {
-                                parent.appendChild(lkButton);
-                                if (teacherButton) parent.appendChild(teacherButton);
+                                allLinks[i].parentElement.appendChild(lkButton);
+                                if (teacherButton) allLinks[i].parentElement.appendChild(teacherButton);
                             }
                             found = true;
                             break;
                         }
-                        parent = parent.parentElement;
-                    }
-                    if (found) break;
-                    
-                    // Если не нашли контейнер, добавляем рядом с найденной кнопкой
-                    if (!found) {
-                        var nextSibling = allLinks[i].nextSibling;
-                        if (nextSibling) {
-                            allLinks[i].parentElement.insertBefore(lkButton, nextSibling);
-                            if (teacherButton) allLinks[i].parentElement.insertBefore(teacherButton, nextSibling);
-                        } else {
-                            allLinks[i].parentElement.appendChild(lkButton);
-                            if (teacherButton) allLinks[i].parentElement.appendChild(teacherButton);
-                        }
-                        found = true;
-                        break;
                     }
                 }
             }
