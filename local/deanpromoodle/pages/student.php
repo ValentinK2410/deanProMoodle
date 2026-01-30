@@ -81,10 +81,72 @@ if (!$hasaccess) {
     require_capability('local/deanpromoodle:viewstudent', $context);
 }
 
+// Проверка роли пользователя и редирект при необходимости
+global $USER;
+$isadmin = false;
+$isteacher = false;
+$isstudent = false;
+
+// Проверяем, является ли пользователь админом
+if (has_capability('moodle/site:config', $context) || has_capability('local/deanpromoodle:viewadmin', $context)) {
+    $isadmin = true;
+    // Админ не может заходить на страницу студента - редирект на admin.php
+    redirect(new moodle_url('/local/deanpromoodle/pages/admin.php'));
+}
+
+// Проверяем, является ли пользователь преподавателем
+$teacherroles = ['teacher', 'editingteacher', 'coursecreator'];
+$roles = get_user_roles($context, $USER->id, false);
+foreach ($roles as $role) {
+    if (in_array($role->shortname, $teacherroles)) {
+        $isteacher = true;
+        break;
+    }
+}
+if (!$isteacher) {
+    $systemcontext = context_system::instance();
+    $systemroles = get_user_roles($systemcontext, $USER->id, false);
+    foreach ($systemroles as $role) {
+        if (in_array($role->shortname, $teacherroles)) {
+            $isteacher = true;
+            break;
+        }
+    }
+}
+
+if ($isteacher && !$isadmin) {
+    // Преподаватель не может заходить на страницу студента - редирект на teacher.php
+    redirect(new moodle_url('/local/deanpromoodle/pages/teacher.php'));
+}
+
+// Проверяем, является ли пользователь студентом
+$studentroles = ['student'];
+foreach ($roles as $role) {
+    if (in_array($role->shortname, $studentroles)) {
+        $isstudent = true;
+        break;
+    }
+}
+if (!$isstudent) {
+    $systemcontext = context_system::instance();
+    $systemroles = get_user_roles($systemcontext, $USER->id, false);
+    foreach ($systemroles as $role) {
+        if (in_array($role->shortname, $studentroles)) {
+            $isstudent = true;
+            break;
+        }
+    }
+}
+
 // Получение параметров
 $tab = optional_param('tab', 'courses', PARAM_ALPHA); // courses, programs
 $action = optional_param('action', '', PARAM_ALPHA); // viewprogram
 $programid = optional_param('programid', 0, PARAM_INT);
+
+// Студент может заходить только на tab=courses, редирект при попытке зайти на другие вкладки
+if ($tab != 'courses' && $action != 'viewprogram') {
+    redirect(new moodle_url('/local/deanpromoodle/pages/student.php', ['tab' => 'courses']));
+}
 
 // Настройка страницы
 $urlparams = ['tab' => $tab];

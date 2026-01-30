@@ -69,6 +69,69 @@ if (!$hasaccess) {
     require_capability('local/deanpromoodle:viewadmin', $context);
 }
 
+// Проверка роли пользователя и редирект при необходимости
+global $USER;
+$isadmin = false;
+$isteacher = false;
+$isstudent = false;
+
+// Проверяем, является ли пользователь админом
+if (has_capability('moodle/site:config', $context) || has_capability('local/deanpromoodle:viewadmin', $context)) {
+    $isadmin = true;
+}
+
+// Если пользователь не админ, редиректим на соответствующую страницу
+if (!$isadmin) {
+    // Проверяем, является ли пользователь преподавателем
+    $teacherroles = ['teacher', 'editingteacher', 'coursecreator'];
+    $roles = get_user_roles($context, $USER->id, false);
+    foreach ($roles as $role) {
+        if (in_array($role->shortname, $teacherroles)) {
+            $isteacher = true;
+            break;
+        }
+    }
+    if (!$isteacher) {
+        $systemcontext = context_system::instance();
+        $systemroles = get_user_roles($systemcontext, $USER->id, false);
+        foreach ($systemroles as $role) {
+            if (in_array($role->shortname, $teacherroles)) {
+                $isteacher = true;
+                break;
+            }
+        }
+    }
+    
+    // Проверяем, является ли пользователь студентом
+    $studentroles = ['student'];
+    foreach ($roles as $role) {
+        if (in_array($role->shortname, $studentroles)) {
+            $isstudent = true;
+            break;
+        }
+    }
+    if (!$isstudent) {
+        $systemcontext = context_system::instance();
+        $systemroles = get_user_roles($systemcontext, $USER->id, false);
+        foreach ($systemroles as $role) {
+            if (in_array($role->shortname, $studentroles)) {
+                $isstudent = true;
+                break;
+            }
+        }
+    }
+    
+    // Редирект в зависимости от роли
+    if ($isteacher && !$isadmin) {
+        redirect(new moodle_url('/local/deanpromoodle/pages/teacher.php'));
+    } elseif ($isstudent && !$isteacher && !$isadmin) {
+        redirect(new moodle_url('/local/deanpromoodle/pages/student.php', ['tab' => 'courses']));
+    } else {
+        // Если не определено, редирект на главную страницу Moodle
+        redirect(new moodle_url('/'));
+    }
+}
+
 // Получение параметров
 $tab = optional_param('tab', 'history', PARAM_ALPHA); // history, teachers, students, subjects, programs, categories
 $teacherid = optional_param('teacherid', 0, PARAM_INT);

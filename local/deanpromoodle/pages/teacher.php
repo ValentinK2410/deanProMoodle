@@ -86,6 +86,63 @@ if (!$hasaccess) {
     require_capability('local/deanpromoodle:viewteacher', $context);
 }
 
+// Проверка роли пользователя и редирект при необходимости
+global $USER;
+$isadmin = false;
+$isteacher = false;
+$isstudent = false;
+
+// Проверяем, является ли пользователь админом
+if (has_capability('moodle/site:config', $context) || has_capability('local/deanpromoodle:viewadmin', $context)) {
+    $isadmin = true;
+    // Админ может заходить на teacher.php, но если он пытается зайти как преподаватель, оставляем доступ
+    // Админ также может заходить на admin.php
+}
+
+// Проверяем, является ли пользователь преподавателем
+$teacherroles = ['teacher', 'editingteacher', 'coursecreator'];
+$roles = get_user_roles($context, $USER->id, false);
+foreach ($roles as $role) {
+    if (in_array($role->shortname, $teacherroles)) {
+        $isteacher = true;
+        break;
+    }
+}
+if (!$isteacher) {
+    $systemcontext = context_system::instance();
+    $systemroles = get_user_roles($systemcontext, $USER->id, false);
+    foreach ($systemroles as $role) {
+        if (in_array($role->shortname, $teacherroles)) {
+            $isteacher = true;
+            break;
+        }
+    }
+}
+
+// Проверяем, является ли пользователь студентом
+$studentroles = ['student'];
+foreach ($roles as $role) {
+    if (in_array($role->shortname, $studentroles)) {
+        $isstudent = true;
+        break;
+    }
+}
+if (!$isstudent) {
+    $systemcontext = context_system::instance();
+    $systemroles = get_user_roles($systemcontext, $USER->id, false);
+    foreach ($systemroles as $role) {
+        if (in_array($role->shortname, $studentroles)) {
+            $isstudent = true;
+            break;
+        }
+    }
+}
+
+// Если пользователь только студент (не преподаватель и не админ), редирект на student.php
+if ($isstudent && !$isteacher && !$isadmin) {
+    redirect(new moodle_url('/local/deanpromoodle/pages/student.php', ['tab' => 'courses']));
+}
+
 // Получение параметров
 $tab = optional_param('tab', 'assignments', PARAM_ALPHA); // assignments, quizzes, forums
 $courseid = optional_param('courseid', 0, PARAM_INT);
