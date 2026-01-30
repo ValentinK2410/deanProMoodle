@@ -252,16 +252,12 @@ function local_deanpromoodle_before_footer() {
                 buttonsContainer.appendChild(teacherButton);
             }
             
-            // Стратегия 1: Ищем контейнер moodle-sso-buttons-container и добавляем кнопки сразу после него
+            // Стратегия 1: Ищем контейнер moodle-sso-buttons-container и добавляем кнопки внутрь него
             var found = false;
             var ssoContainer = document.querySelector('.moodle-sso-buttons-container');
             if (ssoContainer) {
-                // Добавляем контейнер с кнопками сразу после блока moodle-sso-buttons-container
-                if (ssoContainer.nextSibling) {
-                    ssoContainer.parentElement.insertBefore(buttonsContainer, ssoContainer.nextSibling);
-                } else {
-                    ssoContainer.parentElement.appendChild(buttonsContainer);
-                }
+                // Добавляем контейнер с кнопками внутрь блока moodle-sso-buttons-container
+                ssoContainer.appendChild(buttonsContainer);
                 found = true;
             }
             
