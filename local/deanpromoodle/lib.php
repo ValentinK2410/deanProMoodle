@@ -268,6 +268,7 @@ function local_deanpromoodle_before_footer() {
             var teacherButton = null;
             " . ($isadmin ? "
             teacherButton = document.createElement('a');
+            teacherButton.id = 'teacher-button-deanpromoodle';
             teacherButton.href = '" . $teacherurlstring . "';
             teacherButton.className = 'btn btn-secondary';
             teacherButton.style.cssText = 'margin-left: 5px; margin-right: 10px; background-color: #6c757d; color: white; text-decoration: none; border-radius: 4px; font-weight: 500; border: none; ' + buttonStyles;
@@ -374,16 +375,139 @@ function local_deanpromoodle_before_footer() {
             }
         }
         
-        // Пытаемся добавить сразу
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', addLKButton);
-        } else {
-            addLKButton();
+        // Функция для получения точных стилей существующей кнопки
+        function getButtonStyles() {
+            var existingButton = null;
+            var allButtons = document.querySelectorAll('a, button');
+            for (var b = 0; b < allButtons.length; b++) {
+                var btnText = (allButtons[b].textContent || allButtons[b].innerText || '').trim();
+                // Ищем именно кнопки 'Сайт семинарии' или 'Деканат'
+                if (btnText === 'Сайт семинарии' || btnText === 'Деканат') {
+                    existingButton = allButtons[b];
+                    break;
+                }
+            }
+            
+            if (existingButton && window.getComputedStyle) {
+                var computed = window.getComputedStyle(existingButton);
+                return {
+                    paddingTop: computed.paddingTop,
+                    paddingRight: computed.paddingRight,
+                    paddingBottom: computed.paddingBottom,
+                    paddingLeft: computed.paddingLeft,
+                    height: computed.height,
+                    minHeight: computed.minHeight,
+                    maxHeight: computed.maxHeight,
+                    lineHeight: computed.lineHeight,
+                    fontSize: computed.fontSize,
+                    boxSizing: computed.boxSizing,
+                    display: computed.display,
+                    verticalAlign: 'middle'
+                };
+            }
+            return null;
         }
         
-        // Также пытаемся добавить после небольшой задержки на случай динамической загрузки
-        setTimeout(addLKButton, 1000);
-        setTimeout(addLKButton, 2000);
+        // Пытаемся добавить кнопку с несколькими попытками
+        function tryAddButton(attempt) {
+            attempt = attempt || 0;
+            if (attempt > 5) return; // Максимум 5 попыток
+            
+            var styles = getButtonStyles();
+            if (!styles && attempt < 3) {
+                // Если стили не найдены, ждем и пробуем снова
+                setTimeout(function() { tryAddButton(attempt + 1); }, 500);
+                return;
+            }
+            
+            // Если кнопка уже добавлена, обновляем ее стили
+            var existingLK = document.getElementById('lk-button-deanpromoodle');
+            if (existingLK && styles) {
+                existingLK.style.paddingTop = styles.paddingTop;
+                existingLK.style.paddingRight = styles.paddingRight;
+                existingLK.style.paddingBottom = styles.paddingBottom;
+                existingLK.style.paddingLeft = styles.paddingLeft;
+                existingLK.style.height = styles.height;
+                existingLK.style.minHeight = styles.minHeight;
+                existingLK.style.maxHeight = styles.maxHeight;
+                existingLK.style.lineHeight = styles.lineHeight;
+                existingLK.style.fontSize = styles.fontSize;
+                existingLK.style.boxSizing = styles.boxSizing;
+                existingLK.style.display = styles.display;
+                existingLK.style.verticalAlign = styles.verticalAlign;
+                
+                if (teacherButton && document.getElementById('teacher-button-deanpromoodle')) {
+                    var existingTeacher = document.getElementById('teacher-button-deanpromoodle');
+                    existingTeacher.style.paddingTop = styles.paddingTop;
+                    existingTeacher.style.paddingRight = styles.paddingRight;
+                    existingTeacher.style.paddingBottom = styles.paddingBottom;
+                    existingTeacher.style.paddingLeft = styles.paddingLeft;
+                    existingTeacher.style.height = styles.height;
+                    existingTeacher.style.minHeight = styles.minHeight;
+                    existingTeacher.style.maxHeight = styles.maxHeight;
+                    existingTeacher.style.lineHeight = styles.lineHeight;
+                    existingTeacher.style.fontSize = styles.fontSize;
+                    existingTeacher.style.boxSizing = styles.boxSizing;
+                    existingTeacher.style.display = styles.display;
+                    existingTeacher.style.verticalAlign = styles.verticalAlign;
+                }
+                return;
+            }
+            
+            // Если кнопка еще не добавлена, добавляем ее
+            if (!existingLK) {
+                addLKButton();
+                // После добавления обновляем стили
+                setTimeout(function() {
+                    var btn = document.getElementById('lk-button-deanpromoodle');
+                    if (btn && styles) {
+                        btn.style.paddingTop = styles.paddingTop;
+                        btn.style.paddingRight = styles.paddingRight;
+                        btn.style.paddingBottom = styles.paddingBottom;
+                        btn.style.paddingLeft = styles.paddingLeft;
+                        btn.style.height = styles.height;
+                        btn.style.minHeight = styles.minHeight;
+                        btn.style.maxHeight = styles.maxHeight;
+                        btn.style.lineHeight = styles.lineHeight;
+                        btn.style.fontSize = styles.fontSize;
+                        btn.style.boxSizing = styles.boxSizing;
+                        btn.style.display = styles.display;
+                        btn.style.verticalAlign = styles.verticalAlign;
+                    }
+                    if (teacherButton) {
+                        var tbtn = document.getElementById('teacher-button-deanpromoodle');
+                        if (tbtn && styles) {
+                            tbtn.style.paddingTop = styles.paddingTop;
+                            tbtn.style.paddingRight = styles.paddingRight;
+                            tbtn.style.paddingBottom = styles.paddingBottom;
+                            tbtn.style.paddingLeft = styles.paddingLeft;
+                            tbtn.style.height = styles.height;
+                            tbtn.style.minHeight = styles.minHeight;
+                            tbtn.style.maxHeight = styles.maxHeight;
+                            tbtn.style.lineHeight = styles.lineHeight;
+                            tbtn.style.fontSize = styles.fontSize;
+                            tbtn.style.boxSizing = styles.boxSizing;
+                            tbtn.style.display = styles.display;
+                            tbtn.style.verticalAlign = styles.verticalAlign;
+                        }
+                    }
+                }, 100);
+            }
+        }
+        
+        // Пытаемся добавить сразу
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function() {
+                setTimeout(function() { tryAddButton(0); }, 100);
+            });
+        } else {
+            setTimeout(function() { tryAddButton(0); }, 100);
+        }
+        
+        // Также пытаемся добавить после задержек на случай динамической загрузки
+        setTimeout(function() { tryAddButton(0); }, 500);
+        setTimeout(function() { tryAddButton(0); }, 1000);
+        setTimeout(function() { tryAddButton(0); }, 2000);
     })();
     ";
     
