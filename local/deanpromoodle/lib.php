@@ -206,11 +206,11 @@ function local_deanpromoodle_before_footer() {
         $teacherurlstring = $teacherurl->out(false);
     }
     
-    // Подготавливаем тексты для кнопок с правильным экранированием
-    $lkButtonText = json_encode('ЛК', JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    $lkButtonTitle = json_encode('Личный кабинет', JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    $teacherButtonText = json_encode('Преподаватель', JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    $teacherButtonTitle = json_encode('Панель преподавателя', JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    // Prepare button texts
+    $lkButtonTextRaw = 'ЛК';
+    $lkButtonTitleRaw = 'Личный кабинет';
+    $teacherButtonTextRaw = 'Преподаватель';
+    $teacherButtonTitleRaw = 'Панель преподавателя';
     
     $js = "
     (function() {
@@ -237,8 +237,8 @@ function local_deanpromoodle_before_footer() {
             lkButton.href = " . json_encode($lkurlstring, JSON_UNESCAPED_SLASHES) . ";
             lkButton.className = 'deanpromoodle-button deanpromoodle-button-lk';
             lkButton.style.cssText = 'display: inline-block; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 14px; font-weight: 500; transition: 0.3s; cursor: pointer; border: medium; white-space: nowrap; color: white; margin-left: 10px; margin-right: 10px; background-color: rgb(0, 123, 255);';
-            lkButton.textContent = " . $lkButtonText . ";
-            lkButton.title = " . $lkButtonTitle . ";
+            lkButton.textContent = " . json_encode($lkButtonTextRaw, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ";
+            lkButton.title = " . json_encode($lkButtonTitleRaw, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ";
             
             // Add LK button to container
             ssoContainer.appendChild(lkButton);
@@ -250,8 +250,8 @@ function local_deanpromoodle_before_footer() {
             teacherButton.href = " . json_encode($teacherurlstring, JSON_UNESCAPED_SLASHES) . ";
             teacherButton.className = 'deanpromoodle-button deanpromoodle-button-teacher';
             teacherButton.style.cssText = 'display: inline-block; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 14px; font-weight: 500; transition: 0.3s; cursor: pointer; border: medium; white-space: nowrap; color: white; margin-left: 5px; margin-right: 10px; background-color: rgb(108, 117, 125);';
-            teacherButton.textContent = " . $teacherButtonText . ";
-            teacherButton.title = " . $teacherButtonTitle . ";
+            teacherButton.textContent = " . json_encode($teacherButtonTextRaw, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ";
+            teacherButton.title = " . json_encode($teacherButtonTitleRaw, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ";
             
             // Add Teacher button to container
             ssoContainer.appendChild(teacherButton);
