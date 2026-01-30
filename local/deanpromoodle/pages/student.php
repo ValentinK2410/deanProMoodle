@@ -1082,6 +1082,8 @@ if ($action == 'viewprogram' && $programid > 0) {
         // Фото студента
         $userpicture = $OUTPUT->user_picture($USER, ['size' => 100, 'class' => 'userpicture']);
         echo html_writer::div($userpicture, '', ['style' => 'margin-right: 20px;']);
+        // ФИО и email студента
+        echo html_writer::start_div('', ['style' => 'flex: 1;']);
         // ФИО студента как ссылка на профиль
         $profileurl = new moodle_url('/user/profile.php', ['id' => $USER->id]);
         echo html_writer::tag('h1', 
@@ -1091,6 +1093,17 @@ if ($action == 'viewprogram' && $programid > 0) {
             ]), 
             ['style' => 'margin: 0;']
         );
+        // Email студента
+        if (!empty($USER->email)) {
+            echo html_writer::tag('div', 
+                html_writer::link('mailto:' . htmlspecialchars($USER->email, ENT_QUOTES, 'UTF-8'), 
+                    htmlspecialchars($USER->email, ENT_QUOTES, 'UTF-8'), 
+                    ['style' => 'color: #6c757d; text-decoration: none; font-size: 1.1em; margin-top: 5px;']
+                ), 
+                ['style' => 'margin-top: 5px;']
+            );
+        }
+        echo html_writer::end_div();
         echo html_writer::end_div();
         
         // Подвкладки
