@@ -880,8 +880,13 @@ if ($action == 'viewprogram' && $programid > 0) {
                             
                             // Показываем только если не сдано (нет оценки и нет файлов)
                             if (!($grade && $grade->grade !== null && $grade->grade >= 0) && !$hasfiles) {
-                                $statustext = 'Сдача письменной работы';
-                                $badgecontent = htmlspecialchars($statustext, ENT_QUOTES, 'UTF-8');
+                                // Если название точно "Сдача письменной работы" - используем его, иначе оригинальное название
+                                if (mb_strtolower(trim($assignment->name)) == 'сдача письменной работы') {
+                                    $statustext = 'Сдача письменной работы';
+                                } else {
+                                    $statustext = htmlspecialchars($assignment->name, ENT_QUOTES, 'UTF-8');
+                                }
+                                $badgecontent = $statustext;
                                 $statusitems[] = '<span class="badge assignment-status-item assignment-status-red">' . 
                                     html_writer::link($assignmenturl, $badgecontent, ['target' => '_blank']) . '</span>';
                             }
