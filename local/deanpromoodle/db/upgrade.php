@@ -143,7 +143,7 @@ function xmldb_local_deanpromoodle_upgrade($oldversion) {
             
             $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
             $table->add_key('userid', XMLDB_KEY_FOREIGN, ['userid'], 'user', ['id']);
-            $table->add_index('userid', XMLDB_INDEX_UNIQUE, ['userid']);
+            $table->add_index('userid_unique', XMLDB_INDEX_UNIQUE, ['userid']);
             
             $dbman->create_table($table);
         }
