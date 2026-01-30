@@ -382,7 +382,7 @@ function local_deanpromoodle_before_footer() {
                 }
             }
             
-            // Стратегия 2: Ищем область пользователя или навигации
+            // Стратегия 3: Ищем область пользователя или навигации
             if (!found) {
                 var selectors = [
                     '.usermenu',
@@ -399,19 +399,12 @@ function local_deanpromoodle_before_footer() {
                     var element = document.querySelector(selectors[s]);
                     if (element) {
                         if (element.tagName === 'UL' || element.classList.contains('navbar-nav')) {
-                            var li1 = document.createElement('li');
-                            li1.className = 'nav-item';
-                            li1.appendChild(lkButton);
-                            element.appendChild(li1);
-                            if (teacherButton) {
-                                var li2 = document.createElement('li');
-                                li2.className = 'nav-item';
-                                li2.appendChild(teacherButton);
-                                element.appendChild(li2);
-                            }
+                            var li = document.createElement('li');
+                            li.className = 'nav-item';
+                            li.appendChild(buttonsContainer);
+                            element.appendChild(li);
                         } else {
-                            element.appendChild(lkButton);
-                            if (teacherButton) element.appendChild(teacherButton);
+                            element.appendChild(buttonsContainer);
                         }
                         found = true;
                         break;
@@ -419,7 +412,7 @@ function local_deanpromoodle_before_footer() {
                 }
             }
             
-            // Стратегия 3: Добавляем в фиксированное положение в правом верхнем углу
+            // Стратегия 4: Добавляем в фиксированное положение в правом верхнем углу
             if (!found) {
                 var container = document.createElement('div');
                 container.id = 'lk-button-container-deanpromoodle';
