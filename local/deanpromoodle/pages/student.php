@@ -557,6 +557,7 @@ if ($action == 'viewprogram' && $programid > 0) {
                     // Функция для получения итоговой оценки курса
                     $coursegrade = null;
                     $finalgradepercent = null;
+                    $courseitem = null;
                     try {
                         $courseitem = grade_item::fetch_course_item($course->id);
                         if ($courseitem) {
@@ -570,6 +571,7 @@ if ($action == 'viewprogram' && $programid > 0) {
                         }
                     } catch (\Exception $e) {
                         // Игнорируем ошибки получения оценки
+                        $courseitem = null;
                     }
                     
                     // Функция для проверки, все ли задания имеют оценку
