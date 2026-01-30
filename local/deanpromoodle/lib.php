@@ -206,11 +206,11 @@ function local_deanpromoodle_before_footer() {
         $teacherurlstring = $teacherurl->out(false);
     }
     
-    // Prepare button texts
-    $lkButtonTextRaw = 'ЛК';
-    $lkButtonTitleRaw = 'Личный кабинет';
-    $teacherButtonTextRaw = 'Преподаватель';
-    $teacherButtonTitleRaw = 'Панель преподавателя';
+    // Get button texts from language files
+    $lkButtonTextRaw = get_string('lkbutton', 'local_deanpromoodle');
+    $lkButtonTitleRaw = get_string('lkbuttontitle', 'local_deanpromoodle');
+    $teacherButtonTextRaw = get_string('teacherbutton', 'local_deanpromoodle');
+    $teacherButtonTitleRaw = get_string('teacherbuttontitle', 'local_deanpromoodle');
     
     $js = "
     (function() {

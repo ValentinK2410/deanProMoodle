@@ -127,3 +127,9 @@ $string['searchcohort'] = 'Поиск когорты';
 $string['searchcourse'] = 'Поиск курса';
 $string['searchprogram'] = 'Поиск программы';
 $string['searchsubject'] = 'Поиск предмета';
+
+// Тексты кнопок
+$string['lkbutton'] = 'ЛК';
+$string['lkbuttontitle'] = 'Личный кабинет';
+$string['teacherbutton'] = 'Преподаватель';
+$string['teacherbuttontitle'] = 'Панель преподавателя';

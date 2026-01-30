@@ -116,3 +116,9 @@ $string['searchcohort'] = 'Search cohort';
 $string['searchcourse'] = 'Search course';
 $string['searchprogram'] = 'Search program';
 $string['searchsubject'] = 'Search subject';
+
+// Button texts
+$string['lkbutton'] = 'LK';
+$string['lkbuttontitle'] = 'Personal cabinet';
+$string['teacherbutton'] = 'Teacher';
+$string['teacherbuttontitle'] = 'Teacher panel';
