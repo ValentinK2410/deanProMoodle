@@ -632,12 +632,16 @@ if ($action == 'viewprogram' && $programid > 0) {
                         $completionstatus = 'Не завершен';
                         $completionclass = 'completion-status-not-completed';
                     } elseif ($finalgradepercent >= 70) {
-                        // Если есть задания и не все оценены - частично завершен
-                        if ($hasassignments && !$allassignmentsgraded) {
+                        // Если нет заданий в курсе - не завершен
+                        if (!$hasassignments) {
+                            $completionstatus = 'Не завершен';
+                            $completionclass = 'completion-status-not-completed';
+                        } elseif (!$allassignmentsgraded) {
+                            // Есть задания и не все оценены - частично завершен
                             $completionstatus = 'Завершен частично';
                             $completionclass = 'completion-status-partial';
                         } else {
-                            // Нет заданий или все оценены - полностью завершен
+                            // Все задания оценены - полностью завершен
                             $completionstatus = 'Завершен полностью';
                             $completionclass = 'completion-status-completed';
                         }
