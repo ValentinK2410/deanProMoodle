@@ -219,44 +219,6 @@ function local_deanpromoodle_before_footer() {
                 return;
             }
             
-            // Ищем существующие кнопки для копирования стилей
-            var existingButton = null;
-            var allButtons = document.querySelectorAll('a, button');
-            for (var b = 0; b < allButtons.length; b++) {
-                var btnText = (allButtons[b].textContent || allButtons[b].innerText || '').trim();
-                // Ищем именно кнопки 'Сайт семинарии' или 'Деканат' для точного совпадения
-                if (btnText.indexOf('Сайт семинарии') !== -1 || btnText.indexOf('Деканат') !== -1) {
-                    existingButton = allButtons[b];
-                    break;
-                }
-            }
-            
-            // Копируем все важные стили с существующей кнопки
-            var buttonStyles = '';
-            if (existingButton && window.getComputedStyle) {
-                var computed = window.getComputedStyle(existingButton);
-                // Копируем все размерные стили
-                var paddingTop = computed.paddingTop || '6px';
-                var paddingRight = computed.paddingRight || '12px';
-                var paddingBottom = computed.paddingBottom || '6px';
-                var paddingLeft = computed.paddingLeft || '12px';
-                var height = computed.height || 'auto';
-                var lineHeight = computed.lineHeight || '1.4';
-                var fontSize = computed.fontSize || '14px';
-                var boxSizing = computed.boxSizing || 'border-box';
-                
-                buttonStyles = 'padding: ' + paddingTop + ' ' + paddingRight + ' ' + paddingBottom + ' ' + paddingLeft + '; ' +
-                              'height: ' + height + '; ' +
-                              'line-height: ' + lineHeight + '; ' +
-                              'font-size: ' + fontSize + '; ' +
-                              'box-sizing: ' + boxSizing + '; ' +
-                              'vertical-align: middle; ' +
-                              'display: inline-block;';
-            } else {
-                // Стандартные стили, если не удалось найти существующую кнопку
-                buttonStyles = 'padding: 6px 12px; height: 32px; line-height: 20px; font-size: 14px; box-sizing: border-box; vertical-align: middle; display: inline-block;';
-            }
-            
             // Создаем контейнер для кнопок
             var buttonsContainer = document.createElement('div');
             buttonsContainer.className = 'deanpromoodle-buttons-container';
@@ -294,45 +256,6 @@ function local_deanpromoodle_before_footer() {
             var found = false;
             var ssoContainer = document.querySelector('.moodle-sso-buttons-container');
             if (ssoContainer) {
-                // Копируем стили с кнопок внутри контейнера
-                var ssoButtons = ssoContainer.querySelectorAll('a.sso-button');
-                if (ssoButtons.length > 0) {
-                    var firstButton = ssoButtons[0];
-                    var computed = window.getComputedStyle(firstButton);
-                    // Применяем стили к нашим кнопкам
-                    lkButton.style.paddingTop = computed.paddingTop;
-                    lkButton.style.paddingRight = computed.paddingRight;
-                    lkButton.style.paddingBottom = computed.paddingBottom;
-                    lkButton.style.paddingLeft = computed.paddingLeft;
-                    lkButton.style.height = computed.height;
-                    lkButton.style.minHeight = computed.minHeight;
-                    lkButton.style.maxHeight = computed.maxHeight;
-                    lkButton.style.lineHeight = computed.lineHeight;
-                    lkButton.style.fontSize = computed.fontSize;
-                    lkButton.style.boxSizing = computed.boxSizing;
-                    lkButton.style.display = computed.display;
-                    lkButton.style.verticalAlign = computed.verticalAlign;
-                    lkButton.style.marginLeft = '10px';
-                    lkButton.style.marginRight = '10px';
-                    
-                    if (teacherButton) {
-                        teacherButton.style.paddingTop = computed.paddingTop;
-                        teacherButton.style.paddingRight = computed.paddingRight;
-                        teacherButton.style.paddingBottom = computed.paddingBottom;
-                        teacherButton.style.paddingLeft = computed.paddingLeft;
-                        teacherButton.style.height = computed.height;
-                        teacherButton.style.minHeight = computed.minHeight;
-                        teacherButton.style.maxHeight = computed.maxHeight;
-                        teacherButton.style.lineHeight = computed.lineHeight;
-                        teacherButton.style.fontSize = computed.fontSize;
-                        teacherButton.style.boxSizing = computed.boxSizing;
-                        teacherButton.style.display = computed.display;
-                        teacherButton.style.verticalAlign = computed.verticalAlign;
-                        teacherButton.style.marginLeft = '5px';
-                        teacherButton.style.marginRight = '10px';
-                    }
-                }
-                
                 // Добавляем контейнер с кнопками сразу после блока moodle-sso-buttons-container
                 if (ssoContainer.nextSibling) {
                     ssoContainer.parentElement.insertBefore(buttonsContainer, ssoContainer.nextSibling);
