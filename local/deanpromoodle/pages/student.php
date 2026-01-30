@@ -558,7 +558,7 @@ if ($action == 'viewprogram' && $programid > 0) {
                             if ($submission) {
                                 // Проверяем, есть ли оценка (grade не null и не -1, что означает "не оценено")
                                 if ($grade && $grade->grade !== null && $grade->grade >= 0) {
-                                    // Сдано и есть оценка (зеленый)
+                                    // Сдано и есть оценка (зеленый) - тоже ссылка для просмотра
                                     $maxgrade = $assignment->grade ? $assignment->grade : 100;
                                     $statusclass = 'assignment-status-green';
                                     $statusicon = '<i class="fas fa-check-circle"></i> ';
@@ -567,10 +567,12 @@ if ($action == 'viewprogram' && $programid > 0) {
                                         $gradetext .= '/' . $maxgrade;
                                     }
                                     $gradetext .= ')';
+                                    $islink = true; // Делаем ссылкой для просмотра результата
                                 } else {
-                                    // Сдано, но нет оценки (желтый)
+                                    // Сдано, но нет оценки (желтый) - ссылка для проверки статуса
                                     $statusclass = 'assignment-status-yellow';
                                     $statusicon = '<i class="fas fa-clock"></i> ';
+                                    $islink = true;
                                 }
                             } else {
                                 // Не сдано (красный) - делаем ссылкой
@@ -598,14 +600,16 @@ if ($action == 'viewprogram' && $programid > 0) {
                         }
                     }
                     
-                    // Если не найдены типы заданий, все равно показываем их
+                    // Если не найдены типы заданий, все равно показываем их со ссылкой на курс
                     if (!$foundreadingreport) {
+                        $courseurl = new moodle_url('/course/view.php', ['id' => $course->id]);
                         $statusitems[] = '<span class="badge assignment-status-item assignment-status-red">' . 
-                            '<i class="fas fa-times-circle"></i> Сдача отчета о чтении</span>';
+                            html_writer::link($courseurl, '<i class="fas fa-times-circle"></i> Сдача отчета о чтении', ['target' => '_blank']) . '</span>';
                     }
                     if (!$foundwrittenwork) {
+                        $courseurl = new moodle_url('/course/view.php', ['id' => $course->id]);
                         $statusitems[] = '<span class="badge assignment-status-item assignment-status-red">' . 
-                            '<i class="fas fa-times-circle"></i> Сдача письменной работы</span>';
+                            html_writer::link($courseurl, '<i class="fas fa-times-circle"></i> Сдача письменной работы', ['target' => '_blank']) . '</span>';
                     }
                     
                     // Получаем тесты (экзамены) курса
@@ -653,11 +657,12 @@ if ($action == 'viewprogram' && $programid > 0) {
                             $islink = false;
                             
                             if ($attempt && $grade && $grade->grade !== null && $grade->grade >= 0) {
-                                // Сдан и есть оценка (зеленый)
+                                // Сдан и есть оценка (зеленый) - тоже ссылка для просмотра результата
                                 $maxgrade = $quiz->grade ? $quiz->grade : 100;
                                 $statusclass = 'assignment-status-green';
                                 $statusicon = '<i class="fas fa-check-circle"></i> ';
                                 $gradetext = ' (Оценка: ' . round($grade->grade, 1) . '/' . $maxgrade . ')';
+                                $islink = true;
                             } else {
                                 // Не сдан (красный) - делаем ссылкой
                                 $statusclass = 'assignment-status-red';
@@ -677,10 +682,11 @@ if ($action == 'viewprogram' && $programid > 0) {
                         }
                     }
                     
-                    // Если экзамен не найден, все равно показываем его как не сданный
+                    // Если экзамен не найден, все равно показываем его как не сданный со ссылкой на курс
                     if (!$foundexam) {
+                        $courseurl = new moodle_url('/course/view.php', ['id' => $course->id]);
                         $statusitems[] = '<span class="badge assignment-status-item assignment-status-red">' . 
-                            '<i class="fas fa-times-circle"></i> Экзамен</span>';
+                            html_writer::link($courseurl, '<i class="fas fa-times-circle"></i> Экзамен', ['target' => '_blank']) . '</span>';
                     }
                     
                     if (!empty($statusitems)) {
