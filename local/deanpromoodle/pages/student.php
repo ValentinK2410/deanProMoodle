@@ -560,12 +560,13 @@ if ($action == 'viewprogram' && $programid > 0) {
                         
                         // Проверяем, является ли это экзаменом
                         if (strpos($quizname, 'экзамен') !== false) {
-                            // Проверяем, есть ли попытка у студента
-                            $attempt = $DB->get_record('quiz_attempts', [
-                                'quiz' => $quiz->id,
-                                'userid' => $USER->id,
-                                'state' => 'finished'
-                            ], '*', IGNORE_MULTIPLE);
+                            // Проверяем, есть ли попытка у студента (берем последнюю завершенную попытку)
+                            $attempt = $DB->get_record_sql(
+                                "SELECT * FROM {quiz_attempts} 
+                                 WHERE quiz = ? AND userid = ? AND state = 'finished'
+                                 ORDER BY timemodified DESC LIMIT 1",
+                                [$quiz->id, $USER->id]
+                            );
                             
                             // Получаем оценку из quiz_grades
                             $grade = $DB->get_record('quiz_grades', [
