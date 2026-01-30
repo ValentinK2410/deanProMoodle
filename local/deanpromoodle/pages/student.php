@@ -646,13 +646,18 @@ if ($action == 'viewprogram' && $programid > 0) {
                     
                     // Итоговая оценка
                     $gradeText = '';
-                    if ($finalgradepercent === null || $finalgradepercent < 70) {
-                        // Если нет оценки вообще или оценка ниже 70%
-                        if ($finalgradepercent === null) {
-                            $gradeText = 'Вычисляемая оценка<br/>Итоговая оценка за курс';
+                    if ($finalgradepercent === null) {
+                        // Если нет оценки вообще
+                        $gradeText = 'нет оценки';
+                    } elseif ($finalgradepercent < 70) {
+                        // Если оценка ниже 70% - показываем фактическую оценку из gradebook
+                        if ($coursegrade !== null && $courseitem && $courseitem->grademax > 0) {
+                            // Показываем оценку в формате "получено/максимум" или "получено%"
+                            $gradeText = round($coursegrade, 1) . '/' . round($courseitem->grademax, 1);
+                            // Также можно добавить процент
+                            $gradeText .= ' (' . round($finalgradepercent, 1) . '%)';
                         } else {
-                            // Есть оценка, но ниже 70%
-                            $gradeText = 'Вычисляемая оценка<br/>Итоговая оценка за курс<br/>курс не пройден';
+                            $gradeText = round($finalgradepercent, 1) . '%';
                         }
                     } elseif ($finalgradepercent >= 70 && $finalgradepercent < 80) {
                         $gradeText = '3 (удовлетворительно)';
@@ -661,7 +666,7 @@ if ($action == 'viewprogram' && $programid > 0) {
                     } elseif ($finalgradepercent >= 90) {
                         $gradeText = '5 (отлично)';
                     }
-                    echo html_writer::tag('td', $gradeText);
+                    echo html_writer::tag('td', htmlspecialchars($gradeText, ENT_QUOTES, 'UTF-8'));
                     
                     // Количество академических кредитов
                     $credits = '-';
