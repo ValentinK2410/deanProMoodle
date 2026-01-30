@@ -212,50 +212,50 @@ function local_deanpromoodle_before_footer() {
     $teacherButtonTextRaw = get_string('teacherbutton', 'local_deanpromoodle');
     $teacherButtonTitleRaw = get_string('teacherbuttontitle', 'local_deanpromoodle');
     
-    $js = "
+    $js = '
     (function() {
         // Check if button already added
-        if (document.getElementById('lk-button-deanpromoodle')) {
+        if (document.getElementById("lk-button-deanpromoodle")) {
             return;
         }
         
         function addLKButton() {
             // Check again before adding
-            if (document.getElementById('lk-button-deanpromoodle')) {
+            if (document.getElementById("lk-button-deanpromoodle")) {
                 return;
             }
             
             // Find moodle-sso-buttons-container
-            var ssoContainer = document.querySelector('.moodle-sso-buttons-container');
+            var ssoContainer = document.querySelector(".moodle-sso-buttons-container");
             if (!ssoContainer) {
                 return;
             }
             
             // Create LK button
-            var lkButton = document.createElement('a');
-            lkButton.id = 'lk-button-deanpromoodle';
-            lkButton.href = " . json_encode($lkurlstring, JSON_UNESCAPED_SLASHES) . ";
-            lkButton.className = 'deanpromoodle-button deanpromoodle-button-lk';
-            lkButton.style.cssText = 'display: inline-block; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 14px; font-weight: 500; transition: 0.3s; cursor: pointer; border: medium; white-space: nowrap; color: white; margin-left: 10px; margin-right: 10px; background-color: rgb(0, 123, 255);';
-            lkButton.textContent = " . json_encode($lkButtonTextRaw, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ";
-            lkButton.title = " . json_encode($lkButtonTitleRaw, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ";
+            var lkButton = document.createElement("a");
+            lkButton.id = "lk-button-deanpromoodle";
+            lkButton.href = ' . json_encode($lkurlstring, JSON_UNESCAPED_SLASHES) . ';
+            lkButton.className = "deanpromoodle-button deanpromoodle-button-lk";
+            lkButton.style.cssText = "display: inline-block; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 14px; font-weight: 500; transition: 0.3s; cursor: pointer; border: medium; white-space: nowrap; color: white; margin-left: 10px; margin-right: 10px; background-color: rgb(0, 123, 255);";
+            lkButton.textContent = ' . json_encode($lkButtonTextRaw, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';
+            lkButton.title = ' . json_encode($lkButtonTitleRaw, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';
             
             // Add LK button to container
             ssoContainer.appendChild(lkButton);
             
-            " . ($isadmin ? "
+            ' . ($isadmin ? '
             // Create Teacher button for admins
-            var teacherButton = document.createElement('a');
-            teacherButton.id = 'teacher-button-deanpromoodle';
-            teacherButton.href = " . json_encode($teacherurlstring, JSON_UNESCAPED_SLASHES) . ";
-            teacherButton.className = 'deanpromoodle-button deanpromoodle-button-teacher';
-            teacherButton.style.cssText = 'display: inline-block; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 14px; font-weight: 500; transition: 0.3s; cursor: pointer; border: medium; white-space: nowrap; color: white; margin-left: 5px; margin-right: 10px; background-color: rgb(108, 117, 125);';
-            teacherButton.textContent = " . json_encode($teacherButtonTextRaw, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ";
-            teacherButton.title = " . json_encode($teacherButtonTitleRaw, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ";
+            var teacherButton = document.createElement("a");
+            teacherButton.id = "teacher-button-deanpromoodle";
+            teacherButton.href = ' . json_encode($teacherurlstring, JSON_UNESCAPED_SLASHES) . ';
+            teacherButton.className = "deanpromoodle-button deanpromoodle-button-teacher";
+            teacherButton.style.cssText = "display: inline-block; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 14px; font-weight: 500; transition: 0.3s; cursor: pointer; border: medium; white-space: nowrap; color: white; margin-left: 5px; margin-right: 10px; background-color: rgb(108, 117, 125);";
+            teacherButton.textContent = ' . json_encode($teacherButtonTextRaw, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';
+            teacherButton.title = ' . json_encode($teacherButtonTitleRaw, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';
             
             // Add Teacher button to container
             ssoContainer.appendChild(teacherButton);
-            " : "") . "
+            ' : '') . '
         }
         
         // Try to add button with multiple attempts
@@ -264,12 +264,12 @@ function local_deanpromoodle_before_footer() {
             if (attempt > 5) return; // Maximum 5 attempts
             
             // If button already added, do nothing
-            if (document.getElementById('lk-button-deanpromoodle')) {
+            if (document.getElementById("lk-button-deanpromoodle")) {
                 return;
             }
             
             // Check if moodle-sso-buttons-container exists
-            var ssoContainer = document.querySelector('.moodle-sso-buttons-container');
+            var ssoContainer = document.querySelector(".moodle-sso-buttons-container");
             if (!ssoContainer && attempt < 3) {
                 // If container not found, wait and try again
                 setTimeout(function() { tryAddButton(attempt + 1); }, 500);
@@ -283,8 +283,8 @@ function local_deanpromoodle_before_footer() {
         }
         
         // Try to add immediately
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', function() {
+        if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", function() {
                 setTimeout(function() { tryAddButton(0); }, 100);
             });
         } else {
@@ -296,7 +296,7 @@ function local_deanpromoodle_before_footer() {
         setTimeout(function() { tryAddButton(0); }, 1000);
         setTimeout(function() { tryAddButton(0); }, 2000);
     })();
-    ";
+    ';
     
     $PAGE->requires->js_init_code($js);
 }
