@@ -257,11 +257,19 @@ function local_deanpromoodle_before_footer() {
                 buttonStyles = 'padding: 6px 12px; height: 32px; line-height: 20px; font-size: 14px; box-sizing: border-box; vertical-align: middle; display: inline-block;';
             }
             
+            // Создаем контейнер для кнопок
+            var buttonsContainer = document.createElement('div');
+            buttonsContainer.className = 'deanpromoodle-buttons-container';
+            buttonsContainer.style.cssText = 'display: inline-block;';
+            
+            // Создаем стили для кнопок внутри контейнера (копируем стили из .moodle-sso-buttons-container .sso-button)
+            var buttonBaseStyles = 'display: inline-block; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 14px; font-weight: 500; transition: all 0.3s ease; cursor: pointer; border: none; white-space: nowrap; color: white;';
+            
             var lkButton = document.createElement('a');
             lkButton.id = 'lk-button-deanpromoodle';
             lkButton.href = '" . $lkurlstring . "';
-            lkButton.className = 'btn btn-primary';
-            lkButton.style.cssText = 'margin-left: 10px; margin-right: 10px; background-color: #007bff; color: white; text-decoration: none; border-radius: 4px; font-weight: 500; border: none; ' + buttonStyles;
+            lkButton.className = 'deanpromoodle-button deanpromoodle-button-lk';
+            lkButton.style.cssText = buttonBaseStyles + ' margin-left: 10px; margin-right: 10px; background-color: #007bff;';
             lkButton.textContent = 'ЛК';
             lkButton.title = 'Личный кабинет';
             
@@ -270,11 +278,17 @@ function local_deanpromoodle_before_footer() {
             teacherButton = document.createElement('a');
             teacherButton.id = 'teacher-button-deanpromoodle';
             teacherButton.href = '" . $teacherurlstring . "';
-            teacherButton.className = 'btn btn-secondary';
-            teacherButton.style.cssText = 'margin-left: 5px; margin-right: 10px; background-color: #6c757d; color: white; text-decoration: none; border-radius: 4px; font-weight: 500; border: none; ' + buttonStyles;
+            teacherButton.className = 'deanpromoodle-button deanpromoodle-button-teacher';
+            teacherButton.style.cssText = buttonBaseStyles + ' margin-left: 5px; margin-right: 10px; background-color: #6c757d;';
             teacherButton.textContent = 'Преподаватель';
             teacherButton.title = 'Панель преподавателя';
             " : "") . "
+            
+            // Добавляем кнопки в контейнер
+            buttonsContainer.appendChild(lkButton);
+            if (teacherButton) {
+                buttonsContainer.appendChild(teacherButton);
+            }
             
             // Стратегия 1: Ищем контейнер moodle-sso-buttons-container и добавляем кнопки сразу после него
             var found = false;
@@ -319,17 +333,11 @@ function local_deanpromoodle_before_footer() {
                     }
                 }
                 
-                // Добавляем кнопки сразу после контейнера
+                // Добавляем контейнер с кнопками сразу после блока moodle-sso-buttons-container
                 if (ssoContainer.nextSibling) {
-                    ssoContainer.parentElement.insertBefore(lkButton, ssoContainer.nextSibling);
-                    if (teacherButton) {
-                        ssoContainer.parentElement.insertBefore(teacherButton, ssoContainer.nextSibling);
-                    }
+                    ssoContainer.parentElement.insertBefore(buttonsContainer, ssoContainer.nextSibling);
                 } else {
-                    ssoContainer.parentElement.appendChild(lkButton);
-                    if (teacherButton) {
-                        ssoContainer.parentElement.appendChild(teacherButton);
-                    }
+                    ssoContainer.parentElement.appendChild(buttonsContainer);
                 }
                 found = true;
             }
@@ -345,19 +353,12 @@ function local_deanpromoodle_before_footer() {
                         while (parent && parent !== document.body) {
                             if (parent.classList && (parent.classList.contains('navbar-nav') || parent.classList.contains('nav') || parent.tagName === 'NAV' || parent.tagName === 'HEADER')) {
                                 if (parent.tagName === 'UL' || parent.classList.contains('navbar-nav')) {
-                                    var li1 = document.createElement('li');
-                                    li1.className = 'nav-item';
-                                    li1.appendChild(lkButton);
-                                    parent.appendChild(li1);
-                                    if (teacherButton) {
-                                        var li2 = document.createElement('li');
-                                        li2.className = 'nav-item';
-                                        li2.appendChild(teacherButton);
-                                        parent.appendChild(li2);
-                                    }
+                                    var li = document.createElement('li');
+                                    li.className = 'nav-item';
+                                    li.appendChild(buttonsContainer);
+                                    parent.appendChild(li);
                                 } else {
-                                    parent.appendChild(lkButton);
-                                    if (teacherButton) parent.appendChild(teacherButton);
+                                    parent.appendChild(buttonsContainer);
                                 }
                                 found = true;
                                 break;
@@ -370,11 +371,9 @@ function local_deanpromoodle_before_footer() {
                         if (!found) {
                             var nextSibling = allLinks[i].nextSibling;
                             if (nextSibling) {
-                                allLinks[i].parentElement.insertBefore(lkButton, nextSibling);
-                                if (teacherButton) allLinks[i].parentElement.insertBefore(teacherButton, nextSibling);
+                                allLinks[i].parentElement.insertBefore(buttonsContainer, nextSibling);
                             } else {
-                                allLinks[i].parentElement.appendChild(lkButton);
-                                if (teacherButton) allLinks[i].parentElement.appendChild(teacherButton);
+                                allLinks[i].parentElement.appendChild(buttonsContainer);
                             }
                             found = true;
                             break;
@@ -425,11 +424,7 @@ function local_deanpromoodle_before_footer() {
                 var container = document.createElement('div');
                 container.id = 'lk-button-container-deanpromoodle';
                 container.style.cssText = 'position: fixed; top: 70px; right: 20px; z-index: 9999; background: rgba(255,255,255,0.95); padding: 10px; border-radius: 5px; box-shadow: 0 2px 10px rgba(0,0,0,0.2);';
-                container.appendChild(lkButton);
-                if (teacherButton) {
-                    container.appendChild(document.createTextNode(' '));
-                    container.appendChild(teacherButton);
-                }
+                container.appendChild(buttonsContainer);
                 document.body.appendChild(container);
             }
         }
@@ -479,79 +474,14 @@ function local_deanpromoodle_before_footer() {
                 return;
             }
             
-            // Если кнопка уже добавлена, обновляем ее стили
-            var existingLK = document.getElementById('lk-button-deanpromoodle');
-            if (existingLK && styles) {
-                existingLK.style.paddingTop = styles.paddingTop;
-                existingLK.style.paddingRight = styles.paddingRight;
-                existingLK.style.paddingBottom = styles.paddingBottom;
-                existingLK.style.paddingLeft = styles.paddingLeft;
-                existingLK.style.height = styles.height;
-                existingLK.style.minHeight = styles.minHeight;
-                existingLK.style.maxHeight = styles.maxHeight;
-                existingLK.style.lineHeight = styles.lineHeight;
-                existingLK.style.fontSize = styles.fontSize;
-                existingLK.style.boxSizing = styles.boxSizing;
-                existingLK.style.display = styles.display;
-                existingLK.style.verticalAlign = styles.verticalAlign;
-                
-                if (teacherButton && document.getElementById('teacher-button-deanpromoodle')) {
-                    var existingTeacher = document.getElementById('teacher-button-deanpromoodle');
-                    existingTeacher.style.paddingTop = styles.paddingTop;
-                    existingTeacher.style.paddingRight = styles.paddingRight;
-                    existingTeacher.style.paddingBottom = styles.paddingBottom;
-                    existingTeacher.style.paddingLeft = styles.paddingLeft;
-                    existingTeacher.style.height = styles.height;
-                    existingTeacher.style.minHeight = styles.minHeight;
-                    existingTeacher.style.maxHeight = styles.maxHeight;
-                    existingTeacher.style.lineHeight = styles.lineHeight;
-                    existingTeacher.style.fontSize = styles.fontSize;
-                    existingTeacher.style.boxSizing = styles.boxSizing;
-                    existingTeacher.style.display = styles.display;
-                    existingTeacher.style.verticalAlign = styles.verticalAlign;
-                }
+            // Если контейнер уже добавлен, ничего не делаем
+            var existingContainer = document.querySelector('.deanpromoodle-buttons-container');
+            if (existingContainer) {
                 return;
             }
             
-            // Если кнопка еще не добавлена, добавляем ее
-            if (!existingLK) {
-                addLKButton();
-                // После добавления обновляем стили
-                setTimeout(function() {
-                    var btn = document.getElementById('lk-button-deanpromoodle');
-                    if (btn && styles) {
-                        btn.style.paddingTop = styles.paddingTop;
-                        btn.style.paddingRight = styles.paddingRight;
-                        btn.style.paddingBottom = styles.paddingBottom;
-                        btn.style.paddingLeft = styles.paddingLeft;
-                        btn.style.height = styles.height;
-                        btn.style.minHeight = styles.minHeight;
-                        btn.style.maxHeight = styles.maxHeight;
-                        btn.style.lineHeight = styles.lineHeight;
-                        btn.style.fontSize = styles.fontSize;
-                        btn.style.boxSizing = styles.boxSizing;
-                        btn.style.display = styles.display;
-                        btn.style.verticalAlign = styles.verticalAlign;
-                    }
-                    if (teacherButton) {
-                        var tbtn = document.getElementById('teacher-button-deanpromoodle');
-                        if (tbtn && styles) {
-                            tbtn.style.paddingTop = styles.paddingTop;
-                            tbtn.style.paddingRight = styles.paddingRight;
-                            tbtn.style.paddingBottom = styles.paddingBottom;
-                            tbtn.style.paddingLeft = styles.paddingLeft;
-                            tbtn.style.height = styles.height;
-                            tbtn.style.minHeight = styles.minHeight;
-                            tbtn.style.maxHeight = styles.maxHeight;
-                            tbtn.style.lineHeight = styles.lineHeight;
-                            tbtn.style.fontSize = styles.fontSize;
-                            tbtn.style.boxSizing = styles.boxSizing;
-                            tbtn.style.display = styles.display;
-                            tbtn.style.verticalAlign = styles.verticalAlign;
-                        }
-                    }
-                }, 100);
-            }
+            // Если контейнер еще не добавлен, добавляем его
+            addLKButton();
         }
         
         // Пытаемся добавить сразу
