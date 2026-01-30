@@ -214,24 +214,24 @@ function local_deanpromoodle_before_footer() {
     
     $js = "
     (function() {
-        // Проверяем, не добавлена ли уже кнопка
+        // Check if button already added
         if (document.getElementById('lk-button-deanpromoodle')) {
             return;
         }
         
         function addLKButton() {
-            // Проверяем еще раз перед добавлением
+            // Check again before adding
             if (document.getElementById('lk-button-deanpromoodle')) {
                 return;
             }
             
-            // Ищем контейнер moodle-sso-buttons-container
+            // Find moodle-sso-buttons-container
             var ssoContainer = document.querySelector('.moodle-sso-buttons-container');
             if (!ssoContainer) {
-                return; // Если контейнер не найден, не добавляем кнопки
+                return;
             }
             
-            // Создаем кнопку \"ЛК\"
+            // Create LK button
             var lkButton = document.createElement('a');
             lkButton.id = 'lk-button-deanpromoodle';
             lkButton.href = " . json_encode($lkurlstring, JSON_UNESCAPED_SLASHES) . ";
@@ -240,11 +240,11 @@ function local_deanpromoodle_before_footer() {
             lkButton.textContent = " . $lkButtonText . ";
             lkButton.title = " . $lkButtonTitle . ";
             
-            // Добавляем кнопку \"ЛК\" в контейнер
+            // Add LK button to container
             ssoContainer.appendChild(lkButton);
             
             " . ($isadmin ? "
-            // Создаем кнопку \"Преподаватель\" для админов
+            // Create Teacher button for admins
             var teacherButton = document.createElement('a');
             teacherButton.id = 'teacher-button-deanpromoodle';
             teacherButton.href = " . json_encode($teacherurlstring, JSON_UNESCAPED_SLASHES) . ";
@@ -253,36 +253,36 @@ function local_deanpromoodle_before_footer() {
             teacherButton.textContent = " . $teacherButtonText . ";
             teacherButton.title = " . $teacherButtonTitle . ";
             
-            // Добавляем кнопку \"Преподаватель\" в контейнер
+            // Add Teacher button to container
             ssoContainer.appendChild(teacherButton);
             " : "") . "
         }
         
-        // Пытаемся добавить кнопку с несколькими попытками
+        // Try to add button with multiple attempts
         function tryAddButton(attempt) {
             attempt = attempt || 0;
-            if (attempt > 5) return; // Максимум 5 попыток
+            if (attempt > 5) return; // Maximum 5 attempts
             
-            // Если кнопка уже добавлена, ничего не делаем
+            // If button already added, do nothing
             if (document.getElementById('lk-button-deanpromoodle')) {
                 return;
             }
             
-            // Проверяем, существует ли контейнер moodle-sso-buttons-container
+            // Check if moodle-sso-buttons-container exists
             var ssoContainer = document.querySelector('.moodle-sso-buttons-container');
             if (!ssoContainer && attempt < 3) {
-                // Если контейнер не найден, ждем и пробуем снова
+                // If container not found, wait and try again
                 setTimeout(function() { tryAddButton(attempt + 1); }, 500);
                 return;
             }
             
-            // Если контейнер найден, добавляем кнопки
+            // If container found, add buttons
             if (ssoContainer) {
                 addLKButton();
             }
         }
         
-        // Пытаемся добавить сразу
+        // Try to add immediately
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', function() {
                 setTimeout(function() { tryAddButton(0); }, 100);
@@ -291,7 +291,7 @@ function local_deanpromoodle_before_footer() {
             setTimeout(function() { tryAddButton(0); }, 100);
         }
         
-        // Также пытаемся добавить после задержек на случай динамической загрузки
+        // Also try to add after delays for dynamic loading
         setTimeout(function() { tryAddButton(0); }, 500);
         setTimeout(function() { tryAddButton(0); }, 1000);
         setTimeout(function() { tryAddButton(0); }, 2000);
