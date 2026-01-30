@@ -594,17 +594,6 @@ if ($action == 'viewprogram' && $programid > 0) {
                         }
                     }
                     
-                    // Всегда показываем все типы заданий
-                    // Если не найдены типы заданий, показываем их со ссылкой на курс
-                    if (!$foundreadingreport) {
-                        $statusitems[] = '<span class="badge assignment-status-item assignment-status-red">' . 
-                            html_writer::link($readingreporturl, '<i class="fas fa-times-circle"></i> Сдача отчета о чтении', ['target' => '_blank']) . '</span>';
-                    }
-                    if (!$foundwrittenwork) {
-                        $statusitems[] = '<span class="badge assignment-status-item assignment-status-red">' . 
-                            html_writer::link($writtenworkurl, '<i class="fas fa-times-circle"></i> Сдача письменной работы', ['target' => '_blank']) . '</span>';
-                    }
-                    
                     // Получаем тесты (экзамены) курса
                     try {
                         $quizzes = get_all_instances_in_course('quiz', $course, false);
