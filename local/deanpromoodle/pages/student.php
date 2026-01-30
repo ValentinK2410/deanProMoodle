@@ -177,10 +177,10 @@ global $USER, $DB;
 $tabs = [];
 $tabs[] = new tabobject('courses', 
     new moodle_url('/local/deanpromoodle/pages/student.php', ['tab' => 'courses']),
-    'Мои курсы');
+    'Мои оценки');
 $tabs[] = new tabobject('programs', 
     new moodle_url('/local/deanpromoodle/pages/student.php', ['tab' => 'programs']),
-    'Мои программы');
+    'Личная информация и статус');
 
 // Если это просмотр программы, не показываем вкладки
 if ($action != 'viewprogram') {
