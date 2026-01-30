@@ -885,6 +885,61 @@ if ($action == 'viewprogram' && $programid > 0) {
                                 $statusitems[] = '<span class="badge assignment-status-item assignment-status-red">' . 
                                     html_writer::link($assignmenturl, $badgecontent, ['target' => '_blank']) . '</span>';
                             }
+                        } else {
+                            // Остальные задания - отображаем с оригинальным названием
+                            // Получаем cmid для ссылки
+                            $cm = get_coursemodule_from_instance('assign', $assignment->id, $course->id);
+                            if (!$cm) {
+                                continue; // Пропускаем, если модуль не найден
+                            }
+                            $assignmenturl = new moodle_url('/mod/assign/view.php', ['id' => $cm->id]);
+                            
+                            // Проверяем статус задания для студента
+                            $submission = $DB->get_record('assign_submission', [
+                                'assignment' => $assignment->id,
+                                'userid' => $USER->id
+                            ]);
+                            
+                            // Проверяем наличие файлов или текста
+                            $hasfiles = false;
+                            if ($submission) {
+                                $filecount = $DB->count_records_sql(
+                                    "SELECT COUNT(*) FROM {assignsubmission_file} WHERE submission = ?",
+                                    [$submission->id]
+                                );
+                                $textcount = $DB->count_records_sql(
+                                    "SELECT COUNT(*) FROM {assignsubmission_onlinetext} WHERE submission = ? AND onlinetext IS NOT NULL AND onlinetext != ''",
+                                    [$submission->id]
+                                );
+                                $hasfiles = ($filecount > 0 || $textcount > 0);
+                            }
+                            
+                            $grade = $DB->get_record('assign_grades', [
+                                'assignment' => $assignment->id,
+                                'userid' => $USER->id
+                            ]);
+                            
+                            $statusclass = '';
+                            $statustext = '';
+                            
+                            // Логика для остальных заданий:
+                            // 1. Если есть оценка - зеленый "Название – сдано"
+                            if ($grade && $grade->grade !== null && $grade->grade >= 0) {
+                                $statusclass = 'assignment-status-green';
+                                $statustext = htmlspecialchars($assignment->name, ENT_QUOTES, 'UTF-8') . ' – сдано';
+                            } elseif ($hasfiles) {
+                                // 2. Если файл загружен, но нет оценки - желтый "Название – не проверено"
+                                $statusclass = 'assignment-status-yellow';
+                                $statustext = htmlspecialchars($assignment->name, ENT_QUOTES, 'UTF-8') . ' – не проверено';
+                            } else {
+                                // 3. Если файл не загружен и нет оценки - красный "Название – не сдано"
+                                $statusclass = 'assignment-status-red';
+                                $statustext = htmlspecialchars($assignment->name, ENT_QUOTES, 'UTF-8') . ' – не сдано';
+                            }
+                            
+                            $badgecontent = $statustext;
+                            $statusitems[] = '<span class="badge assignment-status-item ' . $statusclass . '">' . 
+                                html_writer::link($assignmenturl, $badgecontent, ['target' => '_blank']) . '</span>';
                         }
                     }
                     
