@@ -622,7 +622,11 @@ if ($action == 'viewprogram' && $programid > 0) {
                     // Статус завершения курса
                     $completionstatus = '';
                     $completionclass = '';
-                    if ($finalgradepercent === null || $finalgradepercent < 70) {
+                    // Если итоговая оценка ниже 70%, но все задания имеют оценку - "Завершен полностью" (зеленым)
+                    if (($finalgradepercent === null || $finalgradepercent < 70) && $allassignmentsgraded && $hasassignments) {
+                        $completionstatus = 'Завершен полностью';
+                        $completionclass = 'completion-status-completed';
+                    } elseif ($finalgradepercent === null || $finalgradepercent < 70) {
                         $completionstatus = 'Не завершен';
                         $completionclass = 'completion-status-not-completed';
                     } elseif ($finalgradepercent >= 70) {
@@ -641,19 +645,23 @@ if ($action == 'viewprogram' && $programid > 0) {
                     );
                     
                     // Итоговая оценка
-                    $gradeText = '-';
-                    if ($finalgradepercent !== null) {
-                        if ($finalgradepercent < 70) {
-                            $gradeText = 'курс не пройден';
-                        } elseif ($finalgradepercent >= 70 && $finalgradepercent < 80) {
-                            $gradeText = '3 (удовлетворительно)';
-                        } elseif ($finalgradepercent >= 80 && $finalgradepercent < 90) {
-                            $gradeText = '4 (хорошо)';
-                        } elseif ($finalgradepercent >= 90) {
-                            $gradeText = '5 (отлично)';
+                    $gradeText = '';
+                    if ($finalgradepercent === null || $finalgradepercent < 70) {
+                        // Если нет оценки вообще или оценка ниже 70%
+                        if ($finalgradepercent === null) {
+                            $gradeText = 'Вычисляемая оценка<br/>Итоговая оценка за курс';
+                        } else {
+                            // Есть оценка, но ниже 70%
+                            $gradeText = 'Вычисляемая оценка<br/>Итоговая оценка за курс<br/>курс не пройден';
                         }
+                    } elseif ($finalgradepercent >= 70 && $finalgradepercent < 80) {
+                        $gradeText = '3 (удовлетворительно)';
+                    } elseif ($finalgradepercent >= 80 && $finalgradepercent < 90) {
+                        $gradeText = '4 (хорошо)';
+                    } elseif ($finalgradepercent >= 90) {
+                        $gradeText = '5 (отлично)';
                     }
-                    echo html_writer::tag('td', htmlspecialchars($gradeText, ENT_QUOTES, 'UTF-8'));
+                    echo html_writer::tag('td', $gradeText);
                     
                     // Количество академических кредитов
                     $credits = '-';
