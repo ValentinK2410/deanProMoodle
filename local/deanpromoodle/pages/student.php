@@ -656,14 +656,12 @@ if ($action == 'viewprogram' && $programid > 0) {
                         // Если нет оценки вообще
                         $gradeText = 'нет оценки';
                     } elseif ($finalgradepercent < 70) {
-                        // Если оценка ниже 70% - показываем фактическую оценку из gradebook
+                        // Если оценка ниже 70% - показываем фактическую оценку из gradebook (только целые числа)
                         if ($coursegrade !== null && $courseitem && $courseitem->grademax > 0) {
-                            // Показываем оценку в формате "получено/максимум" или "получено%"
-                            $gradeText = round($coursegrade, 1) . '/' . round($courseitem->grademax, 1);
-                            // Также можно добавить процент
-                            $gradeText .= ' (' . round($finalgradepercent, 1) . '%)';
+                            // Показываем оценку в формате "получено/максимум" без дробей и процентов
+                            $gradeText = (int)round($coursegrade) . '/' . (int)round($courseitem->grademax);
                         } else {
-                            $gradeText = round($finalgradepercent, 1) . '%';
+                            $gradeText = (int)round($finalgradepercent);
                         }
                     } elseif ($finalgradepercent >= 70 && $finalgradepercent < 80) {
                         $gradeText = '3 (удовлетворительно)';
