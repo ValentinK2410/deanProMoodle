@@ -223,7 +223,7 @@ function local_deanpromoodle_before_footer() {
             lkButton.id = 'lk-button-deanpromoodle';
             lkButton.href = '" . $lkurlstring . "';
             lkButton.className = 'btn btn-primary';
-            lkButton.style.cssText = 'margin-left: 10px; margin-right: 10px; padding: 8px 16px; background-color: #007bff; color: white; text-decoration: none; border-radius: 4px; font-weight: 500; display: inline-block;';
+            lkButton.style.cssText = 'margin-left: 10px; margin-right: 10px; padding: 6px 12px; background-color: #007bff; color: white; text-decoration: none; border-radius: 4px; font-weight: 500; display: inline-block; height: auto; line-height: 1.4; vertical-align: middle; font-size: 14px;';
             lkButton.textContent = 'ЛК';
             lkButton.title = 'Личный кабинет';
             
@@ -232,7 +232,7 @@ function local_deanpromoodle_before_footer() {
             teacherButton = document.createElement('a');
             teacherButton.href = '" . $teacherurlstring . "';
             teacherButton.className = 'btn btn-secondary';
-            teacherButton.style.cssText = 'margin-left: 5px; margin-right: 10px; padding: 8px 16px; background-color: #6c757d; color: white; text-decoration: none; border-radius: 4px; font-weight: 500; display: inline-block;';
+            teacherButton.style.cssText = 'margin-left: 5px; margin-right: 10px; padding: 6px 12px; background-color: #6c757d; color: white; text-decoration: none; border-radius: 4px; font-weight: 500; display: inline-block; height: auto; line-height: 1.4; vertical-align: middle; font-size: 14px;';
             teacherButton.textContent = 'Преподаватель';
             teacherButton.title = 'Панель преподавателя';
             " : "") . "
