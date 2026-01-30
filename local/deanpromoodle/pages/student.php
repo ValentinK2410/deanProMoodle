@@ -267,7 +267,8 @@ if ($action == 'viewprogram' && $programid > 0) {
                     echo html_writer::end_tag('thead');
                     echo html_writer::start_tag('tbody');
                     
-                    foreach ($subjects as $index => $subject) {
+                    $displayedindex = 0; // Счетчик для отображения порядкового номера
+                    foreach ($subjects as $subject) {
                         // Получаем курсы предмета
                         $subjectcourses = $DB->get_records_sql(
                             "SELECT c.id, c.fullname, c.shortname
@@ -278,57 +279,61 @@ if ($action == 'viewprogram' && $programid > 0) {
                             [$subject->id]
                         );
                         
-                        $subjectstarted = false;
-                        $courseshtml = '';
-                        
-                        if (!empty($subjectcourses)) {
-                            $courseshtml = '<ul class="subject-courses-list">';
-                            foreach ($subjectcourses as $course) {
-                                $isenrolled = in_array($course->id, $mycourseids);
-                                if ($isenrolled) {
-                                    $subjectstarted = true;
-                                    $courseurl = new moodle_url('/course/view.php', ['id' => $course->id]);
-                                    $courseshtml .= '<li>' . html_writer::link($courseurl, 
-                                        '<i class="fas fa-check"></i> ' . htmlspecialchars($course->fullname, ENT_QUOTES, 'UTF-8'), 
-                                        ['class' => 'course-link-enrolled', 'target' => '_blank']
-                                    ) . '</li>';
-                                } else {
-                                    $courseshtml .= '<li><span class="course-link-not-enrolled">' . 
-                                        htmlspecialchars($course->fullname, ENT_QUOTES, 'UTF-8') . '</span></li>';
-                                }
+                        // Фильтруем курсы: оставляем только те, на которые зачислен студент
+                        $enrolledcourses = [];
+                        foreach ($subjectcourses as $course) {
+                            if (in_array($course->id, $mycourseids)) {
+                                $enrolledcourses[] = $course;
                             }
-                            $courseshtml .= '</ul>';
-                        } else {
-                            $courseshtml = '<span class="text-muted">Нет курсов</span>';
                         }
                         
+                        // Показываем предмет только если есть курсы, на которые зачислен студент
+                        if (empty($enrolledcourses)) {
+                            continue; // Пропускаем предмет, если нет курсов, на которые зачислен студент
+                        }
+                        
+                        $subjectstarted = true; // Если есть зачисленные курсы, предмет считается начатым
+                        $courseshtml = '<ul class="subject-courses-list">';
+                        foreach ($enrolledcourses as $course) {
+                            $courseurl = new moodle_url('/course/view.php', ['id' => $course->id]);
+                            $courseshtml .= '<li>' . html_writer::link($courseurl, 
+                                '<i class="fas fa-check"></i> ' . htmlspecialchars($course->fullname, ENT_QUOTES, 'UTF-8'), 
+                                ['class' => 'course-link-enrolled', 'target' => '_blank']
+                            ) . '</li>';
+                        }
+                        $courseshtml .= '</ul>';
+                        
+                        $displayedindex++; // Увеличиваем счетчик только для отображаемых предметов
+                        
                         echo html_writer::start_tag('tr');
-                        echo html_writer::tag('td', $index + 1);
+                        echo html_writer::tag('td', $displayedindex);
                         echo html_writer::tag('td', htmlspecialchars($subject->name, ENT_QUOTES, 'UTF-8'), [
                             'style' => 'font-weight: 500;'
                         ]);
                         echo html_writer::tag('td', $subject->code ? htmlspecialchars($subject->code, ENT_QUOTES, 'UTF-8') : '-');
                         
-                        // Статус
-                        if ($subjectstarted) {
-                            echo html_writer::tag('td', 
-                                '<span class="subject-status-started"><i class="fas fa-check-circle"></i> Начат</span>'
-                            );
-                        } else {
-                            echo html_writer::tag('td', 
-                                '<span class="subject-status-not-started">Не начат</span>'
-                            );
-                        }
+                        // Статус - всегда "Начат", так как показываем только предметы с зачисленными курсами
+                        echo html_writer::tag('td', 
+                            '<span class="subject-status-started"><i class="fas fa-check-circle"></i> Начат</span>'
+                        );
                         
-                        // Курсы
+                        // Курсы - только те, на которые зачислен студент
                         echo html_writer::tag('td', $courseshtml);
                         
                         echo html_writer::end_tag('tr');
                     }
                     
-                    echo html_writer::end_tag('tbody');
-                    echo html_writer::end_tag('table');
-                    echo html_writer::end_div();
+                    // Если не было отображено ни одного предмета, показываем сообщение
+                    if ($displayedindex == 0) {
+                        echo html_writer::end_tag('tbody');
+                        echo html_writer::end_tag('table');
+                        echo html_writer::end_div();
+                        echo html_writer::div('У вас нет доступа к курсам в предметах этой программы.', 'alert alert-info');
+                    } else {
+                        echo html_writer::end_tag('tbody');
+                        echo html_writer::end_tag('table');
+                        echo html_writer::end_div();
+                    }
                 }
             }
         }
