@@ -397,18 +397,45 @@ if ($action == 'viewprogram' && $programid > 0) {
                 ";
                 echo html_writer::end_tag('style');
                 
+                // Добавляем стили для статусов заданий
+                echo html_writer::start_tag('style');
+                echo "
+                    .assignment-status-yellow {
+                        color: #ffc107;
+                        font-weight: 500;
+                    }
+                    .assignment-status-green {
+                        color: #28a745;
+                        font-weight: 500;
+                    }
+                    .assignment-status-red {
+                        color: #dc3545;
+                        font-weight: 500;
+                    }
+                    .assignment-status-item {
+                        margin: 4px 0;
+                        font-size: 0.9em;
+                    }
+                ";
+                echo html_writer::end_tag('style');
+                
                 echo html_writer::start_div('courses-table');
                 echo html_writer::start_tag('table', ['class' => 'table']);
                 echo html_writer::start_tag('thead');
                 echo html_writer::start_tag('tr');
                 echo html_writer::tag('th', 'Название курса');
-                echo html_writer::tag('th', 'Краткое название', ['style' => 'width: 200px;']);
-                echo html_writer::tag('th', 'Дата начала', ['style' => 'width: 150px;']);
-                echo html_writer::tag('th', 'Дата окончания', ['style' => 'width: 150px;']);
+                echo html_writer::tag('th', 'Краткое название', ['style' => 'width: 150px;']);
+                echo html_writer::tag('th', 'Дата начала', ['style' => 'width: 120px;']);
+                echo html_writer::tag('th', 'Дата окончания', ['style' => 'width: 120px;']);
+                echo html_writer::tag('th', 'Преподаватель', ['style' => 'width: 200px;']);
+                echo html_writer::tag('th', 'Статус заданий (ПОСЛЕ СЕССИИ)', ['style' => 'width: 300px;']);
                 echo html_writer::tag('th', 'Действие', ['style' => 'width: 100px; text-align: center;']);
                 echo html_writer::end_tag('tr');
                 echo html_writer::end_tag('thead');
                 echo html_writer::start_tag('tbody');
+                
+                // Подключаем необходимые функции Moodle
+                require_once($CFG->libdir . '/modinfolib.php');
                 
                 foreach ($mycourses as $course) {
                     if ($course->id <= 1) continue; // Пропускаем системный курс
@@ -433,6 +460,148 @@ if ($action == 'viewprogram' && $programid > 0) {
                     // Дата окончания
                     $enddate = $course->enddate > 0 ? userdate($course->enddate, get_string('strftimedatefullshort')) : '-';
                     echo html_writer::tag('td', $enddate);
+                    
+                    // Преподаватель
+                    $coursecontext = context_course::instance($course->id);
+                    $teacherroleids = $DB->get_fieldset_select('role', 'id', "shortname IN ('teacher', 'editingteacher', 'manager')");
+                    $teachers = [];
+                    if (!empty($teacherroleids)) {
+                        $placeholders = implode(',', array_fill(0, count($teacherroleids), '?'));
+                        $teacherusers = $DB->get_records_sql(
+                            "SELECT DISTINCT u.id, u.firstname, u.lastname
+                             FROM {user} u
+                             JOIN {role_assignments} ra ON ra.userid = u.id
+                             WHERE ra.contextid = ? AND ra.roleid IN ($placeholders)
+                             AND u.deleted = 0
+                             ORDER BY u.lastname, u.firstname",
+                            array_merge([$coursecontext->id], $teacherroleids)
+                        );
+                        foreach ($teacherusers as $teacher) {
+                            $teachers[] = fullname($teacher);
+                        }
+                    }
+                    $teachernames = !empty($teachers) ? implode(', ', $teachers) : '-';
+                    echo html_writer::tag('td', htmlspecialchars($teachernames, ENT_QUOTES, 'UTF-8'));
+                    
+                    // Статус заданий (ПОСЛЕ СЕССИИ)
+                    $statushtml = '';
+                    $statusitems = [];
+                    
+                    // Получаем задания курса
+                    $assignments = get_all_instances_in_course('assign', $course, false);
+                    foreach ($assignments as $assignment) {
+                        $assignmentname = mb_strtolower($assignment->name);
+                        
+                        // Определяем тип задания по названию
+                        $assignmenttype = '';
+                        if (strpos($assignmentname, 'отчет') !== false && strpos($assignmentname, 'чтени') !== false) {
+                            $assignmenttype = 'reading_report';
+                        } elseif (strpos($assignmentname, 'письменн') !== false) {
+                            $assignmenttype = 'written_work';
+                        }
+                        
+                        if ($assignmenttype) {
+                            // Проверяем статус задания для студента
+                            $submission = $DB->get_record('assign_submission', [
+                                'assignment' => $assignment->id,
+                                'userid' => $USER->id,
+                                'status' => 'submitted'
+                            ]);
+                            
+                            $grade = $DB->get_record('assign_grades', [
+                                'assignment' => $assignment->id,
+                                'userid' => $USER->id
+                            ]);
+                            
+                            $statusclass = '';
+                            $statusicon = '';
+                            $gradetext = '';
+                            
+                            if ($submission) {
+                                // Проверяем, есть ли оценка (grade не null и не -1, что означает "не оценено")
+                                if ($grade && $grade->grade !== null && $grade->grade >= 0) {
+                                    // Сдано и есть оценка (зеленый)
+                                    $maxgrade = $assignment->grade ? $assignment->grade : 100;
+                                    $statusclass = 'assignment-status-green';
+                                    $statusicon = '<i class="fas fa-check-circle"></i> ';
+                                    $gradetext = ' (Оценка: ' . round($grade->grade, 1);
+                                    if ($maxgrade > 0) {
+                                        $gradetext .= '/' . $maxgrade;
+                                    }
+                                    $gradetext .= ')';
+                                } else {
+                                    // Сдано, но нет оценки (желтый)
+                                    $statusclass = 'assignment-status-yellow';
+                                    $statusicon = '<i class="fas fa-clock"></i> ';
+                                }
+                            } else {
+                                // Не сдано (красный)
+                                $statusclass = 'assignment-status-red';
+                                $statusicon = '<i class="fas fa-times-circle"></i> ';
+                            }
+                            
+                            $assignmentdisplayname = '';
+                            if ($assignmenttype == 'reading_report') {
+                                $assignmentdisplayname = 'Сдача отчета о чтении';
+                            } elseif ($assignmenttype == 'written_work') {
+                                $assignmentdisplayname = 'Сдача письменной работы';
+                            }
+                            
+                            $statusitems[] = '<div class="assignment-status-item ' . $statusclass . '">' . 
+                                $statusicon . htmlspecialchars($assignmentdisplayname, ENT_QUOTES, 'UTF-8') . 
+                                $gradetext . '</div>';
+                        }
+                    }
+                    
+                    // Получаем тесты (экзамены) курса
+                    $quizzes = get_all_instances_in_course('quiz', $course, false);
+                    foreach ($quizzes as $quiz) {
+                        $quizname = mb_strtolower($quiz->name);
+                        
+                        // Проверяем, является ли это экзаменом
+                        if (strpos($quizname, 'экзамен') !== false) {
+                            // Проверяем, есть ли попытка у студента
+                            $attempt = $DB->get_record('quiz_attempts', [
+                                'quiz' => $quiz->id,
+                                'userid' => $USER->id,
+                                'state' => 'finished'
+                            ], '*', IGNORE_MULTIPLE);
+                            
+                            // Получаем оценку из quiz_grades
+                            $grade = $DB->get_record('quiz_grades', [
+                                'quiz' => $quiz->id,
+                                'userid' => $USER->id
+                            ]);
+                            
+                            $statusclass = '';
+                            $statusicon = '';
+                            $gradetext = '';
+                            
+                            if ($attempt && $grade && $grade->grade !== null && $grade->grade >= 0) {
+                                // Сдан и есть оценка (зеленый)
+                                // Нужно получить максимальный балл для правильного отображения
+                                $maxgrade = $quiz->grade ? $quiz->grade : 100;
+                                $statusclass = 'assignment-status-green';
+                                $statusicon = '<i class="fas fa-check-circle"></i> ';
+                                $gradetext = ' (Оценка: ' . round($grade->grade, 1) . '/' . $maxgrade . ')';
+                            } else {
+                                // Не сдан (красный)
+                                $statusclass = 'assignment-status-red';
+                                $statusicon = '<i class="fas fa-times-circle"></i> ';
+                            }
+                            
+                            $statusitems[] = '<div class="assignment-status-item ' . $statusclass . '">' . 
+                                $statusicon . 'Экзамен' . $gradetext . '</div>';
+                        }
+                    }
+                    
+                    if (!empty($statusitems)) {
+                        $statushtml = implode('', $statusitems);
+                    } else {
+                        $statushtml = '<span class="text-muted">Нет заданий</span>';
+                    }
+                    
+                    echo html_writer::tag('td', $statushtml);
                     
                     // Действие
                     echo html_writer::start_tag('td', ['style' => 'text-align: center;']);
