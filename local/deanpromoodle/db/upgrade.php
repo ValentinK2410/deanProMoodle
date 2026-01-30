@@ -105,5 +105,51 @@ function xmldb_local_deanpromoodle_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026013005, 'local', 'deanpromoodle');
     }
     
+    // Создаем таблицу личной информации студентов
+    if ($oldversion < 2026013006) {
+        $table = new xmldb_table('local_deanpromoodle_student_info');
+        
+        if (!$dbman->table_exists($table)) {
+            $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+            $table->add_field('userid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+            $table->add_field('lastname', XMLDB_TYPE_CHAR, '255', null, null, null, null);
+            $table->add_field('firstname', XMLDB_TYPE_CHAR, '255', null, null, null, null);
+            $table->add_field('middlename', XMLDB_TYPE_CHAR, '255', null, null, null, null);
+            $table->add_field('status', XMLDB_TYPE_CHAR, '100', null, null, null, null);
+            $table->add_field('enrollment_year', XMLDB_TYPE_INTEGER, '4', null, null, null, null);
+            $table->add_field('gender', XMLDB_TYPE_CHAR, '10', null, null, null, null);
+            $table->add_field('birthdate', XMLDB_TYPE_INTEGER, '10', null, null, null, null);
+            $table->add_field('snils', XMLDB_TYPE_CHAR, '20', null, null, null, null);
+            $table->add_field('mobile', XMLDB_TYPE_CHAR, '50', null, null, null, null);
+            $table->add_field('email', XMLDB_TYPE_CHAR, '255', null, null, null, null);
+            $table->add_field('citizenship', XMLDB_TYPE_CHAR, '100', null, null, null, null);
+            $table->add_field('birthplace', XMLDB_TYPE_CHAR, '255', null, null, null, null);
+            $table->add_field('id_type', XMLDB_TYPE_CHAR, '50', null, null, null, null);
+            $table->add_field('passport_number', XMLDB_TYPE_CHAR, '50', null, null, null, null);
+            $table->add_field('passport_issued_by', XMLDB_TYPE_CHAR, '255', null, null, null, null);
+            $table->add_field('passport_issue_date', XMLDB_TYPE_INTEGER, '10', null, null, null, null);
+            $table->add_field('passport_division_code', XMLDB_TYPE_CHAR, '20', null, null, null, null);
+            $table->add_field('postal_index', XMLDB_TYPE_CHAR, '20', null, null, null, null);
+            $table->add_field('country', XMLDB_TYPE_CHAR, '100', null, null, null, null);
+            $table->add_field('region', XMLDB_TYPE_CHAR, '255', null, null, null, null);
+            $table->add_field('city', XMLDB_TYPE_CHAR, '255', null, null, null, null);
+            $table->add_field('street', XMLDB_TYPE_CHAR, '255', null, null, null, null);
+            $table->add_field('house_apartment', XMLDB_TYPE_CHAR, '100', null, null, null, null);
+            $table->add_field('previous_institution', XMLDB_TYPE_CHAR, '255', null, null, null, null);
+            $table->add_field('previous_institution_year', XMLDB_TYPE_INTEGER, '4', null, null, null, null);
+            $table->add_field('cohort', XMLDB_TYPE_CHAR, '255', null, null, null, null);
+            $table->add_field('timemodified', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $table->add_field('timecreated', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            
+            $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+            $table->add_key('userid', XMLDB_KEY_FOREIGN, ['userid'], 'user', ['id']);
+            $table->add_index('userid', XMLDB_INDEX_UNIQUE, ['userid']);
+            
+            $dbman->create_table($table);
+        }
+        
+        upgrade_plugin_savepoint(true, 2026013006, 'local', 'deanpromoodle');
+    }
+    
     return true;
 }
