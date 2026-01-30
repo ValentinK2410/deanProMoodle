@@ -661,8 +661,6 @@ if ($action == 'viewprogram' && $programid > 0) {
                         }
                     }
                     
-                    // Показываем только экзамен, если он найден в курсе
-                    
                     if (!empty($statusitems)) {
                         $statushtml = implode(' ', $statusitems);
                     } else {
