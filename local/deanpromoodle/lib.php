@@ -219,159 +219,62 @@ function local_deanpromoodle_before_footer() {
                 return;
             }
             
-            // Создаем контейнер для кнопок
-            var buttonsContainer = document.createElement('div');
-            buttonsContainer.className = 'deanpromoodle-buttons-container';
-            buttonsContainer.style.cssText = 'display: inline-block;';
+            // Ищем контейнер moodle-sso-buttons-container
+            var ssoContainer = document.querySelector('.moodle-sso-buttons-container');
+            if (!ssoContainer) {
+                return; // Если контейнер не найден, не добавляем кнопки
+            }
             
-            // Создаем стили для кнопок внутри контейнера (копируем стили из .moodle-sso-buttons-container .sso-button)
-            var buttonBaseStyles = 'display: inline-block; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 14px; font-weight: 500; transition: all 0.3s ease; cursor: pointer; border: none; white-space: nowrap; color: white;';
+            // Получаем стили существующих кнопок из контейнера
+            var existingButton = ssoContainer.querySelector('.sso-button');
+            var buttonBaseStyles = '';
+            if (existingButton && window.getComputedStyle) {
+                var computed = window.getComputedStyle(existingButton);
+                buttonBaseStyles = 'display: ' + computed.display + '; ' +
+                    'padding: ' + computed.paddingTop + ' ' + computed.paddingRight + ' ' + computed.paddingBottom + ' ' + computed.paddingLeft + '; ' +
+                    'height: ' + computed.height + '; ' +
+                    'line-height: ' + computed.lineHeight + '; ' +
+                    'font-size: ' + computed.fontSize + '; ' +
+                    'box-sizing: ' + computed.boxSizing + '; ' +
+                    'border-radius: 4px; ' +
+                    'text-decoration: none; ' +
+                    'font-weight: 500; ' +
+                    'transition: all 0.3s ease; ' +
+                    'cursor: pointer; ' +
+                    'border: none; ' +
+                    'white-space: nowrap; ' +
+                    'color: white; ' +
+                    'vertical-align: middle;';
+            } else {
+                // Fallback стили, если не удалось получить вычисленные стили
+                buttonBaseStyles = 'display: inline-block; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 14px; font-weight: 500; transition: all 0.3s ease; cursor: pointer; border: none; white-space: nowrap; color: white;';
+            }
             
+            // Создаем кнопку "ЛК"
             var lkButton = document.createElement('a');
             lkButton.id = 'lk-button-deanpromoodle';
             lkButton.href = '" . $lkurlstring . "';
-            lkButton.className = 'deanpromoodle-button deanpromoodle-button-lk';
-            lkButton.style.cssText = buttonBaseStyles + ' margin-left: 10px; margin-right: 10px; background-color: #007bff;';
+            lkButton.className = 'sso-button deanpromoodle-button-lk';
+            lkButton.style.cssText = buttonBaseStyles + ' background-color: #007bff;';
             lkButton.textContent = 'ЛК';
             lkButton.title = 'Личный кабинет';
             
-            var teacherButton = null;
+            // Добавляем кнопку "ЛК" в контейнер
+            ssoContainer.appendChild(lkButton);
+            
+            // Создаем кнопку "Преподаватель" для админов
             " . ($isadmin ? "
-            teacherButton = document.createElement('a');
+            var teacherButton = document.createElement('a');
             teacherButton.id = 'teacher-button-deanpromoodle';
             teacherButton.href = '" . $teacherurlstring . "';
-            teacherButton.className = 'deanpromoodle-button deanpromoodle-button-teacher';
-            teacherButton.style.cssText = buttonBaseStyles + ' margin-left: 5px; margin-right: 10px; background-color: #6c757d;';
+            teacherButton.className = 'sso-button deanpromoodle-button-teacher';
+            teacherButton.style.cssText = buttonBaseStyles + ' background-color: #6c757d;';
             teacherButton.textContent = 'Преподаватель';
             teacherButton.title = 'Панель преподавателя';
+            
+            // Добавляем кнопку "Преподаватель" в контейнер
+            ssoContainer.appendChild(teacherButton);
             " : "") . "
-            
-            // Добавляем кнопки в контейнер
-            buttonsContainer.appendChild(lkButton);
-            if (teacherButton) {
-                buttonsContainer.appendChild(teacherButton);
-            }
-            
-            // Стратегия 1: Ищем контейнер moodle-sso-buttons-container и добавляем кнопки внутрь него
-            var found = false;
-            var ssoContainer = document.querySelector('.moodle-sso-buttons-container');
-            if (ssoContainer) {
-                // Добавляем контейнер с кнопками внутрь блока moodle-sso-buttons-container
-                ssoContainer.appendChild(buttonsContainer);
-                found = true;
-            }
-            
-            // Стратегия 2: Если контейнер не найден, ищем по тексту существующих кнопок
-            if (!found) {
-                var allLinks = document.querySelectorAll('a, button');
-                for (var i = 0; i < allLinks.length; i++) {
-                    var text = (allLinks[i].textContent || allLinks[i].innerText || '').trim();
-                    if (text.indexOf('Сайт семинарии') !== -1 || text.indexOf('Деканат') !== -1) {
-                        var parent = allLinks[i].parentElement;
-                        // Ищем контейнер с кнопками
-                        while (parent && parent !== document.body) {
-                            if (parent.classList && (parent.classList.contains('navbar-nav') || parent.classList.contains('nav') || parent.tagName === 'NAV' || parent.tagName === 'HEADER')) {
-                                if (parent.tagName === 'UL' || parent.classList.contains('navbar-nav')) {
-                                    var li = document.createElement('li');
-                                    li.className = 'nav-item';
-                                    li.appendChild(buttonsContainer);
-                                    parent.appendChild(li);
-                                } else {
-                                    parent.appendChild(buttonsContainer);
-                                }
-                                found = true;
-                                break;
-                            }
-                            parent = parent.parentElement;
-                        }
-                        if (found) break;
-                        
-                        // Если не нашли контейнер, добавляем рядом с найденной кнопкой
-                        if (!found) {
-                            var nextSibling = allLinks[i].nextSibling;
-                            if (nextSibling) {
-                                allLinks[i].parentElement.insertBefore(buttonsContainer, nextSibling);
-                            } else {
-                                allLinks[i].parentElement.appendChild(buttonsContainer);
-                            }
-                            found = true;
-                            break;
-                        }
-                    }
-                }
-            }
-            
-            // Стратегия 3: Ищем область пользователя или навигации
-            if (!found) {
-                var selectors = [
-                    '.usermenu',
-                    '.user-info',
-                    '[data-region=\"usermenu\"]',
-                    '.navbar-nav',
-                    '.header-actions',
-                    '.custom-nav-buttons',
-                    'header nav',
-                    '.navbar .container'
-                ];
-                
-                for (var s = 0; s < selectors.length; s++) {
-                    var element = document.querySelector(selectors[s]);
-                    if (element) {
-                        if (element.tagName === 'UL' || element.classList.contains('navbar-nav')) {
-                            var li = document.createElement('li');
-                            li.className = 'nav-item';
-                            li.appendChild(buttonsContainer);
-                            element.appendChild(li);
-                        } else {
-                            element.appendChild(buttonsContainer);
-                        }
-                        found = true;
-                        break;
-                    }
-                }
-            }
-            
-            // Стратегия 4: Добавляем в фиксированное положение в правом верхнем углу
-            if (!found) {
-                var container = document.createElement('div');
-                container.id = 'lk-button-container-deanpromoodle';
-                container.style.cssText = 'position: fixed; top: 70px; right: 20px; z-index: 9999; background: rgba(255,255,255,0.95); padding: 10px; border-radius: 5px; box-shadow: 0 2px 10px rgba(0,0,0,0.2);';
-                container.appendChild(buttonsContainer);
-                document.body.appendChild(container);
-            }
-        }
-        
-        // Функция для получения точных стилей существующей кнопки
-        function getButtonStyles() {
-            var existingButton = null;
-            var allButtons = document.querySelectorAll('a, button');
-            for (var b = 0; b < allButtons.length; b++) {
-                var btnText = (allButtons[b].textContent || allButtons[b].innerText || '').trim();
-                // Ищем именно кнопки 'Сайт семинарии' или 'Деканат'
-                if (btnText === 'Сайт семинарии' || btnText === 'Деканат') {
-                    existingButton = allButtons[b];
-                    break;
-                }
-            }
-            
-            if (existingButton && window.getComputedStyle) {
-                var computed = window.getComputedStyle(existingButton);
-                return {
-                    paddingTop: computed.paddingTop,
-                    paddingRight: computed.paddingRight,
-                    paddingBottom: computed.paddingBottom,
-                    paddingLeft: computed.paddingLeft,
-                    height: computed.height,
-                    minHeight: computed.minHeight,
-                    maxHeight: computed.maxHeight,
-                    lineHeight: computed.lineHeight,
-                    fontSize: computed.fontSize,
-                    boxSizing: computed.boxSizing,
-                    display: computed.display,
-                    verticalAlign: 'middle'
-                };
-            }
-            return null;
         }
         
         // Пытаемся добавить кнопку с несколькими попытками
@@ -379,21 +282,23 @@ function local_deanpromoodle_before_footer() {
             attempt = attempt || 0;
             if (attempt > 5) return; // Максимум 5 попыток
             
-            var styles = getButtonStyles();
-            if (!styles && attempt < 3) {
-                // Если стили не найдены, ждем и пробуем снова
+            // Если кнопка уже добавлена, ничего не делаем
+            if (document.getElementById('lk-button-deanpromoodle')) {
+                return;
+            }
+            
+            // Проверяем, существует ли контейнер moodle-sso-buttons-container
+            var ssoContainer = document.querySelector('.moodle-sso-buttons-container');
+            if (!ssoContainer && attempt < 3) {
+                // Если контейнер не найден, ждем и пробуем снова
                 setTimeout(function() { tryAddButton(attempt + 1); }, 500);
                 return;
             }
             
-            // Если контейнер уже добавлен, ничего не делаем
-            var existingContainer = document.querySelector('.deanpromoodle-buttons-container');
-            if (existingContainer) {
-                return;
+            // Если контейнер найден, добавляем кнопки
+            if (ssoContainer) {
+                addLKButton();
             }
-            
-            // Если контейнер еще не добавлен, добавляем его
-            addLKButton();
         }
         
         // Пытаемся добавить сразу
