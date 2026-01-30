@@ -206,6 +206,12 @@ function local_deanpromoodle_before_footer() {
         $teacherurlstring = $teacherurl->out(false);
     }
     
+    // Подготавливаем тексты для кнопок с правильным экранированием
+    $lkButtonText = json_encode('ЛК', JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    $lkButtonTitle = json_encode('Личный кабинет', JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    $teacherButtonText = json_encode('Преподаватель', JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    $teacherButtonTitle = json_encode('Панель преподавателя', JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    
     $js = "
     (function() {
         // Проверяем, не добавлена ли уже кнопка
@@ -225,27 +231,27 @@ function local_deanpromoodle_before_footer() {
                 return; // Если контейнер не найден, не добавляем кнопки
             }
             
-            // Создаем кнопку "ЛК"
+            // Создаем кнопку \"ЛК\"
             var lkButton = document.createElement('a');
             lkButton.id = 'lk-button-deanpromoodle';
-            lkButton.href = '" . $lkurlstring . "';
+            lkButton.href = " . json_encode($lkurlstring, JSON_UNESCAPED_SLASHES) . ";
             lkButton.className = 'deanpromoodle-button deanpromoodle-button-lk';
             lkButton.style.cssText = 'display: inline-block; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 14px; font-weight: 500; transition: 0.3s; cursor: pointer; border: medium; white-space: nowrap; color: white; margin-left: 10px; margin-right: 10px; background-color: rgb(0, 123, 255);';
-            lkButton.textContent = 'ЛК';
-            lkButton.title = 'Личный кабинет';
+            lkButton.textContent = " . $lkButtonText . ";
+            lkButton.title = " . $lkButtonTitle . ";
             
-            // Добавляем кнопку "ЛК" в контейнер
+            // Добавляем кнопку \"ЛК\" в контейнер
             ssoContainer.appendChild(lkButton);
             
             " . ($isadmin ? "
             // Создаем кнопку \"Преподаватель\" для админов
             var teacherButton = document.createElement('a');
             teacherButton.id = 'teacher-button-deanpromoodle';
-            teacherButton.href = '" . $teacherurlstring . "';
+            teacherButton.href = " . json_encode($teacherurlstring, JSON_UNESCAPED_SLASHES) . ";
             teacherButton.className = 'deanpromoodle-button deanpromoodle-button-teacher';
             teacherButton.style.cssText = 'display: inline-block; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 14px; font-weight: 500; transition: 0.3s; cursor: pointer; border: medium; white-space: nowrap; color: white; margin-left: 5px; margin-right: 10px; background-color: rgb(108, 117, 125);';
-            teacherButton.textContent = 'Преподаватель';
-            teacherButton.title = 'Панель преподавателя';
+            teacherButton.textContent = " . $teacherButtonText . ";
+            teacherButton.title = " . $teacherButtonTitle . ";
             
             // Добавляем кнопку \"Преподаватель\" в контейнер
             ssoContainer.appendChild(teacherButton);
