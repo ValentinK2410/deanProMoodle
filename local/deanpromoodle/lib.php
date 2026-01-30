@@ -166,7 +166,7 @@ function local_deanpromoodle_before_footer() {
             }
         }
         
-        // Check if user is student
+        // Check if user is student (check in any course context)
         $studentroles = ['student'];
         foreach ($roles as $role) {
             if (in_array($role->shortname, $studentroles)) {
@@ -174,15 +174,23 @@ function local_deanpromoodle_before_footer() {
                 break;
             }
         }
+        // If not found in system context, check if user is enrolled in any course as student
         if (!$isstudent) {
-            $systemcontext = context_system::instance();
-            $systemroles = get_user_roles($systemcontext, $USER->id, false);
-            foreach ($systemroles as $role) {
-                if (in_array($role->shortname, $studentroles)) {
-                    $isstudent = true;
-                    break;
+            $courses = enrol_get_all_users_courses($USER->id, true);
+            foreach ($courses as $course) {
+                $coursecontext = context_course::instance($course->id);
+                $courseroles = get_user_roles($coursecontext, $USER->id, false);
+                foreach ($courseroles as $role) {
+                    if (in_array($role->shortname, $studentroles)) {
+                        $isstudent = true;
+                        break 2;
+                    }
                 }
             }
+        }
+        // If still not found, assume any authenticated user without teacher/admin role is a student
+        if (!$isstudent && !$isteacher && !$isadmin) {
+            $isstudent = true;
         }
         
         // Determine URL based on role
