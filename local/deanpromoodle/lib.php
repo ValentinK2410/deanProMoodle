@@ -122,18 +122,18 @@ function local_deanpromoodle_has_access($pagename) {
 }
 
 /**
- * Добавляет кнопку "ЛК" в хедер Moodle в зависимости от роли пользователя
- * Вызывается через хук before_footer
+ * Adds LK button to Moodle header based on user role
+ * Called via before_footer hook
  */
 function local_deanpromoodle_before_footer() {
     global $PAGE, $USER, $OUTPUT;
     
-    // Проверяем, что пользователь залогинен
+    // Check if user is logged in
     if (!isloggedin() || isguestuser()) {
         return;
     }
     
-    // Определяем роль пользователя и URL для кнопки "ЛК"
+    // Determine user role and URL for LK button
     $lkurl = null;
     $isadmin = false;
     $isteacher = false;
@@ -141,12 +141,12 @@ function local_deanpromoodle_before_footer() {
     
     $context = context_system::instance();
     
-    // Проверяем, является ли пользователь админом
+    // Check if user is admin
     if (has_capability('moodle/site:config', $context) || has_capability('local/deanpromoodle:viewadmin', $context)) {
         $isadmin = true;
         $lkurl = new moodle_url('/local/deanpromoodle/pages/admin.php');
     } else {
-        // Проверяем, является ли пользователь преподавателем
+        // Check if user is teacher
         $teacherroles = ['teacher', 'editingteacher', 'coursecreator'];
         $roles = get_user_roles($context, $USER->id, false);
         foreach ($roles as $role) {
@@ -166,7 +166,7 @@ function local_deanpromoodle_before_footer() {
             }
         }
         
-        // Проверяем, является ли пользователь студентом
+        // Check if user is student
         $studentroles = ['student'];
         foreach ($roles as $role) {
             if (in_array($role->shortname, $studentroles)) {
@@ -185,7 +185,7 @@ function local_deanpromoodle_before_footer() {
             }
         }
         
-        // Определяем URL в зависимости от роли
+        // Determine URL based on role
         if ($isteacher && !$isadmin) {
             $lkurl = new moodle_url('/local/deanpromoodle/pages/teacher.php');
         } elseif ($isstudent && !$isteacher && !$isadmin) {
@@ -193,12 +193,12 @@ function local_deanpromoodle_before_footer() {
         }
     }
     
-    // Если URL не определен, не добавляем кнопку
+    // If URL is not defined, don't add button
     if (!$lkurl) {
         return;
     }
     
-    // Добавляем JavaScript для вставки кнопки "ЛК" в хедер
+    // Add JavaScript to insert LK button into header
     $lkurlstring = $lkurl->out(false);
     $teacherurlstring = '';
     if ($isadmin) {
