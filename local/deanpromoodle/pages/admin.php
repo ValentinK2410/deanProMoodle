@@ -2896,62 +2896,71 @@ switch ($tab) {
                         var xhr = new XMLHttpRequest();
                         xhr.open('GET', url, true);
                         xhr.onreadystatechange = function() {
-                            if (xhr.readyState === 4 && xhr.status === 200) {
-                                try {
-                                    var response = JSON.parse(xhr.responseText);
-                                    if (response.success && response.cohorts) {
-                                        if (response.cohorts.length > 0) {
-                                            var html = '<table class=\"table table-striped table-hover\" style=\"margin: 0; background: white;\"><thead><tr><th style=\"width: 60px;\">ID</th><th>Название</th><th style=\"width: 150px;\">ID Number</th><th style=\"width: 120px;\">Действие</th></tr></thead><tbody>';
-                                            response.cohorts.forEach(function(cohort) {
-                                                html += '<tr>';
-                                                html += '<td>' + cohort.id + '</td>';
-                                                html += '<td>' + escapeHtml(cohort.name) + '</td>';
-                                                html += '<td>' + (cohort.idnumber ? escapeHtml(cohort.idnumber) : '-') + '</td>';
-                                                html += '<td><button class=\"btn btn-sm btn-primary attach-cohort-btn\" data-cohort-id=\"' + cohort.id + '\" title=\"Прикрепить группу\" style=\"padding: 4px 8px; font-size: 12px;\"><i class=\"fas fa-link\"></i></button></td>';
-                                                html += '</tr>';
-                                            });
-                                            html += '</tbody></table>';
-                                            cohortsList.innerHTML = html;
-                                            
-                                            // Обработчики кнопок прикрепления
-                                            document.querySelectorAll('.attach-cohort-btn').forEach(function(btn) {
-                                                btn.addEventListener('click', function() {
-                                                    var cohortId = this.getAttribute('data-cohort-id');
-                                                    var btn = this;
-                                                    btn.disabled = true;
-                                                    btn.innerHTML = '<i class=\"fas fa-spinner fa-spin\"></i>';
-                                                    btn.title = 'Прикрепление...';
-                                                    
-                                                    var xhr2 = new XMLHttpRequest();
-                                                    xhr2.open('POST', '/local/deanpromoodle/pages/admin_ajax.php', true);
-                                                    xhr2.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-                                                    xhr2.onreadystatechange = function() {
-                                                        if (xhr2.readyState === 4 && xhr2.status === 200) {
-                                                            var response2 = JSON.parse(xhr2.responseText);
-                                                            if (response2.success) {
-                                                                alert('Группа успешно прикреплена к программе');
-                                                                location.reload();
-                                                            } else {
-                                                                alert('Ошибка: ' + (response2.error || 'Неизвестная ошибка'));
-                                                                btn.disabled = false;
-                                                                btn.innerHTML = '<i class=\"fas fa-link\"></i>';
-                                                                btn.title = 'Прикрепить группу';
-                                                            }
-                                                        }
-                                                    };
-                                                    xhr2.send('action=attachcohorttoprogram&programid=' + programId + '&cohortid=' + cohortId);
+                            if (xhr.readyState === 4) {
+                                if (xhr.status === 200) {
+                                    try {
+                                        var response = JSON.parse(xhr.responseText);
+                                        if (response.success && response.cohorts) {
+                                            if (response.cohorts.length > 0) {
+                                                var html = '<table class=\"table table-striped table-hover\" style=\"margin: 0; background: white;\"><thead><tr><th style=\"width: 60px;\">ID</th><th>Название</th><th style=\"width: 150px;\">ID Number</th><th style=\"width: 120px;\">Действие</th></tr></thead><tbody>';
+                                                response.cohorts.forEach(function(cohort) {
+                                                    html += '<tr>';
+                                                    html += '<td>' + cohort.id + '</td>';
+                                                    html += '<td>' + escapeHtml(cohort.name) + '</td>';
+                                                    html += '<td>' + (cohort.idnumber ? escapeHtml(cohort.idnumber) : '-') + '</td>';
+                                                    html += '<td><button class=\"btn btn-sm btn-primary attach-cohort-btn\" data-cohort-id=\"' + cohort.id + '\" title=\"Прикрепить группу\" style=\"padding: 4px 8px; font-size: 12px;\"><i class=\"fas fa-link\"></i></button></td>';
+                                                    html += '</tr>';
                                                 });
-                                            });
+                                                html += '</tbody></table>';
+                                                cohortsList.innerHTML = html;
+                                                
+                                                // Обработчики кнопок прикрепления
+                                                document.querySelectorAll('.attach-cohort-btn').forEach(function(btn) {
+                                                    btn.addEventListener('click', function() {
+                                                        var cohortId = this.getAttribute('data-cohort-id');
+                                                        var btn = this;
+                                                        btn.disabled = true;
+                                                        btn.innerHTML = '<i class=\"fas fa-spinner fa-spin\"></i>';
+                                                        btn.title = 'Прикрепление...';
+                                                        
+                                                        var xhr2 = new XMLHttpRequest();
+                                                        xhr2.open('POST', '/local/deanpromoodle/pages/admin_ajax.php', true);
+                                                        xhr2.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                                                        xhr2.onreadystatechange = function() {
+                                                            if (xhr2.readyState === 4 && xhr2.status === 200) {
+                                                                var response2 = JSON.parse(xhr2.responseText);
+                                                                if (response2.success) {
+                                                                    alert('Группа успешно прикреплена к программе');
+                                                                    location.reload();
+                                                                } else {
+                                                                    alert('Ошибка: ' + (response2.error || 'Неизвестная ошибка'));
+                                                                    btn.disabled = false;
+                                                                    btn.innerHTML = '<i class=\"fas fa-link\"></i>';
+                                                                    btn.title = 'Прикрепить группу';
+                                                                }
+                                                            }
+                                                        };
+                                                        xhr2.send('action=attachcohorttoprogram&programid=' + programId + '&cohortid=' + cohortId);
+                                                    });
+                                                });
+                                            } else {
+                                                cohortsList.innerHTML = '<div class=\"alert alert-info\" style=\"margin: 0;\">Когорты не найдены или все уже прикреплены</div>';
+                                            }
                                         } else {
-                                            cohortsList.innerHTML = '<div class=\"alert alert-info\" style=\"margin: 0;\">Когорты не найдены или все уже прикреплены</div>';
+                                            cohortsList.innerHTML = '<div class=\"alert alert-danger\" style=\"margin: 0;\">Ошибка: ' + (response.error || 'Неизвестная ошибка') + '</div>';
                                         }
-                                    } else {
-                                        cohortsList.innerHTML = '<div class=\"alert alert-danger\" style=\"margin: 0;\">Ошибка: ' + (response.error || 'Неизвестная ошибка') + '</div>';
+                                    } catch (e) {
+                                        console.error('Ошибка парсинга JSON:', e);
+                                        console.error('Ответ сервера:', xhr.responseText);
+                                        cohortsList.innerHTML = '<div class=\"alert alert-danger\" style=\"margin: 0;\">Ошибка при обработке ответа: ' + e.message + '</div>';
                                     }
-                                } catch (e) {
-                                    cohortsList.innerHTML = '<div class=\"alert alert-danger\" style=\"margin: 0;\">Ошибка при обработке ответа</div>';
+                                } else {
+                                    cohortsList.innerHTML = '<div class=\"alert alert-danger\" style=\"margin: 0;\">Ошибка загрузки данных (HTTP ' + xhr.status + ')</div>';
                                 }
                             }
+                        };
+                        xhr.onerror = function() {
+                            cohortsList.innerHTML = '<div class=\"alert alert-danger\" style=\"margin: 0;\">Ошибка сети при загрузке данных</div>';
                         };
                         xhr.send();
                     }

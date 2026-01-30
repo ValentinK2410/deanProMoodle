@@ -556,6 +556,10 @@ if ($action == 'getteachercourses' && $teacherid > 0) {
     // Получение списка когорт (глобальных групп) с фильтрацией
     global $DB;
     
+    // Получаем параметр поиска (может быть не передан)
+    $search = optional_param('search', '', PARAM_TEXT);
+    $programid = optional_param('programid', 0, PARAM_INT);
+    
     $cohorts = [];
     if (!empty($search) && strlen($search) >= 2) {
         // Поиск по названию или ID number
@@ -565,7 +569,7 @@ if ($action == 'getteachercourses' && $teacherid > 0) {
              FROM {cohort} c
              WHERE c.name LIKE ? OR c.idnumber LIKE ?
              ORDER BY c.name ASC
-             LIMIT 50",
+             LIMIT 100",
             [$searchpattern, $searchpattern]
         );
     } else {
