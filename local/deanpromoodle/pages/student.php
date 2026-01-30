@@ -591,6 +591,7 @@ if ($action == 'viewprogram' && $programid > 0) {
                         // Проверяем задания
                         foreach ($assignments as $assignment) {
                             $assignmentname = mb_strtolower($assignment->name);
+                            // Проверяем отчеты о чтении
                             if (strpos($assignmentname, 'отчет') !== false && strpos($assignmentname, 'чтени') !== false) {
                                 $hasassignments = true;
                                 $grade = $DB->get_record('assign_grades', [
@@ -598,6 +599,36 @@ if ($action == 'viewprogram' && $programid > 0) {
                                     'userid' => $USER->id
                                 ]);
                                 if (!$grade || $grade->grade === null || $grade->grade < 0) {
+                                    $allassignmentsgraded = false;
+                                }
+                            }
+                            // Проверяем письменные работы
+                            if (strpos($assignmentname, 'письменн') !== false) {
+                                $hasassignments = true;
+                                // Проверяем наличие файлов или текста
+                                $submission = $DB->get_record('assign_submission', [
+                                    'assignment' => $assignment->id,
+                                    'userid' => $USER->id
+                                ]);
+                                $hasfiles = false;
+                                if ($submission) {
+                                    $filecount = $DB->count_records_sql(
+                                        "SELECT COUNT(*) FROM {assignsubmission_file} WHERE submission = ?",
+                                        [$submission->id]
+                                    );
+                                    $textcount = $DB->count_records_sql(
+                                        "SELECT COUNT(*) FROM {assignsubmission_onlinetext} WHERE submission = ? AND onlinetext IS NOT NULL AND onlinetext != ''",
+                                        [$submission->id]
+                                    );
+                                    $hasfiles = ($filecount > 0 || $textcount > 0);
+                                }
+                                // Проверяем оценку
+                                $grade = $DB->get_record('assign_grades', [
+                                    'assignment' => $assignment->id,
+                                    'userid' => $USER->id
+                                ]);
+                                // Письменная работа считается сданной, если есть оценка ИЛИ есть файлы
+                                if (!($grade && $grade->grade !== null && $grade->grade >= 0) && !$hasfiles) {
                                     $allassignmentsgraded = false;
                                 }
                             }
