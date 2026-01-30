@@ -219,30 +219,49 @@ function local_deanpromoodle_before_footer() {
                 return;
             }
             
-            // Пытаемся скопировать стили с существующих кнопок для точного совпадения
+            // Ищем существующие кнопки для копирования стилей
             var existingButton = null;
             var allButtons = document.querySelectorAll('a, button');
             for (var b = 0; b < allButtons.length; b++) {
                 var btnText = (allButtons[b].textContent || allButtons[b].innerText || '').trim();
-                if (btnText.indexOf('Сайт семинарии') !== -1 || btnText.indexOf('Деканат') !== -1 || btnText.indexOf('Преподаватель') !== -1) {
+                // Ищем именно кнопки 'Сайт семинарии' или 'Деканат' для точного совпадения
+                if (btnText.indexOf('Сайт семинарии') !== -1 || btnText.indexOf('Деканат') !== -1) {
                     existingButton = allButtons[b];
                     break;
                 }
             }
             
+            // Копируем все важные стили с существующей кнопки
             var buttonStyles = '';
             if (existingButton && window.getComputedStyle) {
                 var computed = window.getComputedStyle(existingButton);
-                buttonStyles = 'padding: ' + computed.padding + '; height: ' + computed.height + '; line-height: ' + computed.lineHeight + '; font-size: ' + computed.fontSize + '; vertical-align: middle;';
+                // Копируем все размерные стили
+                var paddingTop = computed.paddingTop || '6px';
+                var paddingRight = computed.paddingRight || '12px';
+                var paddingBottom = computed.paddingBottom || '6px';
+                var paddingLeft = computed.paddingLeft || '12px';
+                var height = computed.height || 'auto';
+                var lineHeight = computed.lineHeight || '1.4';
+                var fontSize = computed.fontSize || '14px';
+                var boxSizing = computed.boxSizing || 'border-box';
+                
+                buttonStyles = 'padding: ' + paddingTop + ' ' + paddingRight + ' ' + paddingBottom + ' ' + paddingLeft + '; ' +
+                              'height: ' + height + '; ' +
+                              'line-height: ' + lineHeight + '; ' +
+                              'font-size: ' + fontSize + '; ' +
+                              'box-sizing: ' + boxSizing + '; ' +
+                              'vertical-align: middle; ' +
+                              'display: inline-block;';
             } else {
-                buttonStyles = 'padding: 6px 12px; height: auto; line-height: 1.4; font-size: 14px; vertical-align: middle;';
+                // Стандартные стили, если не удалось найти существующую кнопку
+                buttonStyles = 'padding: 6px 12px; height: 32px; line-height: 20px; font-size: 14px; box-sizing: border-box; vertical-align: middle; display: inline-block;';
             }
             
             var lkButton = document.createElement('a');
             lkButton.id = 'lk-button-deanpromoodle';
             lkButton.href = '" . $lkurlstring . "';
             lkButton.className = 'btn btn-primary';
-            lkButton.style.cssText = 'margin-left: 10px; margin-right: 10px; background-color: #007bff; color: white; text-decoration: none; border-radius: 4px; font-weight: 500; display: inline-block; border: none; ' + buttonStyles;
+            lkButton.style.cssText = 'margin-left: 10px; margin-right: 10px; background-color: #007bff; color: white; text-decoration: none; border-radius: 4px; font-weight: 500; border: none; ' + buttonStyles;
             lkButton.textContent = 'ЛК';
             lkButton.title = 'Личный кабинет';
             
@@ -251,7 +270,7 @@ function local_deanpromoodle_before_footer() {
             teacherButton = document.createElement('a');
             teacherButton.href = '" . $teacherurlstring . "';
             teacherButton.className = 'btn btn-secondary';
-            teacherButton.style.cssText = 'margin-left: 5px; margin-right: 10px; background-color: #6c757d; color: white; text-decoration: none; border-radius: 4px; font-weight: 500; display: inline-block; border: none; ' + buttonStyles;
+            teacherButton.style.cssText = 'margin-left: 5px; margin-right: 10px; background-color: #6c757d; color: white; text-decoration: none; border-radius: 4px; font-weight: 500; border: none; ' + buttonStyles;
             teacherButton.textContent = 'Преподаватель';
             teacherButton.title = 'Панель преподавателя';
             " : "") . "
