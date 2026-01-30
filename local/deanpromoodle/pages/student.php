@@ -140,6 +140,7 @@ if (!$isstudent) {
 
 // Получение параметров
 $tab = optional_param('tab', 'courses', PARAM_ALPHA); // courses, programs
+$subtab = optional_param('subtab', 'programs', PARAM_ALPHA); // programs, additional для вкладки "Личная информация и статус"
 $action = optional_param('action', '', PARAM_ALPHA); // viewprogram
 $programid = optional_param('programid', 0, PARAM_INT);
 
@@ -1015,9 +1016,32 @@ if ($action == 'viewprogram' && $programid > 0) {
     case 'programs':
         // Вкладка "Личная информация и статус"
         echo html_writer::start_div('local-deanpromoodle-student-content', ['style' => 'margin-top: 20px;']);
-        echo html_writer::tag('h2', 'Личная информация и статус', ['style' => 'margin-bottom: 20px;']);
         
-        try {
+        // Заголовок с ФИО и фото
+        echo html_writer::start_div('', ['style' => 'display: flex; align-items: center; margin-bottom: 30px; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);']);
+        // Фото студента
+        $userpicture = $OUTPUT->user_picture($USER, ['size' => 100, 'class' => 'userpicture']);
+        echo html_writer::div($userpicture, '', ['style' => 'margin-right: 20px;']);
+        // ФИО студента
+        echo html_writer::tag('h1', fullname($USER), ['style' => 'margin: 0; font-size: 2em;']);
+        echo html_writer::end_div();
+        
+        // Подвкладки
+        $subtabs = [];
+        $subtabs[] = new tabobject('programs', 
+            new moodle_url('/local/deanpromoodle/pages/student.php', ['tab' => 'programs', 'subtab' => 'programs']),
+            'Программы');
+        $subtabs[] = new tabobject('additional', 
+            new moodle_url('/local/deanpromoodle/pages/student.php', ['tab' => 'programs', 'subtab' => 'additional']),
+            'Дополнительные данные');
+        
+        echo $OUTPUT->tabtree($subtabs, $subtab);
+        
+        // Содержимое подвкладок
+        switch ($subtab) {
+        case 'programs':
+            // Подвкладка "Программы"
+            try {
             // Получаем когорты, к которым принадлежит студент
             $studentcohorts = $DB->get_records_sql(
                 "SELECT c.id, c.name, c.idnumber, c.description
@@ -1177,8 +1201,138 @@ if ($action == 'viewprogram' && $programid > 0) {
                     echo html_writer::end_div();
                 }
             }
-        } catch (\Exception $e) {
-            echo html_writer::div('Ошибка: ' . $e->getMessage(), 'alert alert-danger');
+            } catch (\Exception $e) {
+                echo html_writer::div('Ошибка: ' . $e->getMessage(), 'alert alert-danger');
+            }
+            break;
+            
+        case 'additional':
+            // Подвкладка "Дополнительные данные"
+            try {
+                // Получаем группы (когорты) студента
+                $studentcohorts = $DB->get_records_sql(
+                    "SELECT c.id, c.name, c.idnumber, c.description
+                     FROM {cohort_members} cm
+                     JOIN {cohort} c ON c.id = cm.cohortid
+                     WHERE cm.userid = ?
+                     ORDER BY c.name ASC",
+                    [$USER->id]
+                );
+                
+                // Получаем дату зачисления (берем самую раннюю дату зачисления в любой курс)
+                $enrollmentdate = null;
+                $enrollments = $DB->get_records_sql(
+                    "SELECT MIN(ue.timestart) as earliest_enrollment
+                     FROM {user_enrolments} ue
+                     JOIN {enrol} e ON e.id = ue.enrolid
+                     WHERE ue.userid = ? AND ue.status = 0 AND e.status = 0",
+                    [$USER->id]
+                );
+                if (!empty($enrollments)) {
+                    $enrollment = reset($enrollments);
+                    if ($enrollment->earliest_enrollment > 0) {
+                        $enrollmentdate = $enrollment->earliest_enrollment;
+                    }
+                }
+                
+                // Получаем адрес из профиля пользователя
+                $address = $USER->address ? $USER->address : '';
+                
+                // Получаем СНИЛС (может быть в idnumber или в customfield)
+                $snils = $USER->idnumber ? $USER->idnumber : '';
+                // Также проверяем customfield для СНИЛС
+                if (empty($snils)) {
+                    require_once($CFG->dirroot . '/user/profile/lib.php');
+                    $userfields = profile_user_record($USER->id);
+                    if (isset($userfields->snils)) {
+                        $snils = $userfields->snils;
+                    }
+                }
+                
+                // Стили для таблицы дополнительных данных
+                echo html_writer::start_tag('style');
+                echo "
+                    .additional-data-table {
+                        background: white;
+                        border-radius: 8px;
+                        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                        overflow: hidden;
+                    }
+                    .additional-data-table table {
+                        margin: 0;
+                        width: 100%;
+                    }
+                    .additional-data-table tbody tr {
+                        border-bottom: 1px solid #f0f0f0;
+                    }
+                    .additional-data-table tbody tr:last-child {
+                        border-bottom: none;
+                    }
+                    .additional-data-table tbody td {
+                        padding: 16px;
+                        vertical-align: middle;
+                    }
+                    .additional-data-table tbody td:first-child {
+                        font-weight: 600;
+                        width: 250px;
+                        color: #495057;
+                    }
+                    .additional-data-table tbody td:last-child {
+                        color: #212529;
+                    }
+                ";
+                echo html_writer::end_tag('style');
+                
+                echo html_writer::start_div('additional-data-table');
+                echo html_writer::start_tag('table', ['class' => 'table']);
+                echo html_writer::start_tag('tbody');
+                
+                // Группа
+                echo html_writer::start_tag('tr');
+                echo html_writer::tag('td', 'Группа');
+                echo html_writer::start_tag('td');
+                if (!empty($studentcohorts)) {
+                    $cohortnames = [];
+                    foreach ($studentcohorts as $cohort) {
+                        $cohortnames[] = htmlspecialchars($cohort->name, ENT_QUOTES, 'UTF-8');
+                    }
+                    echo implode(', ', $cohortnames);
+                } else {
+                    echo '-';
+                }
+                echo html_writer::end_tag('td');
+                echo html_writer::end_tag('tr');
+                
+                // Дата зачисления
+                echo html_writer::start_tag('tr');
+                echo html_writer::tag('td', 'Дата зачисления');
+                echo html_writer::tag('td', $enrollmentdate ? userdate($enrollmentdate, get_string('strftimedatefullshort')) : '-');
+                echo html_writer::end_tag('tr');
+                
+                // Адрес
+                echo html_writer::start_tag('tr');
+                echo html_writer::tag('td', 'Адрес');
+                echo html_writer::tag('td', $address ? htmlspecialchars($address, ENT_QUOTES, 'UTF-8') : '-');
+                echo html_writer::end_tag('tr');
+                
+                // СНИЛС
+                echo html_writer::start_tag('tr');
+                echo html_writer::tag('td', 'СНИЛС');
+                echo html_writer::tag('td', $snils ? htmlspecialchars($snils, ENT_QUOTES, 'UTF-8') : '-');
+                echo html_writer::end_tag('tr');
+                
+                echo html_writer::end_tag('tbody');
+                echo html_writer::end_tag('table');
+                echo html_writer::end_div();
+            } catch (\Exception $e) {
+                echo html_writer::div('Ошибка: ' . $e->getMessage(), 'alert alert-danger');
+            }
+            break;
+            
+        default:
+            // По умолчанию показываем программы
+            redirect(new moodle_url('/local/deanpromoodle/pages/student.php', ['tab' => 'programs', 'subtab' => 'programs']));
+            break;
         }
         
         echo html_writer::end_div();
