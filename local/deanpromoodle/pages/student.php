@@ -728,10 +728,12 @@ if ($action == 'viewprogram' && $programid > 0) {
                     foreach ($assignments as $assignment) {
                         $assignmentname = mb_strtolower($assignment->name);
                         
-                        // Определяем тип задания по названию (только отчеты о чтении)
+                        // Определяем тип задания по названию
                         $assignmenttype = '';
                         if (strpos($assignmentname, 'отчет') !== false && strpos($assignmentname, 'чтени') !== false) {
                             $assignmenttype = 'reading_report';
+                        } elseif (strpos($assignmentname, 'письменн') !== false) {
+                            $assignmenttype = 'written_work';
                         }
                         
                         if ($assignmenttype == 'reading_report') {
@@ -793,6 +795,47 @@ if ($action == 'viewprogram' && $programid > 0) {
                             $badgecontent = htmlspecialchars($statustext, ENT_QUOTES, 'UTF-8');
                             $statusitems[] = '<span class="badge assignment-status-item ' . $statusclass . '">' . 
                                 html_writer::link($assignmenturl, $badgecontent, ['target' => '_blank']) . '</span>';
+                        } elseif ($assignmenttype == 'written_work') {
+                            // Письменная работа - показываем только если не сдана
+                            // Получаем cmid для ссылки
+                            $cm = get_coursemodule_from_instance('assign', $assignment->id, $course->id);
+                            if (!$cm) {
+                                continue; // Пропускаем, если модуль не найден
+                            }
+                            $assignmenturl = new moodle_url('/mod/assign/view.php', ['id' => $cm->id]);
+                            
+                            // Проверяем, сдано ли задание
+                            $submission = $DB->get_record('assign_submission', [
+                                'assignment' => $assignment->id,
+                                'userid' => $USER->id
+                            ]);
+                            
+                            // Проверяем наличие файлов или текста
+                            $hasfiles = false;
+                            if ($submission) {
+                                $filecount = $DB->count_records_sql(
+                                    "SELECT COUNT(*) FROM {assignsubmission_file} WHERE submission = ?",
+                                    [$submission->id]
+                                );
+                                $textcount = $DB->count_records_sql(
+                                    "SELECT COUNT(*) FROM {assignsubmission_onlinetext} WHERE submission = ? AND onlinetext IS NOT NULL AND onlinetext != ''",
+                                    [$submission->id]
+                                );
+                                $hasfiles = ($filecount > 0 || $textcount > 0);
+                            }
+                            
+                            $grade = $DB->get_record('assign_grades', [
+                                'assignment' => $assignment->id,
+                                'userid' => $USER->id
+                            ]);
+                            
+                            // Показываем только если не сдано (нет оценки и нет файлов)
+                            if (!($grade && $grade->grade !== null && $grade->grade >= 0) && !$hasfiles) {
+                                $statustext = 'Сдача письменной работы';
+                                $badgecontent = htmlspecialchars($statustext, ENT_QUOTES, 'UTF-8');
+                                $statusitems[] = '<span class="badge assignment-status-item assignment-status-red">' . 
+                                    html_writer::link($assignmenturl, $badgecontent, ['target' => '_blank']) . '</span>';
+                            }
                         }
                     }
                     
