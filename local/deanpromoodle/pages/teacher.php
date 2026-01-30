@@ -247,6 +247,109 @@ if (!empty($teacherroleids) && $studentroleid) {
     }
 }
 
+// Подсчет проверенных заданий, тестов и форумов за текущий календарный месяц
+$currentmonthstart = mktime(0, 0, 0, date('n'), 1, date('Y')); // Первый день текущего месяца
+$currentmonthend = mktime(23, 59, 59, date('n'), date('t'), date('Y')); // Последний день текущего месяца
+
+// Подсчет проверенных заданий за текущий месяц
+$gradedassignmentscount = 0;
+if (!empty($teachercourses)) {
+    $courseids = array_keys($teachercourses);
+    $courseids_placeholders = implode(',', array_fill(0, count($courseids), '?'));
+    
+    // Получаем все задания из курсов преподавателя
+    $allassignments = [];
+    foreach ($teachercourses as $course) {
+        try {
+            $assignments = get_all_instances_in_course('assign', $course, false);
+            foreach ($assignments as $assignment) {
+                $allassignments[] = $assignment->id;
+            }
+        } catch (\Exception $e) {
+            // Пропускаем курс, если не удалось получить задания
+        }
+    }
+    
+    if (!empty($allassignments)) {
+        $assignmentids_placeholders = implode(',', array_fill(0, count($allassignments), '?'));
+        // Подсчитываем оценки, поставленные текущим преподавателем в текущем месяце
+        // Проверяем через assign_grades, где timemodified в текущем месяце
+        // И проверяем, что это оценка от преподавателя (grader = USER->id или проверяем через контекст)
+        $gradedassignmentscount = $DB->count_records_sql(
+            "SELECT COUNT(DISTINCT ag.id)
+             FROM {assign_grades} ag
+             JOIN {assign} a ON a.id = ag.assignment
+             WHERE ag.assignment IN ($assignmentids_placeholders)
+             AND ag.timemodified >= ? AND ag.timemodified <= ?
+             AND ag.grader = ?",
+            array_merge($allassignments, [$currentmonthstart, $currentmonthend, $USER->id])
+        );
+    }
+}
+
+// Подсчет проверенных тестов за текущий месяц
+$gradedquizzescount = 0;
+if (!empty($teachercourses)) {
+    $allquizzes = [];
+    foreach ($teachercourses as $course) {
+        try {
+            $quizzes = get_all_instances_in_course('quiz', $course, false);
+            foreach ($quizzes as $quiz) {
+                $allquizzes[] = $quiz->id;
+            }
+        } catch (\Exception $e) {
+            // Пропускаем курс, если не удалось получить тесты
+        }
+    }
+    
+    if (!empty($allquizzes)) {
+        $quizids_placeholders = implode(',', array_fill(0, count($allquizzes), '?'));
+        // Подсчитываем оценки тестов, где timemodified в текущем месяце
+        // Для quiz_grades нет поля grader, но можно проверить через попытки и оценки
+        // Проверяем, что есть попытка и оценка в текущем месяце
+        $gradedquizzescount = $DB->count_records_sql(
+            "SELECT COUNT(DISTINCT qg.id)
+             FROM {quiz_grades} qg
+             JOIN {quiz_attempts} qa ON qa.quiz = qg.quiz AND qa.userid = qg.userid
+             WHERE qg.quiz IN ($quizids_placeholders)
+             AND qg.timemodified >= ? AND qg.timemodified <= ?
+             AND qa.state = 'finished'",
+            array_merge($allquizzes, [$currentmonthstart, $currentmonthend])
+        );
+    }
+}
+
+// Подсчет ответов на форумы за текущий месяц
+$forumrepliescount = 0;
+if (!empty($teachercourses)) {
+    $allforums = [];
+    foreach ($teachercourses as $course) {
+        try {
+            $forums = get_all_instances_in_course('forum', $course, false);
+            foreach ($forums as $forum) {
+                $allforums[] = $forum->id;
+            }
+        } catch (\Exception $e) {
+            // Пропускаем курс, если не удалось получить форумы
+        }
+    }
+    
+    if (!empty($allforums)) {
+        $forumids_placeholders = implode(',', array_fill(0, count($allforums), '?'));
+        // Подсчитываем ответы преподавателя на форумах в текущем месяце
+        $forumrepliescount = $DB->count_records_sql(
+            "SELECT COUNT(DISTINCT p.id)
+             FROM {forum_posts} p
+             JOIN {forum_discussions} d ON d.id = p.discussion
+             WHERE d.forum IN ($forumids_placeholders)
+             AND p.userid = ?
+             AND p.created >= ? AND p.created <= ?
+             AND p.parent > 0", // Только ответы, не начальные сообщения
+            array_merge($allforums, [$USER->id, $currentmonthstart, $currentmonthend])
+        );
+    }
+}
+
 // Вывод страницы
 echo $OUTPUT->header();
 // Заголовок уже выводится через set_heading(), не нужно дублировать
@@ -276,6 +379,23 @@ $tabs[] = new tabobject('forums',
     $forumsstr . ' (' . $forumscount . ')');
 
 echo $OUTPUT->tabtree($tabs, $tab);
+
+// Блок со статистикой за текущий месяц
+$monthname = strftime('%B %Y', $currentmonthstart);
+$monthnameru = [
+    'January' => 'Январь', 'February' => 'Февраль', 'March' => 'Март', 'April' => 'Апрель',
+    'May' => 'Май', 'June' => 'Июнь', 'July' => 'Июль', 'August' => 'Август',
+    'September' => 'Сентябрь', 'October' => 'Октябрь', 'November' => 'Ноябрь', 'December' => 'Декабрь'
+];
+$monthnameru_key = date('F', $currentmonthstart);
+$monthdisplay = isset($monthnameru[$monthnameru_key]) ? $monthnameru[$monthnameru_key] . ' ' . date('Y', $currentmonthstart) : $monthname;
+
+echo html_writer::start_div('alert alert-info', ['style' => 'margin-top: 20px; margin-bottom: 20px; padding: 15px;']);
+echo html_writer::tag('strong', 'Статистика за ' . $monthdisplay . ': ', ['style' => 'margin-right: 15px;']);
+echo html_writer::tag('span', 'Проверено заданий: ' . $gradedassignmentscount, ['style' => 'margin-right: 20px; color: #28a745; font-weight: 500;']);
+echo html_writer::tag('span', 'Проверено тестов: ' . $gradedquizzescount, ['style' => 'margin-right: 20px; color: #007bff; font-weight: 500;']);
+echo html_writer::tag('span', 'Ответов на форумах: ' . $forumrepliescount, ['style' => 'color: #17a2b8; font-weight: 500;']);
+echo html_writer::end_div();
 
 // Фильтр по курсам
 if (count($teachercourses) > 1) {
