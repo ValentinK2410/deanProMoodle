@@ -503,6 +503,9 @@ if ($action == 'viewprogram' && $programid > 0) {
                     $statushtml = '';
                     $statusitems = [];
                     
+                    // Создаем URL курса для ссылок на не найденные задания
+                    $courseurl = new moodle_url('/course/view.php', ['id' => $course->id]);
+                    
                     // Получаем задания курса
                     try {
                         $assignments = get_all_instances_in_course('assign', $course, false);
@@ -516,6 +519,8 @@ if ($action == 'viewprogram' && $programid > 0) {
                     // Отслеживаем найденные типы заданий
                     $foundreadingreport = false;
                     $foundwrittenwork = false;
+                    $readingreporturl = $courseurl;
+                    $writtenworkurl = $courseurl;
                     
                     foreach ($assignments as $assignment) {
                         $assignmentname = mb_strtolower($assignment->name);
@@ -537,6 +542,13 @@ if ($action == 'viewprogram' && $programid > 0) {
                                 continue; // Пропускаем, если модуль не найден
                             }
                             $assignmenturl = new moodle_url('/mod/assign/view.php', ['id' => $cm->id]);
+                            
+                            // Сохраняем URL для этого типа задания
+                            if ($assignmenttype == 'reading_report') {
+                                $readingreporturl = $assignmenturl;
+                            } elseif ($assignmenttype == 'written_work') {
+                                $writtenworkurl = $assignmenturl;
+                            }
                             
                             // Проверяем статус задания для студента
                             $submission = $DB->get_record('assign_submission', [
@@ -600,16 +612,15 @@ if ($action == 'viewprogram' && $programid > 0) {
                         }
                     }
                     
-                    // Если не найдены типы заданий, все равно показываем их со ссылкой на курс
+                    // Всегда показываем все типы заданий
+                    // Если не найдены типы заданий, показываем их со ссылкой на курс
                     if (!$foundreadingreport) {
-                        $courseurl = new moodle_url('/course/view.php', ['id' => $course->id]);
                         $statusitems[] = '<span class="badge assignment-status-item assignment-status-red">' . 
-                            html_writer::link($courseurl, '<i class="fas fa-times-circle"></i> Сдача отчета о чтении', ['target' => '_blank']) . '</span>';
+                            html_writer::link($readingreporturl, '<i class="fas fa-times-circle"></i> Сдача отчета о чтении', ['target' => '_blank']) . '</span>';
                     }
                     if (!$foundwrittenwork) {
-                        $courseurl = new moodle_url('/course/view.php', ['id' => $course->id]);
                         $statusitems[] = '<span class="badge assignment-status-item assignment-status-red">' . 
-                            html_writer::link($courseurl, '<i class="fas fa-times-circle"></i> Сдача письменной работы', ['target' => '_blank']) . '</span>';
+                            html_writer::link($writtenworkurl, '<i class="fas fa-times-circle"></i> Сдача письменной работы', ['target' => '_blank']) . '</span>';
                     }
                     
                     // Получаем тесты (экзамены) курса
@@ -622,6 +633,7 @@ if ($action == 'viewprogram' && $programid > 0) {
                         $quizzes = [];
                     }
                     $foundexam = false;
+                    $examurl = $courseurl;
                     
                     foreach ($quizzes as $quiz) {
                         $quizname = mb_strtolower($quiz->name);
@@ -636,6 +648,7 @@ if ($action == 'viewprogram' && $programid > 0) {
                                 continue; // Пропускаем, если модуль не найден
                             }
                             $quizurl = new moodle_url('/mod/quiz/view.php', ['id' => $cm->id]);
+                            $examurl = $quizurl; // Сохраняем URL для экзамена
                             
                             // Проверяем, есть ли попытка у студента (берем последнюю завершенную попытку)
                             $attempt = $DB->get_record_sql(
@@ -682,11 +695,11 @@ if ($action == 'viewprogram' && $programid > 0) {
                         }
                     }
                     
-                    // Если экзамен не найден, все равно показываем его как не сданный со ссылкой на курс
+                    // Всегда показываем экзамен
+                    // Если экзамен не найден, показываем его как не сданный со ссылкой на курс
                     if (!$foundexam) {
-                        $courseurl = new moodle_url('/course/view.php', ['id' => $course->id]);
                         $statusitems[] = '<span class="badge assignment-status-item assignment-status-red">' . 
-                            html_writer::link($courseurl, '<i class="fas fa-times-circle"></i> Экзамен', ['target' => '_blank']) . '</span>';
+                            html_writer::link($examurl, '<i class="fas fa-times-circle"></i> Экзамен', ['target' => '_blank']) . '</span>';
                     }
                     
                     if (!empty($statusitems)) {
