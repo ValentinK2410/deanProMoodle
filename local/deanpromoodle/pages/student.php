@@ -777,6 +777,54 @@ if ($action == 'viewprogram' && $programid > 0) {
                         }
                     }
                     
+                    // Получаем тесты (экзамены) курса
+                    try {
+                        $quizzes = get_all_instances_in_course('quiz', $course, false);
+                    } catch (\Exception $e) {
+                        $quizzes = [];
+                    }
+                    if (!is_array($quizzes)) {
+                        $quizzes = [];
+                    }
+                    
+                    foreach ($quizzes as $quiz) {
+                        $quizname = mb_strtolower($quiz->name);
+                        
+                        // Проверяем, является ли это экзаменом
+                        if (strpos($quizname, 'экзамен') !== false) {
+                            // Получаем cmid для ссылки
+                            $cm = get_coursemodule_from_instance('quiz', $quiz->id, $course->id);
+                            if (!$cm) {
+                                continue; // Пропускаем, если модуль не найден
+                            }
+                            $quizurl = new moodle_url('/mod/quiz/view.php', ['id' => $cm->id]);
+                            
+                            // Получаем оценку из quiz_grades
+                            $grade = $DB->get_record('quiz_grades', [
+                                'quiz' => $quiz->id,
+                                'userid' => $USER->id
+                            ]);
+                            
+                            $statusclass = '';
+                            $statustext = '';
+                            
+                            // Логика для экзамена: либо сдан, либо не сдан
+                            if ($grade && $grade->grade !== null && $grade->grade >= 0) {
+                                // Есть оценка - зеленый "Экзамен – сдан"
+                                $statusclass = 'assignment-status-green';
+                                $statustext = 'Экзамен – сдан';
+                            } else {
+                                // Нет оценки - красный "Экзамен – не сдан"
+                                $statusclass = 'assignment-status-red';
+                                $statustext = 'Экзамен – не сдан';
+                            }
+                            
+                            $badgecontent = htmlspecialchars($statustext, ENT_QUOTES, 'UTF-8');
+                            $statusitems[] = '<span class="badge assignment-status-item ' . $statusclass . '">' . 
+                                html_writer::link($quizurl, $badgecontent, ['target' => '_blank']) . '</span>';
+                        }
+                    }
+                    
                     if (!empty($statusitems)) {
                         $statushtml = implode(' ', $statusitems);
                     } else {
