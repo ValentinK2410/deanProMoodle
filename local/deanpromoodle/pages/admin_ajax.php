@@ -84,35 +84,6 @@ if ($action == 'getprogramsubjectsforstudent') {
             global $USER;
             $roles = get_user_roles($context, $USER->id, false);
             foreach ($roles as $role) {
-            if ($role->shortname == 'manager') {
-                $hasaccess = true;
-                break;
-            }
-        }
-    }
-}
-
-    if (!$hasaccess) {
-        header('Content-Type: application/json');
-        echo json_encode(['success' => false, 'error' => 'Access denied']);
-        exit;
-    }
-    
-    header('Content-Type: application/json');
-} else {
-    // Для остальных действий проверяем админский доступ
-    $context = context_system::instance();
-    $hasaccess = false;
-    
-    if (has_capability('local/deanpromoodle:viewadmin', $context)) {
-        $hasaccess = true;
-    } else {
-        if (has_capability('moodle/site:config', $context)) {
-            $hasaccess = true;
-        } else {
-            global $USER;
-            $roles = get_user_roles($context, $USER->id, false);
-            foreach ($roles as $role) {
                 if ($role->shortname == 'manager') {
                     $hasaccess = true;
                     break;
