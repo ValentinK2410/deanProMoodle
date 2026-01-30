@@ -486,23 +486,51 @@ if ($action == 'viewprogram' && $programid > 0) {
                 ";
                 echo html_writer::end_tag('style');
                 
+                // Добавляем стили для статусов завершения курса
+                echo html_writer::start_tag('style');
+                echo "
+                    .completion-status-not-completed {
+                        color: #dc3545;
+                        font-weight: 500;
+                    }
+                    .completion-status-partial {
+                        color: #ffc107;
+                        font-weight: 500;
+                    }
+                    .completion-status-completed {
+                        color: #28a745;
+                        font-weight: 500;
+                    }
+                    .teacher-email-link {
+                        color: #007bff;
+                        text-decoration: none;
+                        display: block;
+                        margin-bottom: 4px;
+                    }
+                    .teacher-email-link:hover {
+                        text-decoration: underline;
+                    }
+                ";
+                echo html_writer::end_tag('style');
+                
                 echo html_writer::start_div('courses-table');
                 echo html_writer::start_tag('table', ['class' => 'table']);
                 echo html_writer::start_tag('thead');
                 echo html_writer::start_tag('tr');
-                echo html_writer::tag('th', 'Название курса', ['style' => 'width: 500px;']);
-                echo html_writer::tag('th', 'Краткое название', ['style' => 'width: 150px;']);
-                echo html_writer::tag('th', 'Дата начала', ['style' => 'width: 120px;']);
-                echo html_writer::tag('th', 'Дата окончания', ['style' => 'width: 120px;']);
-                echo html_writer::tag('th', 'Преподаватель', ['style' => 'width: 200px;']);
-                echo html_writer::tag('th', 'Статус заданий (ПОСЛЕ СЕССИИ)', ['style' => 'width: 300px;']);
-                echo html_writer::tag('th', 'Действие', ['style' => 'width: 100px; text-align: center;']);
+                echo html_writer::tag('th', 'Название курса', ['style' => 'width: 250px;']);
+                echo html_writer::tag('th', 'Статус завершения', ['style' => 'width: 150px;']);
+                echo html_writer::tag('th', 'Итоговая оценка', ['style' => 'width: 150px;']);
+                echo html_writer::tag('th', 'Количество академических кредитов', ['style' => 'width: 150px;']);
+                echo html_writer::tag('th', 'Преподаватели, к которым можно обратиться за разъяснениями', ['style' => 'width: 200px;']);
+                echo html_writer::tag('th', 'Задолженности по курсу', ['style' => 'width: 300px;']);
+                echo html_writer::tag('th', 'Перейти к курсу', ['style' => 'width: 100px; text-align: center;']);
                 echo html_writer::end_tag('tr');
                 echo html_writer::end_tag('thead');
                 echo html_writer::start_tag('tbody');
                 
                 // Подключаем необходимые функции Moodle
                 require_once($CFG->libdir . '/modinfolib.php');
+                require_once($CFG->libdir . '/gradelib.php');
                 
                 foreach ($mycourses as $courseobj) {
                     if ($courseobj->id <= 1) continue; // Пропускаем системный курс
@@ -517,33 +545,142 @@ if ($action == 'viewprogram' && $programid > 0) {
                     
                     echo html_writer::start_tag('tr');
                     
-                    // Название курса
+                    // Название курса (краткое название как гиперссылка)
                     $courseurl = new moodle_url('/course/view.php', ['id' => $course->id]);
                     echo html_writer::tag('td', 
-                        html_writer::link($courseurl, htmlspecialchars($course->fullname, ENT_QUOTES, 'UTF-8'), [
+                        html_writer::link($courseurl, htmlspecialchars($course->shortname, ENT_QUOTES, 'UTF-8'), [
                             'class' => 'course-link'
                         ])
                     );
                     
-                    // Краткое название
-                    echo html_writer::tag('td', htmlspecialchars($course->shortname, ENT_QUOTES, 'UTF-8'));
+                    // Функция для получения итоговой оценки курса
+                    $coursegrade = null;
+                    $finalgradepercent = null;
+                    try {
+                        $courseitem = grade_item::fetch_course_item($course->id);
+                        if ($courseitem) {
+                            $usergrade = grade_grade::fetch(['itemid' => $courseitem->id, 'userid' => $USER->id]);
+                            if ($usergrade && $usergrade->finalgrade !== null) {
+                                $coursegrade = $usergrade->finalgrade;
+                                if ($courseitem->grademax > 0) {
+                                    $finalgradepercent = ($coursegrade / $courseitem->grademax) * 100;
+                                }
+                            }
+                        }
+                    } catch (\Exception $e) {
+                        // Игнорируем ошибки получения оценки
+                    }
                     
-                    // Дата начала
-                    $startdate = $course->startdate > 0 ? userdate($course->startdate, get_string('strftimedatefullshort')) : '-';
-                    echo html_writer::tag('td', $startdate);
+                    // Функция для проверки, все ли задания имеют оценку
+                    $allassignmentsgraded = true;
+                    $hasassignments = false;
+                    try {
+                        $assignments = get_all_instances_in_course('assign', $course, false);
+                        $quizzes = get_all_instances_in_course('quiz', $course, false);
+                        
+                        if (!is_array($assignments)) {
+                            $assignments = [];
+                        }
+                        if (!is_array($quizzes)) {
+                            $quizzes = [];
+                        }
+                        
+                        // Проверяем задания
+                        foreach ($assignments as $assignment) {
+                            $assignmentname = mb_strtolower($assignment->name);
+                            if (strpos($assignmentname, 'отчет') !== false && strpos($assignmentname, 'чтени') !== false) {
+                                $hasassignments = true;
+                                $grade = $DB->get_record('assign_grades', [
+                                    'assignment' => $assignment->id,
+                                    'userid' => $USER->id
+                                ]);
+                                if (!$grade || $grade->grade === null || $grade->grade < 0) {
+                                    $allassignmentsgraded = false;
+                                }
+                            }
+                        }
+                        
+                        // Проверяем тесты (экзамены)
+                        foreach ($quizzes as $quiz) {
+                            $quizname = mb_strtolower($quiz->name);
+                            if (strpos($quizname, 'экзамен') !== false) {
+                                $hasassignments = true;
+                                $grade = $DB->get_record('quiz_grades', [
+                                    'quiz' => $quiz->id,
+                                    'userid' => $USER->id
+                                ]);
+                                if (!$grade || $grade->grade === null || $grade->grade < 0) {
+                                    $allassignmentsgraded = false;
+                                }
+                            }
+                        }
+                    } catch (\Exception $e) {
+                        // Игнорируем ошибки
+                    }
                     
-                    // Дата окончания
-                    $enddate = $course->enddate > 0 ? userdate($course->enddate, get_string('strftimedatefullshort')) : '-';
-                    echo html_writer::tag('td', $enddate);
+                    // Статус завершения курса
+                    $completionstatus = '';
+                    $completionclass = '';
+                    if ($finalgradepercent === null || $finalgradepercent < 70) {
+                        $completionstatus = 'Не завершен';
+                        $completionclass = 'completion-status-not-completed';
+                    } elseif ($finalgradepercent >= 70) {
+                        // Если есть задания и не все оценены - частично завершен
+                        if ($hasassignments && !$allassignmentsgraded) {
+                            $completionstatus = 'Завершен частично';
+                            $completionclass = 'completion-status-partial';
+                        } else {
+                            // Нет заданий или все оценены - полностью завершен
+                            $completionstatus = 'Завершен полностью';
+                            $completionclass = 'completion-status-completed';
+                        }
+                    }
+                    echo html_writer::tag('td', 
+                        '<span class="' . $completionclass . '">' . htmlspecialchars($completionstatus, ENT_QUOTES, 'UTF-8') . '</span>'
+                    );
                     
-                    // Преподаватель
+                    // Итоговая оценка
+                    $gradeText = '-';
+                    if ($finalgradepercent !== null) {
+                        if ($finalgradepercent < 70) {
+                            $gradeText = 'курс не пройден';
+                        } elseif ($finalgradepercent >= 70 && $finalgradepercent < 80) {
+                            $gradeText = '3 (удовлетворительно)';
+                        } elseif ($finalgradepercent >= 80 && $finalgradepercent < 90) {
+                            $gradeText = '4 (хорошо)';
+                        } elseif ($finalgradepercent >= 90) {
+                            $gradeText = '5 (отлично)';
+                        }
+                    }
+                    echo html_writer::tag('td', htmlspecialchars($gradeText, ENT_QUOTES, 'UTF-8'));
+                    
+                    // Количество академических кредитов
+                    $credits = '-';
+                    try {
+                        $subject = $DB->get_record_sql(
+                            "SELECT s.credits
+                             FROM {local_deanpromoodle_subject_courses} sc
+                             JOIN {local_deanpromoodle_subjects} s ON s.id = sc.subjectid
+                             WHERE sc.courseid = ?
+                             LIMIT 1",
+                            [$course->id]
+                        );
+                        if ($subject && $subject->credits !== null && $subject->credits > 0) {
+                            $credits = (string)$subject->credits;
+                        }
+                    } catch (\Exception $e) {
+                        // Игнорируем ошибки
+                    }
+                    echo html_writer::tag('td', htmlspecialchars($credits, ENT_QUOTES, 'UTF-8'));
+                    
+                    // Преподаватели с email-ссылками
                     $coursecontext = context_course::instance($course->id);
                     $teacherroleids = $DB->get_fieldset_select('role', 'id', "shortname IN ('teacher', 'editingteacher', 'manager')");
-                    $teachers = [];
+                    $teachershtml = '';
                     if (!empty($teacherroleids)) {
                         $placeholders = implode(',', array_fill(0, count($teacherroleids), '?'));
                         $teacherusers = $DB->get_records_sql(
-                            "SELECT DISTINCT u.id, u.firstname, u.lastname
+                            "SELECT DISTINCT u.id, u.firstname, u.lastname, u.email
                              FROM {user} u
                              JOIN {role_assignments} ra ON ra.userid = u.id
                              WHERE ra.contextid = ? AND ra.roleid IN ($placeholders)
@@ -551,14 +688,29 @@ if ($action == 'viewprogram' && $programid > 0) {
                              ORDER BY u.lastname, u.firstname",
                             array_merge([$coursecontext->id], $teacherroleids)
                         );
-                        foreach ($teacherusers as $teacher) {
-                            $teachers[] = fullname($teacher);
+                        if (!empty($teacherusers)) {
+                            $teacherlinks = [];
+                            foreach ($teacherusers as $teacher) {
+                                $teachername = fullname($teacher);
+                                if (!empty($teacher->email)) {
+                                    $teacherlinks[] = html_writer::link(
+                                        'mailto:' . htmlspecialchars($teacher->email, ENT_QUOTES, 'UTF-8'),
+                                        htmlspecialchars($teachername, ENT_QUOTES, 'UTF-8'),
+                                        ['class' => 'teacher-email-link']
+                                    );
+                                } else {
+                                    $teacherlinks[] = htmlspecialchars($teachername, ENT_QUOTES, 'UTF-8');
+                                }
+                            }
+                            $teachershtml = implode('', $teacherlinks);
                         }
                     }
-                    $teachernames = !empty($teachers) ? implode(', ', $teachers) : '-';
-                    echo html_writer::tag('td', htmlspecialchars($teachernames, ENT_QUOTES, 'UTF-8'));
+                    if (empty($teachershtml)) {
+                        $teachershtml = '-';
+                    }
+                    echo html_writer::tag('td', $teachershtml);
                     
-                    // Статус заданий (ПОСЛЕ СЕССИИ)
+                    // Задолженности по курсу
                     $statushtml = '';
                     $statusitems = [];
                     
@@ -575,15 +727,13 @@ if ($action == 'viewprogram' && $programid > 0) {
                     foreach ($assignments as $assignment) {
                         $assignmentname = mb_strtolower($assignment->name);
                         
-                        // Определяем тип задания по названию
+                        // Определяем тип задания по названию (только отчеты о чтении)
                         $assignmenttype = '';
                         if (strpos($assignmentname, 'отчет') !== false && strpos($assignmentname, 'чтени') !== false) {
                             $assignmenttype = 'reading_report';
-                        } elseif (strpos($assignmentname, 'письменн') !== false) {
-                            $assignmenttype = 'written_work';
                         }
                         
-                        if ($assignmenttype) {
+                        if ($assignmenttype == 'reading_report') {
                             // Получаем cmid для ссылки
                             $cm = get_coursemodule_from_instance('assign', $assignment->id, $course->id);
                             if (!$cm) {
@@ -604,119 +754,26 @@ if ($action == 'viewprogram' && $programid > 0) {
                             ]);
                             
                             $statusclass = '';
-                            $statusicon = '';
-                            $gradetext = '';
-                            $islink = false;
+                            $statustext = '';
                             
-                            if ($submission) {
-                                // Проверяем, есть ли оценка (grade не null и не -1, что означает "не оценено")
-                                if ($grade && $grade->grade !== null && $grade->grade >= 0) {
-                                    // Сдано и есть оценка (зеленый) - тоже ссылка для просмотра
-                                    $maxgrade = $assignment->grade ? $assignment->grade : 100;
-                                    $statusclass = 'assignment-status-green';
-                                    $statusicon = '<i class="fas fa-check-circle"></i> ';
-                                    $gradetext = ' (Оценка: ' . round($grade->grade, 1);
-                                    if ($maxgrade > 0) {
-                                        $gradetext .= '/' . $maxgrade;
-                                    }
-                                    $gradetext .= ')';
-                                    $islink = true; // Делаем ссылкой для просмотра результата
-                                } else {
-                                    // Сдано, но нет оценки (желтый) - ссылка для проверки статуса
-                                    $statusclass = 'assignment-status-yellow';
-                                    $statusicon = '<i class="fas fa-clock"></i> ';
-                                    $islink = true;
-                                }
-                            } else {
-                                // Не сдано (красный) - делаем ссылкой
-                                $statusclass = 'assignment-status-red';
-                                $statusicon = '<i class="fas fa-times-circle"></i> ';
-                                $islink = true;
-                            }
-                            
-                            $assignmentdisplayname = '';
-                            if ($assignmenttype == 'reading_report') {
-                                $assignmentdisplayname = 'Сдача отчета о чтении';
-                            } elseif ($assignmenttype == 'written_work') {
-                                $assignmentdisplayname = 'Сдача письменной работы';
-                            }
-                            
-                            $badgecontent = $statusicon . htmlspecialchars($assignmentdisplayname, ENT_QUOTES, 'UTF-8') . $gradetext;
-                            
-                            if ($islink) {
-                                $statusitems[] = '<span class="badge assignment-status-item ' . $statusclass . '">' . 
-                                    html_writer::link($assignmenturl, $badgecontent, ['target' => '_blank']) . '</span>';
-                            } else {
-                                $statusitems[] = '<span class="badge assignment-status-item ' . $statusclass . '">' . 
-                                    $badgecontent . '</span>';
-                            }
-                        }
-                    }
-                    
-                    // Получаем тесты (экзамены) курса
-                    try {
-                        $quizzes = get_all_instances_in_course('quiz', $course, false);
-                    } catch (\Exception $e) {
-                        $quizzes = [];
-                    }
-                    if (!is_array($quizzes)) {
-                        $quizzes = [];
-                    }
-                    
-                    foreach ($quizzes as $quiz) {
-                        $quizname = mb_strtolower($quiz->name);
-                        
-                        // Проверяем, является ли это экзаменом
-                        if (strpos($quizname, 'экзамен') !== false) {
-                            // Получаем cmid для ссылки
-                            $cm = get_coursemodule_from_instance('quiz', $quiz->id, $course->id);
-                            if (!$cm) {
-                                continue; // Пропускаем, если модуль не найден
-                            }
-                            $quizurl = new moodle_url('/mod/quiz/view.php', ['id' => $cm->id]);
-                            
-                            // Проверяем, есть ли попытка у студента (берем последнюю завершенную попытку)
-                            $attempt = $DB->get_record_sql(
-                                "SELECT * FROM {quiz_attempts} 
-                                 WHERE quiz = ? AND userid = ? AND state = 'finished'
-                                 ORDER BY timemodified DESC LIMIT 1",
-                                [$quiz->id, $USER->id]
-                            );
-                            
-                            // Получаем оценку из quiz_grades
-                            $grade = $DB->get_record('quiz_grades', [
-                                'quiz' => $quiz->id,
-                                'userid' => $USER->id
-                            ]);
-                            
-                            $statusclass = '';
-                            $statusicon = '';
-                            $gradetext = '';
-                            $islink = false;
-                            
-                            if ($attempt && $grade && $grade->grade !== null && $grade->grade >= 0) {
-                                // Сдан и есть оценка (зеленый) - тоже ссылка для просмотра результата
-                                $maxgrade = $quiz->grade ? $quiz->grade : 100;
+                            // Новая логика: приоритет оценке
+                            if ($grade && $grade->grade !== null && $grade->grade >= 0) {
+                                // Есть оценка - зеленый "Чтение – сдано" (даже если файл не загружен)
                                 $statusclass = 'assignment-status-green';
-                                $statusicon = '<i class="fas fa-check-circle"></i> ';
-                                $gradetext = ' (Оценка: ' . round($grade->grade, 1) . '/' . $maxgrade . ')';
-                                $islink = true;
+                                $statustext = 'Чтение – сдано';
+                            } elseif ($submission) {
+                                // Файл загружен, но нет оценки - желтый "Чтение – не проверено"
+                                $statusclass = 'assignment-status-yellow';
+                                $statustext = 'Чтение – не проверено';
                             } else {
-                                // Не сдан (красный) - делаем ссылкой
+                                // Файл не загружен и нет оценки - красный "Чтение – не сдано"
                                 $statusclass = 'assignment-status-red';
-                                $statusicon = '<i class="fas fa-times-circle"></i> ';
-                                $islink = true;
+                                $statustext = 'Чтение – не сдано';
                             }
                             
-                            $badgecontent = $statusicon . 'Экзамен' . $gradetext;
-                            
-                            if ($islink) {
-                                $statusitems[] = '<span class="badge assignment-status-item ' . $statusclass . '">' . 
-                                    html_writer::link($quizurl, $badgecontent, ['target' => '_blank']) . '</span>';
-                            } else {
-                                $statusitems[] = '<span class="badge assignment-status-item ' . $statusclass . '">' . 
-                                    $badgecontent . '</span>';
-                            }
+                            $badgecontent = htmlspecialchars($statustext, ENT_QUOTES, 'UTF-8');
+                            $statusitems[] = '<span class="badge assignment-status-item ' . $statusclass . '">' . 
+                                html_writer::link($assignmenturl, $badgecontent, ['target' => '_blank']) . '</span>';
                         }
                     }
                     
@@ -728,7 +785,7 @@ if ($action == 'viewprogram' && $programid > 0) {
                     
                     echo html_writer::tag('td', $statushtml);
                     
-                    // Действие
+                    // Перейти к курсу
                     echo html_writer::start_tag('td', ['style' => 'text-align: center;']);
                     echo html_writer::link($courseurl, '<i class="fas fa-external-link-alt"></i>', [
                         'class' => 'btn btn-sm btn-primary',

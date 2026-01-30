@@ -93,5 +93,17 @@ function xmldb_local_deanpromoodle_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026013003, 'local', 'deanpromoodle');
     }
     
+    // Добавляем поле credits в таблицу local_deanpromoodle_subjects
+    if ($oldversion < 2026013005) {
+        $table = new xmldb_table('local_deanpromoodle_subjects');
+        $field = new xmldb_field('credits', XMLDB_TYPE_INTEGER, '10', null, null, null, null, 'description');
+        
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+        
+        upgrade_plugin_savepoint(true, 2026013005, 'local', 'deanpromoodle');
+    }
+    
     return true;
 }

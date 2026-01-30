@@ -10,6 +10,7 @@
         <FIELD NAME="code" TYPE="char" LENGTH="100" NOTNULL="false"/>
         <FIELD NAME="shortdescription" TYPE="text" NOTNULL="false"/>
         <FIELD NAME="description" TYPE="text" NOTNULL="false"/>
+        <FIELD NAME="credits" TYPE="int" LENGTH="10" NOTNULL="false"/>
         <FIELD NAME="sortorder" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0"/>
         <FIELD NAME="visible" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="1"/>
         <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0"/>
