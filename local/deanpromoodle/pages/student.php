@@ -401,20 +401,28 @@ if ($action == 'viewprogram' && $programid > 0) {
                 echo html_writer::start_tag('style');
                 echo "
                     .assignment-status-yellow {
-                        color: #ffc107;
-                        font-weight: 500;
+                        background-color: #ffc107;
+                        color: #000;
                     }
                     .assignment-status-green {
-                        color: #28a745;
-                        font-weight: 500;
+                        background-color: #28a745;
+                        color: #fff;
                     }
                     .assignment-status-red {
-                        color: #dc3545;
-                        font-weight: 500;
+                        background-color: #dc3545;
+                        color: #fff;
                     }
                     .assignment-status-item {
-                        margin: 4px 0;
-                        font-size: 0.9em;
+                        margin: 4px 4px 4px 0;
+                        font-size: 0.85em;
+                        display: inline-block;
+                    }
+                    .assignment-status-item a {
+                        color: inherit;
+                        text-decoration: none;
+                    }
+                    .assignment-status-item a:hover {
+                        text-decoration: underline;
                     }
                 ";
                 echo html_writer::end_tag('style');
@@ -489,6 +497,11 @@ if ($action == 'viewprogram' && $programid > 0) {
                     
                     // Получаем задания курса
                     $assignments = get_all_instances_in_course('assign', $course, false);
+                    
+                    // Отслеживаем найденные типы заданий
+                    $foundreadingreport = false;
+                    $foundwrittenwork = false;
+                    
                     foreach ($assignments as $assignment) {
                         $assignmentname = mb_strtolower($assignment->name);
                         
@@ -496,11 +509,17 @@ if ($action == 'viewprogram' && $programid > 0) {
                         $assignmenttype = '';
                         if (strpos($assignmentname, 'отчет') !== false && strpos($assignmentname, 'чтени') !== false) {
                             $assignmenttype = 'reading_report';
+                            $foundreadingreport = true;
                         } elseif (strpos($assignmentname, 'письменн') !== false) {
                             $assignmenttype = 'written_work';
+                            $foundwrittenwork = true;
                         }
                         
                         if ($assignmenttype) {
+                            // Получаем cmid для ссылки
+                            $cm = get_coursemodule_from_instance('assign', $assignment->id, $course->id);
+                            $assignmenturl = new moodle_url('/mod/assign/view.php', ['id' => $cm->id]);
+                            
                             // Проверяем статус задания для студента
                             $submission = $DB->get_record('assign_submission', [
                                 'assignment' => $assignment->id,
@@ -516,6 +535,7 @@ if ($action == 'viewprogram' && $programid > 0) {
                             $statusclass = '';
                             $statusicon = '';
                             $gradetext = '';
+                            $islink = false;
                             
                             if ($submission) {
                                 // Проверяем, есть ли оценка (grade не null и не -1, что означает "не оценено")
@@ -535,9 +555,10 @@ if ($action == 'viewprogram' && $programid > 0) {
                                     $statusicon = '<i class="fas fa-clock"></i> ';
                                 }
                             } else {
-                                // Не сдано (красный)
+                                // Не сдано (красный) - делаем ссылкой
                                 $statusclass = 'assignment-status-red';
                                 $statusicon = '<i class="fas fa-times-circle"></i> ';
+                                $islink = true;
                             }
                             
                             $assignmentdisplayname = '';
@@ -547,19 +568,43 @@ if ($action == 'viewprogram' && $programid > 0) {
                                 $assignmentdisplayname = 'Сдача письменной работы';
                             }
                             
-                            $statusitems[] = '<div class="assignment-status-item ' . $statusclass . '">' . 
-                                $statusicon . htmlspecialchars($assignmentdisplayname, ENT_QUOTES, 'UTF-8') . 
-                                $gradetext . '</div>';
+                            $badgecontent = $statusicon . htmlspecialchars($assignmentdisplayname, ENT_QUOTES, 'UTF-8') . $gradetext;
+                            
+                            if ($islink) {
+                                $statusitems[] = '<span class="badge assignment-status-item ' . $statusclass . '">' . 
+                                    html_writer::link($assignmenturl, $badgecontent, ['target' => '_blank']) . '</span>';
+                            } else {
+                                $statusitems[] = '<span class="badge assignment-status-item ' . $statusclass . '">' . 
+                                    $badgecontent . '</span>';
+                            }
                         }
+                    }
+                    
+                    // Если не найдены типы заданий, все равно показываем их
+                    if (!$foundreadingreport) {
+                        $statusitems[] = '<span class="badge assignment-status-item assignment-status-red">' . 
+                            '<i class="fas fa-times-circle"></i> Сдача отчета о чтении</span>';
+                    }
+                    if (!$foundwrittenwork) {
+                        $statusitems[] = '<span class="badge assignment-status-item assignment-status-red">' . 
+                            '<i class="fas fa-times-circle"></i> Сдача письменной работы</span>';
                     }
                     
                     // Получаем тесты (экзамены) курса
                     $quizzes = get_all_instances_in_course('quiz', $course, false);
+                    $foundexam = false;
+                    
                     foreach ($quizzes as $quiz) {
                         $quizname = mb_strtolower($quiz->name);
                         
                         // Проверяем, является ли это экзаменом
                         if (strpos($quizname, 'экзамен') !== false) {
+                            $foundexam = true;
+                            
+                            // Получаем cmid для ссылки
+                            $cm = get_coursemodule_from_instance('quiz', $quiz->id, $course->id);
+                            $quizurl = new moodle_url('/mod/quiz/view.php', ['id' => $cm->id]);
+                            
                             // Проверяем, есть ли попытка у студента (берем последнюю завершенную попытку)
                             $attempt = $DB->get_record_sql(
                                 "SELECT * FROM {quiz_attempts} 
@@ -577,27 +622,41 @@ if ($action == 'viewprogram' && $programid > 0) {
                             $statusclass = '';
                             $statusicon = '';
                             $gradetext = '';
+                            $islink = false;
                             
                             if ($attempt && $grade && $grade->grade !== null && $grade->grade >= 0) {
                                 // Сдан и есть оценка (зеленый)
-                                // Нужно получить максимальный балл для правильного отображения
                                 $maxgrade = $quiz->grade ? $quiz->grade : 100;
                                 $statusclass = 'assignment-status-green';
                                 $statusicon = '<i class="fas fa-check-circle"></i> ';
                                 $gradetext = ' (Оценка: ' . round($grade->grade, 1) . '/' . $maxgrade . ')';
                             } else {
-                                // Не сдан (красный)
+                                // Не сдан (красный) - делаем ссылкой
                                 $statusclass = 'assignment-status-red';
                                 $statusicon = '<i class="fas fa-times-circle"></i> ';
+                                $islink = true;
                             }
                             
-                            $statusitems[] = '<div class="assignment-status-item ' . $statusclass . '">' . 
-                                $statusicon . 'Экзамен' . $gradetext . '</div>';
+                            $badgecontent = $statusicon . 'Экзамен' . $gradetext;
+                            
+                            if ($islink) {
+                                $statusitems[] = '<span class="badge assignment-status-item ' . $statusclass . '">' . 
+                                    html_writer::link($quizurl, $badgecontent, ['target' => '_blank']) . '</span>';
+                            } else {
+                                $statusitems[] = '<span class="badge assignment-status-item ' . $statusclass . '">' . 
+                                    $badgecontent . '</span>';
+                            }
                         }
                     }
                     
+                    // Если экзамен не найден, все равно показываем его как не сданный
+                    if (!$foundexam) {
+                        $statusitems[] = '<span class="badge assignment-status-item assignment-status-red">' . 
+                            '<i class="fas fa-times-circle"></i> Экзамен</span>';
+                    }
+                    
                     if (!empty($statusitems)) {
-                        $statushtml = implode('', $statusitems);
+                        $statushtml = implode(' ', $statusitems);
                     } else {
                         $statushtml = '<span class="text-muted">Нет заданий</span>';
                     }
