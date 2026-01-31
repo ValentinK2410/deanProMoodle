@@ -603,32 +603,21 @@ if ($action == 'viewprogram' && $programid > 0) {
                     );
                     
                     // Функция для получения итоговой оценки курса
-                    // Используем grade_get_course_grade() для получения итоговой оценки с учетом всех переопределений (overridden)
+                    // Используем grade_grade::fetch() для получения итоговой оценки с учетом всех переопределений (overridden)
+                    // Свойство finalgrade автоматически учитывает принудительно проставленные оценки
                     $coursegrade = null;
                     $finalgradepercent = null;
                     $courseitem = null;
                     try {
-                        require_once($CFG->dirroot . '/lib/gradelib.php');
                         $courseitem = grade_item::fetch_course_item($course->id);
                         if ($courseitem) {
-                            // Используем grade_get_course_grade() - это рекомендуемый способ для получения итоговой оценки курса
-                            // Он автоматически учитывает переопределенные (overridden) оценки
-                            $coursegradeobj = grade_get_course_grade($USER->id, $course->id);
-                            if ($coursegradeobj && $coursegradeobj->grade !== null && $coursegradeobj->grade !== false) {
-                                $coursegrade = $coursegradeobj->grade;
-                                if ($coursegradeobj->grademax > 0) {
-                                    $finalgradepercent = ($coursegrade / $coursegradeobj->grademax) * 100;
-                                }
-                            }
-                            // Fallback: если grade_get_course_grade() не вернул данные, используем прямой доступ
-                            if ($coursegrade === null) {
-                                $usergrade = grade_grade::fetch(['itemid' => $courseitem->id, 'userid' => $USER->id]);
-                                if ($usergrade && $usergrade->finalgrade !== null) {
-                                    // finalgrade уже учитывает переопределенные оценки в Moodle
-                                    $coursegrade = $usergrade->finalgrade;
-                                    if ($courseitem->grademax > 0) {
-                                        $finalgradepercent = ($coursegrade / $courseitem->grademax) * 100;
-                                    }
+                            $usergrade = grade_grade::fetch(['itemid' => $courseitem->id, 'userid' => $USER->id]);
+                            if ($usergrade && $usergrade->finalgrade !== null) {
+                                // finalgrade уже учитывает переопределенные (overridden) оценки в Moodle
+                                // Это финальная оценка с учетом всех принудительно проставленных оценок
+                                $coursegrade = $usergrade->finalgrade;
+                                if ($courseitem->grademax > 0) {
+                                    $finalgradepercent = ($coursegrade / $courseitem->grademax) * 100;
                                 }
                             }
                         }
