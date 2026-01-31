@@ -764,6 +764,52 @@ if ($action == 'viewprogram' && $programid > 0) {
                     $statushtml = '';
                     $statusitems = [];
                     
+                    // Вспомогательная функция для проверки наличия оценки за задание (включая принудительно проставленные)
+                    // Проверяет как assign_grades, так и gradebook для учета принудительно проставленных оценок
+                    global $CFG;
+                    $checkAssignmentGrade = function($assignmentid, $userid) use ($DB, $course, $CFG) {
+                        // Сначала проверяем assign_grades
+                        $grade = $DB->get_record('assign_grades', [
+                            'assignment' => $assignmentid,
+                            'userid' => $userid
+                        ]);
+                        
+                        if ($grade && $grade->grade !== null && $grade->grade >= 0) {
+                            return true; // Есть оценка в assign_grades
+                        }
+                        
+                        // Если нет оценки в assign_grades, проверяем через gradebook API
+                        // Это учитывает принудительно проставленные оценки
+                        try {
+                            require_once($CFG->dirroot . '/lib/gradelib.php');
+                            $cm = get_coursemodule_from_instance('assign', $assignmentid, $course->id);
+                            if ($cm) {
+                                $gradeitem = grade_item::fetch([
+                                    'itemtype' => 'mod',
+                                    'itemmodule' => 'assign',
+                                    'iteminstance' => $assignmentid,
+                                    'courseid' => $course->id
+                                ]);
+                                
+                                if ($gradeitem) {
+                                    $usergrade = grade_grade::fetch([
+                                        'itemid' => $gradeitem->id,
+                                        'userid' => $userid
+                                    ]);
+                                    
+                                    // Проверяем finalgrade, который учитывает принудительно проставленные оценки
+                                    if ($usergrade && $usergrade->finalgrade !== null && $usergrade->finalgrade >= 0) {
+                                        return true; // Есть оценка в gradebook (включая принудительно проставленную)
+                                    }
+                                }
+                            }
+                        } catch (\Exception $e) {
+                            // Игнорируем ошибки
+                        }
+                        
+                        return false; // Нет оценки
+                    };
+                    
                     // Получаем задания курса
                     try {
                         $assignments = get_all_instances_in_course('assign', $course, false);
@@ -962,52 +1008,6 @@ if ($action == 'viewprogram' && $programid > 0) {
                         // Игнорируем ошибки получения оценки
                         $courseitem = null;
                     }
-                    
-                    // Вспомогательная функция для проверки наличия оценки за задание (включая принудительно проставленные)
-                    // Проверяет как assign_grades, так и gradebook для учета принудительно проставленных оценок
-                    global $CFG;
-                    $checkAssignmentGrade = function($assignmentid, $userid) use ($DB, $course, $CFG) {
-                        // Сначала проверяем assign_grades
-                        $grade = $DB->get_record('assign_grades', [
-                            'assignment' => $assignmentid,
-                            'userid' => $userid
-                        ]);
-                        
-                        if ($grade && $grade->grade !== null && $grade->grade >= 0) {
-                            return true; // Есть оценка в assign_grades
-                        }
-                        
-                        // Если нет оценки в assign_grades, проверяем через gradebook API
-                        // Это учитывает принудительно проставленные оценки
-                        try {
-                            require_once($CFG->dirroot . '/lib/gradelib.php');
-                            $cm = get_coursemodule_from_instance('assign', $assignmentid, $course->id);
-                            if ($cm) {
-                                $gradeitem = grade_item::fetch([
-                                    'itemtype' => 'mod',
-                                    'itemmodule' => 'assign',
-                                    'iteminstance' => $assignmentid,
-                                    'courseid' => $course->id
-                                ]);
-                                
-                                if ($gradeitem) {
-                                    $usergrade = grade_grade::fetch([
-                                        'itemid' => $gradeitem->id,
-                                        'userid' => $userid
-                                    ]);
-                                    
-                                    // Проверяем finalgrade, который учитывает принудительно проставленные оценки
-                                    if ($usergrade && $usergrade->finalgrade !== null && $usergrade->finalgrade >= 0) {
-                                        return true; // Есть оценка в gradebook (включая принудительно проставленную)
-                                    }
-                                }
-                            }
-                        } catch (\Exception $e) {
-                            // Игнорируем ошибки
-                        }
-                        
-                        return false; // Нет оценки
-                    };
                     
                     // Функция для проверки, все ли задания имеют оценку
                     $allassignmentsgraded = true;
