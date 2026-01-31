@@ -961,25 +961,25 @@ if ($action == 'viewprogram' && $programid > 0) {
                                     'link' => false
                                 ]);
                                 
-                                // Обертываем в ссылку с tooltip
-                                $iconhtml = html_writer::start_tag('span', [
+                                // Обертываем в span с tooltip
+                                $iconcontent = '';
+                                if (!empty($teacher->email)) {
+                                    $iconcontent = html_writer::link(
+                                        'mailto:' . htmlspecialchars($teacher->email, ENT_QUOTES, 'UTF-8'),
+                                        $userpicture,
+                                        ['class' => 'teacher-email-link', 'target' => '_blank', 'style' => 'text-decoration: none; display: inline-block;']
+                                    );
+                                } else {
+                                    $iconcontent = $userpicture;
+                                }
+                                
+                                $iconhtml = html_writer::tag('span', $iconcontent, [
                                     'class' => 'teacher-icon-wrapper',
                                     'title' => $tooltiptext,
                                     'data-toggle' => 'tooltip',
                                     'data-placement' => 'top'
                                 ]);
                                 
-                                if (!empty($teacher->email)) {
-                                    $iconhtml .= html_writer::link(
-                                        'mailto:' . htmlspecialchars($teacher->email, ENT_QUOTES, 'UTF-8'),
-                                        $userpicture,
-                                        ['class' => 'teacher-email-link', 'target' => '_blank', 'style' => 'text-decoration: none; display: inline-block;']
-                                    );
-                                } else {
-                                    $iconhtml .= $userpicture;
-                                }
-                                
-                                $iconhtml .= html_writer::end_tag('span');
                                 $teachericons[] = $iconhtml;
                             }
                         }
