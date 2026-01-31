@@ -617,7 +617,13 @@ if ($action == 'viewprogram' && $programid > 0) {
                 ";
                 echo html_writer::end_tag('style');
                 
-                echo html_writer::start_div('courses-table');
+                echo html_writer::start_div('courses-table-container', ['id' => 'courses-table-container']);
+                echo html_writer::tag('button', '<i class="fas fa-expand"></i> Развернуть на весь экран', [
+                    'class' => 'fullscreen-toggle-btn',
+                    'id' => 'fullscreen-toggle-btn',
+                    'onclick' => 'toggleFullscreen()'
+                ]);
+                echo html_writer::start_div('courses-table', ['id' => 'courses-table']);
                 echo html_writer::start_tag('table', ['class' => 'table']);
                 echo html_writer::start_tag('thead');
                 echo html_writer::start_tag('tr');
@@ -1427,7 +1433,8 @@ if ($action == 'viewprogram' && $programid > 0) {
                 
                 echo html_writer::end_tag('tbody');
                 echo html_writer::end_tag('table');
-                echo html_writer::end_div();
+                echo html_writer::end_div(); // courses-table
+                echo html_writer::end_div(); // courses-table-container
             }
         } catch (\Exception $e) {
             echo html_writer::div('Ошибка: ' . $e->getMessage(), 'alert alert-danger');
@@ -1903,5 +1910,28 @@ if ($action == 'viewprogram' && $programid > 0) {
 echo html_writer::start_div('local-deanpromoodle-author-footer', ['style' => 'margin-top: 40px; padding-top: 20px; border-top: 1px solid #dee2e6; text-align: center; color: #6c757d; font-size: 0.9em;']);
 echo html_writer::tag('p', 'Автор: ' . html_writer::link('https://github.com/ValentinK2410', 'ValentinK2410', ['target' => '_blank', 'style' => 'color: #007bff; text-decoration: none;']));
 echo html_writer::end_div();
+
+// JavaScript для полноэкранного режима таблицы
+echo html_writer::start_tag('script');
+echo "
+function toggleFullscreen() {
+    var container = document.getElementById('courses-table-container');
+    var table = document.getElementById('courses-table');
+    var btn = document.getElementById('fullscreen-toggle-btn');
+    
+    if (container.classList.contains('fullscreen-mode')) {
+        // Выход из полноэкранного режима
+        container.classList.remove('fullscreen-mode');
+        table.classList.remove('courses-table-fullscreen');
+        btn.innerHTML = '<i class=\"fas fa-expand\"></i> Развернуть на весь экран';
+    } else {
+        // Вход в полноэкранный режим
+        container.classList.add('fullscreen-mode');
+        table.classList.add('courses-table-fullscreen');
+        btn.innerHTML = '<i class=\"fas fa-compress\"></i> Вернуть как было';
+    }
+}
+";
+echo html_writer::end_tag('script');
 
 echo $OUTPUT->footer();
