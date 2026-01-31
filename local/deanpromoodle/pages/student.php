@@ -616,8 +616,13 @@ if ($action == 'viewprogram' && $programid > 0) {
                                 // finalgrade уже учитывает переопределенные (overridden) оценки в Moodle
                                 // Это финальная оценка с учетом всех принудительно проставленных оценок
                                 $coursegrade = $usergrade->finalgrade;
+                                // Проверяем, что grademax установлен и больше 0
                                 if ($courseitem->grademax > 0) {
                                     $finalgradepercent = ($coursegrade / $courseitem->grademax) * 100;
+                                } else {
+                                    // Если grademax не установлен или равен 0, используем оценку как процент
+                                    // (предполагаем, что максимум равен 100)
+                                    $finalgradepercent = $coursegrade;
                                 }
                             }
                         }
@@ -779,18 +784,23 @@ if ($action == 'viewprogram' && $programid > 0) {
                     
                     // В тестовом режиме используем округленную оценку для определения текста
                     $percentForDisplay = $finalgradepercent;
-                    if ($testmode && $coursegrade !== null && $courseitem && $courseitem->grademax > 0) {
+                    if ($testmode && $coursegrade !== null) {
                         $roundedGrade = round($coursegrade, 2);
-                        $percentForDisplay = ($roundedGrade / $courseitem->grademax) * 100;
+                        if ($courseitem && $courseitem->grademax > 0) {
+                            $percentForDisplay = ($roundedGrade / $courseitem->grademax) * 100;
+                        } else {
+                            // Если grademax не установлен, используем округленную оценку как процент
+                            $percentForDisplay = $roundedGrade;
+                        }
                     }
                     
-                    if ($finalgradepercent === null) {
+                    if ($finalgradepercent === null && $percentForDisplay === null) {
                         // Если нет оценки вообще
                         $gradeText = 'нет оценки';
                         $gradeClass = 'grade-badge-no-grade';
                         $gradeIcon = '<i class="fas fa-minus-circle"></i>';
                         $numericGrade = null;
-                    } elseif ($percentForDisplay < 70) {
+                    } elseif ($percentForDisplay !== null && $percentForDisplay < 70) {
                         // Если оценка ниже 70% - показываем фактическую оценку из gradebook (только целые числа, без максимума)
                         $gradeText = 'курс не пройден';
                         $gradeClass = 'grade-badge-failed';
@@ -825,10 +835,15 @@ if ($action == 'viewprogram' && $programid > 0) {
                         }
                         if ($courseitem && $courseitem->grademax > 0) {
                             $testInfo[] = 'Макс: ' . round($courseitem->grademax, 2);
+                        } elseif ($courseitem) {
+                            $testInfo[] = 'Макс: не установлен (используется 100)';
                         }
                         if ($percentForDisplay !== null) {
                             // Используем процент, рассчитанный на основе округленной оценки
                             $testInfo[] = 'Процент: ' . round($percentForDisplay, 2) . '%';
+                        }
+                        if ($finalgradepercent !== null && $finalgradepercent != $percentForDisplay) {
+                            $testInfo[] = 'Исх. процент: ' . round($finalgradepercent, 2) . '%';
                         }
                         if ($courseitem && isset($courseitem->grademin)) {
                             $testInfo[] = 'Мин: ' . round($courseitem->grademin, 2);
