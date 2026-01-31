@@ -854,37 +854,35 @@ if ($action == 'viewprogram' && $programid > 0) {
                     }
                     echo html_writer::tag('td', htmlspecialchars($credits, ENT_QUOTES, 'UTF-8'));
                     
-                    // Преподаватели с email-ссылками
+                    // Преподаватели с email-ссылками (только роль teacher, id 4)
                     $coursecontext = context_course::instance($course->id);
-                    $teacherroleids = $DB->get_fieldset_select('role', 'id', "shortname IN ('teacher', 'editingteacher', 'manager')");
+                    // Используем только роль teacher (id 4)
+                    $teacherroleid = 4; // teacher role id
                     $teachershtml = '';
-                    if (!empty($teacherroleids)) {
-                        $placeholders = implode(',', array_fill(0, count($teacherroleids), '?'));
-                        $teacherusers = $DB->get_records_sql(
-                            "SELECT DISTINCT u.id, u.firstname, u.lastname, u.email
-                             FROM {user} u
-                             JOIN {role_assignments} ra ON ra.userid = u.id
-                             WHERE ra.contextid = ? AND ra.roleid IN ($placeholders)
-                             AND u.deleted = 0
-                             ORDER BY u.lastname, u.firstname",
-                            array_merge([$coursecontext->id], $teacherroleids)
-                        );
-                        if (!empty($teacherusers)) {
-                            $teacherlinks = [];
-                            foreach ($teacherusers as $teacher) {
-                                $teachername = fullname($teacher);
-                                if (!empty($teacher->email)) {
-                                    $teacherlinks[] = html_writer::link(
-                                        'mailto:' . htmlspecialchars($teacher->email, ENT_QUOTES, 'UTF-8'),
-                                        htmlspecialchars($teachername, ENT_QUOTES, 'UTF-8'),
-                                        ['class' => 'teacher-email-link']
-                                    );
-                                } else {
-                                    $teacherlinks[] = htmlspecialchars($teachername, ENT_QUOTES, 'UTF-8');
-                                }
+                    $teacherusers = $DB->get_records_sql(
+                        "SELECT DISTINCT u.id, u.firstname, u.lastname, u.email
+                         FROM {user} u
+                         JOIN {role_assignments} ra ON ra.userid = u.id
+                         WHERE ra.contextid = ? AND ra.roleid = ?
+                         AND u.deleted = 0
+                         ORDER BY u.lastname, u.firstname",
+                        [$coursecontext->id, $teacherroleid]
+                    );
+                    if (!empty($teacherusers)) {
+                        $teacherlinks = [];
+                        foreach ($teacherusers as $teacher) {
+                            $teachername = fullname($teacher);
+                            if (!empty($teacher->email)) {
+                                $teacherlinks[] = html_writer::link(
+                                    'mailto:' . htmlspecialchars($teacher->email, ENT_QUOTES, 'UTF-8'),
+                                    htmlspecialchars($teachername, ENT_QUOTES, 'UTF-8'),
+                                    ['class' => 'teacher-email-link']
+                                );
+                            } else {
+                                $teacherlinks[] = htmlspecialchars($teachername, ENT_QUOTES, 'UTF-8');
                             }
-                            $teachershtml = implode('', $teacherlinks);
                         }
+                        $teachershtml = implode('', $teacherlinks);
                     }
                     if (empty($teachershtml)) {
                         $teachershtml = '-';
