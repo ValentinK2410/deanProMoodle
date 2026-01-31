@@ -502,6 +502,46 @@ if ($action == 'viewprogram' && $programid > 0) {
                         color: #28a745;
                         font-weight: 500;
                     }
+                    /* Стили для итоговых оценок */
+                    .grade-badge {
+                        display: inline-block;
+                        padding: 8px 16px;
+                        border-radius: 20px;
+                        font-weight: 600;
+                        font-size: 14px;
+                        text-align: center;
+                        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+                        transition: all 0.3s ease;
+                        white-space: nowrap;
+                    }
+                    .grade-badge:hover {
+                        transform: translateY(-2px);
+                        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+                    }
+                    .grade-badge-no-grade {
+                        background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
+                        color: #ffffff;
+                    }
+                    .grade-badge-failed {
+                        background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+                        color: #ffffff;
+                    }
+                    .grade-badge-satisfactory {
+                        background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
+                        color: #212529;
+                    }
+                    .grade-badge-good {
+                        background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+                        color: #ffffff;
+                    }
+                    .grade-badge-excellent {
+                        background: linear-gradient(135deg, #28a745 0%, #218838 100%);
+                        color: #ffffff;
+                    }
+                    .grade-badge i {
+                        margin-right: 6px;
+                        font-size: 16px;
+                    }
                     .teacher-email-link {
                         color: #007bff;
                         text-decoration: none;
@@ -684,9 +724,13 @@ if ($action == 'viewprogram' && $programid > 0) {
                     
                     // Итоговая оценка
                     $gradeText = '';
+                    $gradeClass = '';
+                    $gradeIcon = '';
                     if ($finalgradepercent === null) {
                         // Если нет оценки вообще
                         $gradeText = 'нет оценки';
+                        $gradeClass = 'grade-badge-no-grade';
+                        $gradeIcon = '<i class="fas fa-minus-circle"></i>';
                     } elseif ($finalgradepercent < 70) {
                         // Если оценка ниже 70% - показываем фактическую оценку из gradebook (только целые числа, без максимума)
                         if ($coursegrade !== null) {
@@ -695,14 +739,24 @@ if ($action == 'viewprogram' && $programid > 0) {
                         } else {
                             $gradeText = (int)round($finalgradepercent);
                         }
+                        $gradeText = 'курс не пройден';
+                        $gradeClass = 'grade-badge-failed';
+                        $gradeIcon = '<i class="fas fa-times-circle"></i>';
                     } elseif ($finalgradepercent >= 70 && $finalgradepercent < 80) {
                         $gradeText = '3 (удовлетворительно)';
+                        $gradeClass = 'grade-badge-satisfactory';
+                        $gradeIcon = '<i class="fas fa-check-circle"></i>';
                     } elseif ($finalgradepercent >= 80 && $finalgradepercent < 90) {
                         $gradeText = '4 (хорошо)';
+                        $gradeClass = 'grade-badge-good';
+                        $gradeIcon = '<i class="fas fa-star"></i>';
                     } elseif ($finalgradepercent >= 90) {
                         $gradeText = '5 (отлично)';
+                        $gradeClass = 'grade-badge-excellent';
+                        $gradeIcon = '<i class="fas fa-trophy"></i>';
                     }
-                    echo html_writer::tag('td', htmlspecialchars($gradeText, ENT_QUOTES, 'UTF-8'));
+                    $gradeBadge = '<span class="grade-badge ' . $gradeClass . '">' . $gradeIcon . htmlspecialchars($gradeText, ENT_QUOTES, 'UTF-8') . '</span>';
+                    echo html_writer::tag('td', $gradeBadge);
                     
                     // Количество академических кредитов
                     $credits = '-';
@@ -1353,43 +1407,100 @@ if ($action == 'viewprogram' && $programid > 0) {
         case 'additional':
             // Подвкладка "Дополнительные данные"
             try {
-                // Получаем группы (когорты) студента
-                $studentcohorts = $DB->get_records_sql(
-                    "SELECT c.id, c.name, c.idnumber, c.description
-                     FROM {cohort_members} cm
-                     JOIN {cohort} c ON c.id = cm.cohortid
-                     WHERE cm.userid = ?
-                     ORDER BY c.name ASC",
-                    [$USER->id]
-                );
+                // Получаем данные из таблицы local_deanpromoodle_student_info
+                $studentinfo = $DB->get_record('local_deanpromoodle_student_info', ['userid' => $USER->id]);
                 
-                // Получаем дату зачисления (берем самую раннюю дату зачисления в любой курс)
-                $enrollmentdate = null;
-                $enrollments = $DB->get_records_sql(
-                    "SELECT MIN(ue.timestart) as earliest_enrollment
-                     FROM {user_enrolments} ue
-                     JOIN {enrol} e ON e.id = ue.enrolid
-                     WHERE ue.userid = ? AND ue.status = 0 AND e.status = 0",
-                    [$USER->id]
-                );
-                if (!empty($enrollments)) {
-                    $enrollment = reset($enrollments);
-                    if ($enrollment->earliest_enrollment > 0) {
-                        $enrollmentdate = $enrollment->earliest_enrollment;
+                // Группа (cohort) - сначала из таблицы, если нет - из cohort_members
+                $cohortdisplay = '';
+                if ($studentinfo && !empty($studentinfo->cohort)) {
+                    $cohortdisplay = htmlspecialchars($studentinfo->cohort, ENT_QUOTES, 'UTF-8');
+                } else {
+                    // Fallback: получаем группы (когорты) студента из Moodle
+                    $studentcohorts = $DB->get_records_sql(
+                        "SELECT c.id, c.name, c.idnumber, c.description
+                         FROM {cohort_members} cm
+                         JOIN {cohort} c ON c.id = cm.cohortid
+                         WHERE cm.userid = ?
+                         ORDER BY c.name ASC",
+                        [$USER->id]
+                    );
+                    if (!empty($studentcohorts)) {
+                        $cohortnames = [];
+                        foreach ($studentcohorts as $cohort) {
+                            $cohortnames[] = htmlspecialchars($cohort->name, ENT_QUOTES, 'UTF-8');
+                        }
+                        $cohortdisplay = implode(', ', $cohortnames);
                     }
                 }
                 
-                // Получаем адрес из профиля пользователя
-                $address = $USER->address ? $USER->address : '';
+                // Дата зачисления - сначала из таблицы (enrollment_year), если нет - из user_enrolments
+                $enrollmentdisplay = '-';
+                if ($studentinfo && !empty($studentinfo->enrollment_year)) {
+                    $enrollmentdisplay = htmlspecialchars($studentinfo->enrollment_year, ENT_QUOTES, 'UTF-8');
+                } else {
+                    // Fallback: получаем дату зачисления (берем самую раннюю дату зачисления в любой курс)
+                    $enrollments = $DB->get_records_sql(
+                        "SELECT MIN(ue.timestart) as earliest_enrollment
+                         FROM {user_enrolments} ue
+                         JOIN {enrol} e ON e.id = ue.enrolid
+                         WHERE ue.userid = ? AND ue.status = 0 AND e.status = 0",
+                        [$USER->id]
+                    );
+                    if (!empty($enrollments)) {
+                        $enrollment = reset($enrollments);
+                        if ($enrollment->earliest_enrollment > 0) {
+                            $enrollmentdisplay = userdate($enrollment->earliest_enrollment, get_string('strftimedatefullshort'));
+                        }
+                    }
+                }
                 
-                // Получаем СНИЛС (может быть в idnumber или в customfield)
-                $snils = $USER->idnumber ? $USER->idnumber : '';
-                // Также проверяем customfield для СНИЛС
-                if (empty($snils)) {
-                    require_once($CFG->dirroot . '/user/profile/lib.php');
-                    $userfields = profile_user_record($USER->id);
-                    if (isset($userfields->snils)) {
-                        $snils = $userfields->snils;
+                // Адрес - собираем из полей таблицы или из профиля пользователя
+                $addressdisplay = '-';
+                if ($studentinfo) {
+                    $addressparts = [];
+                    if (!empty($studentinfo->postal_index)) {
+                        $addressparts[] = htmlspecialchars($studentinfo->postal_index, ENT_QUOTES, 'UTF-8');
+                    }
+                    if (!empty($studentinfo->country)) {
+                        $addressparts[] = htmlspecialchars($studentinfo->country, ENT_QUOTES, 'UTF-8');
+                    }
+                    if (!empty($studentinfo->region)) {
+                        $addressparts[] = htmlspecialchars($studentinfo->region, ENT_QUOTES, 'UTF-8');
+                    }
+                    if (!empty($studentinfo->city)) {
+                        $addressparts[] = htmlspecialchars($studentinfo->city, ENT_QUOTES, 'UTF-8');
+                    }
+                    if (!empty($studentinfo->street)) {
+                        $addressparts[] = htmlspecialchars($studentinfo->street, ENT_QUOTES, 'UTF-8');
+                    }
+                    if (!empty($studentinfo->house_apartment)) {
+                        $addressparts[] = htmlspecialchars($studentinfo->house_apartment, ENT_QUOTES, 'UTF-8');
+                    }
+                    if (!empty($addressparts)) {
+                        $addressdisplay = implode(', ', $addressparts);
+                    }
+                }
+                // Fallback: получаем адрес из профиля пользователя
+                if ($addressdisplay === '-' && !empty($USER->address)) {
+                    $addressdisplay = htmlspecialchars($USER->address, ENT_QUOTES, 'UTF-8');
+                }
+                
+                // СНИЛС - сначала из таблицы, если нет - из профиля
+                $snilsdisplay = '-';
+                if ($studentinfo && !empty($studentinfo->snils)) {
+                    $snilsdisplay = htmlspecialchars($studentinfo->snils, ENT_QUOTES, 'UTF-8');
+                } else {
+                    // Fallback: получаем СНИЛС (может быть в idnumber или в customfield)
+                    $snils = $USER->idnumber ? $USER->idnumber : '';
+                    if (empty($snils)) {
+                        require_once($CFG->dirroot . '/user/profile/lib.php');
+                        $userfields = profile_user_record($USER->id);
+                        if (isset($userfields->snils)) {
+                            $snils = $userfields->snils;
+                        }
+                    }
+                    if (!empty($snils)) {
+                        $snilsdisplay = htmlspecialchars($snils, ENT_QUOTES, 'UTF-8');
                     }
                 }
                 
@@ -1434,35 +1545,25 @@ if ($action == 'viewprogram' && $programid > 0) {
                 // Группа
                 echo html_writer::start_tag('tr');
                 echo html_writer::tag('td', 'Группа');
-                echo html_writer::start_tag('td');
-                if (!empty($studentcohorts)) {
-                    $cohortnames = [];
-                    foreach ($studentcohorts as $cohort) {
-                        $cohortnames[] = htmlspecialchars($cohort->name, ENT_QUOTES, 'UTF-8');
-                    }
-                    echo implode(', ', $cohortnames);
-                } else {
-                    echo '-';
-                }
-                echo html_writer::end_tag('td');
+                echo html_writer::tag('td', $cohortdisplay ?: '-');
                 echo html_writer::end_tag('tr');
                 
                 // Дата зачисления
                 echo html_writer::start_tag('tr');
                 echo html_writer::tag('td', 'Дата зачисления');
-                echo html_writer::tag('td', $enrollmentdate ? userdate($enrollmentdate, get_string('strftimedatefullshort')) : '-');
+                echo html_writer::tag('td', $enrollmentdisplay);
                 echo html_writer::end_tag('tr');
                 
                 // Адрес
                 echo html_writer::start_tag('tr');
                 echo html_writer::tag('td', 'Адрес');
-                echo html_writer::tag('td', $address ? htmlspecialchars($address, ENT_QUOTES, 'UTF-8') : '-');
+                echo html_writer::tag('td', $addressdisplay);
                 echo html_writer::end_tag('tr');
                 
                 // СНИЛС
                 echo html_writer::start_tag('tr');
                 echo html_writer::tag('td', 'СНИЛС');
-                echo html_writer::tag('td', $snils ? htmlspecialchars($snils, ENT_QUOTES, 'UTF-8') : '-');
+                echo html_writer::tag('td', $snilsdisplay);
                 echo html_writer::end_tag('tr');
                 
                 echo html_writer::end_tag('tbody');
