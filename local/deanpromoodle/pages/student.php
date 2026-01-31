@@ -143,6 +143,7 @@ $tab = optional_param('tab', 'courses', PARAM_ALPHA); // courses, programs
 $subtab = optional_param('subtab', 'programs', PARAM_ALPHA); // programs, additional для вкладки "Личная информация и статус"
 $action = optional_param('action', '', PARAM_ALPHA); // viewprogram
 $programid = optional_param('programid', 0, PARAM_INT);
+$testmode = optional_param('test', false, PARAM_BOOL); // Параметр для тестирования - показывать цифровую оценку
 
 // Студент может заходить на любые вкладки страницы student.php
 
@@ -542,6 +543,12 @@ if ($action == 'viewprogram' && $programid > 0) {
                         margin-right: 6px;
                         font-size: 16px;
                     }
+                    .grade-numeric-value {
+                        font-size: 12px;
+                        opacity: 0.9;
+                        margin-left: 6px;
+                        font-weight: 500;
+                    }
                     .teacher-email-link {
                         color: #007bff;
                         text-decoration: none;
@@ -726,19 +733,18 @@ if ($action == 'viewprogram' && $programid > 0) {
                     $gradeText = '';
                     $gradeClass = '';
                     $gradeIcon = '';
+                    $numericGrade = null; // Числовая оценка для тестового режима
+                    
                     if ($finalgradepercent === null) {
                         // Если нет оценки вообще
                         $gradeText = 'нет оценки';
                         $gradeClass = 'grade-badge-no-grade';
                         $gradeIcon = '<i class="fas fa-minus-circle"></i>';
+                        $numericGrade = null;
                     } elseif ($finalgradepercent < 70) {
                         // Если оценка ниже 70% - показываем фактическую оценку из gradebook (только целые числа, без максимума)
-                        if ($coursegrade !== null) {
-                            // Показываем только полученную оценку без "/максимум"
-                            $gradeText = (int)round($coursegrade);
-                        } else {
-                            $gradeText = (int)round($finalgradepercent);
-                        }
+                        // Для тестового режима сохраняем процент
+                        $numericGrade = round($finalgradepercent, 1);
                         $gradeText = 'курс не пройден';
                         $gradeClass = 'grade-badge-failed';
                         $gradeIcon = '<i class="fas fa-times-circle"></i>';
@@ -746,16 +752,28 @@ if ($action == 'viewprogram' && $programid > 0) {
                         $gradeText = '3 (удовлетворительно)';
                         $gradeClass = 'grade-badge-satisfactory';
                         $gradeIcon = '<i class="fas fa-check-circle"></i>';
+                        $numericGrade = round($finalgradepercent, 1);
                     } elseif ($finalgradepercent >= 80 && $finalgradepercent < 90) {
                         $gradeText = '4 (хорошо)';
                         $gradeClass = 'grade-badge-good';
                         $gradeIcon = '<i class="fas fa-star"></i>';
+                        $numericGrade = round($finalgradepercent, 1);
                     } elseif ($finalgradepercent >= 90) {
                         $gradeText = '5 (отлично)';
                         $gradeClass = 'grade-badge-excellent';
                         $gradeIcon = '<i class="fas fa-trophy"></i>';
+                        $numericGrade = round($finalgradepercent, 1);
                     }
-                    $gradeBadge = '<span class="grade-badge ' . $gradeClass . '">' . $gradeIcon . htmlspecialchars($gradeText, ENT_QUOTES, 'UTF-8') . '</span>';
+                    
+                    // Формируем бейдж с оценкой
+                    $gradeBadgeContent = $gradeIcon . htmlspecialchars($gradeText, ENT_QUOTES, 'UTF-8');
+                    
+                    // Если тестовый режим и есть числовая оценка, добавляем её
+                    if ($testmode && $numericGrade !== null) {
+                        $gradeBadgeContent .= ' <span class="grade-numeric-value">(' . $numericGrade . '%)</span>';
+                    }
+                    
+                    $gradeBadge = '<span class="grade-badge ' . $gradeClass . '">' . $gradeBadgeContent . '</span>';
                     echo html_writer::tag('td', $gradeBadge);
                     
                     // Количество академических кредитов
