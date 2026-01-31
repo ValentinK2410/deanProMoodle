@@ -1226,7 +1226,7 @@ if ($action == 'viewprogram' && $programid > 0) {
                     if (!empty($statusitems)) {
                         $statushtml = implode(' ', $statusitems);
                     } else {
-                        $statushtml = '<span class="text-muted">Нет заданий</span>';
+                        $statushtml = '<span class="text-muted">Нет домашних заданий</span>';
                     }
                     
                     echo html_writer::tag('td', $statushtml);
