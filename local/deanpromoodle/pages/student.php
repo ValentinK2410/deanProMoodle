@@ -558,6 +558,59 @@ if ($action == 'viewprogram' && $programid > 0) {
                     .teacher-email-link:hover {
                         text-decoration: underline;
                     }
+                    .teachers-icons-container {
+                        display: flex;
+                        flex-wrap: wrap;
+                        gap: 8px;
+                        align-items: center;
+                    }
+                    .teacher-icon-wrapper {
+                        position: relative;
+                        display: inline-block;
+                        cursor: pointer;
+                    }
+                    .teacher-icon-wrapper .teacher-avatar {
+                        border-radius: 50%;
+                        border: 2px solid #dee2e6;
+                        transition: all 0.3s ease;
+                        display: block;
+                    }
+                    .teacher-icon-wrapper:hover .teacher-avatar {
+                        border-color: #007bff;
+                        transform: scale(1.1);
+                        box-shadow: 0 2px 8px rgba(0, 123, 255, 0.3);
+                    }
+                    .teacher-icon-wrapper[title]:hover::after {
+                        content: attr(title);
+                        position: absolute;
+                        bottom: 100%;
+                        left: 50%;
+                        transform: translateX(-50%);
+                        margin-bottom: 8px;
+                        padding: 8px 12px;
+                        background-color: #333;
+                        color: #fff;
+                        border-radius: 4px;
+                        font-size: 12px;
+                        white-space: pre-line;
+                        z-index: 1000;
+                        pointer-events: none;
+                        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+                        max-width: 250px;
+                        line-height: 1.4;
+                    }
+                    .teacher-icon-wrapper[title]:hover::before {
+                        content: '';
+                        position: absolute;
+                        bottom: 100%;
+                        left: 50%;
+                        transform: translateX(-50%);
+                        margin-bottom: 2px;
+                        border: 5px solid transparent;
+                        border-top-color: #333;
+                        z-index: 1001;
+                        pointer-events: none;
+                    }
                 ";
                 echo html_writer::end_tag('style');
                 
@@ -888,20 +941,49 @@ if ($action == 'viewprogram' && $programid > 0) {
                         $debuginfo = '<div style="font-size: 10px; color: #666; margin-top: 5px;">' . implode(' | ', $debuginfo) . '</div>';
                     }
                     if (!empty($teacherusers)) {
-                        $teacherlinks = [];
+                        $teachericons = [];
                         foreach ($teacherusers as $teacher) {
                             $teachername = fullname($teacher);
+                            $teacherinfo = [];
+                            $teacherinfo[] = 'ФИО: ' . $teachername;
                             if (!empty($teacher->email)) {
-                                $teacherlinks[] = html_writer::link(
-                                    'mailto:' . htmlspecialchars($teacher->email, ENT_QUOTES, 'UTF-8'),
-                                    htmlspecialchars($teachername, ENT_QUOTES, 'UTF-8'),
-                                    ['class' => 'teacher-email-link', 'target' => '_blank']
-                                );
-                            } else {
-                                $teacherlinks[] = htmlspecialchars($teachername, ENT_QUOTES, 'UTF-8');
+                                $teacherinfo[] = 'Email: ' . htmlspecialchars($teacher->email, ENT_QUOTES, 'UTF-8');
+                            }
+                            $tooltiptext = implode("\n", $teacherinfo);
+                            
+                            // Получаем полный объект пользователя для user_picture
+                            $teacheruser = $DB->get_record('user', ['id' => $teacher->id]);
+                            if ($teacheruser) {
+                                // Отображаем иконку преподавателя
+                                $userpicture = $OUTPUT->user_picture($teacheruser, [
+                                    'size' => 35,
+                                    'class' => 'teacher-avatar',
+                                    'link' => false
+                                ]);
+                                
+                                // Обертываем в ссылку с tooltip
+                                $iconhtml = html_writer::start_tag('span', [
+                                    'class' => 'teacher-icon-wrapper',
+                                    'title' => $tooltiptext,
+                                    'data-toggle' => 'tooltip',
+                                    'data-placement' => 'top'
+                                ]);
+                                
+                                if (!empty($teacher->email)) {
+                                    $iconhtml .= html_writer::link(
+                                        'mailto:' . htmlspecialchars($teacher->email, ENT_QUOTES, 'UTF-8'),
+                                        $userpicture,
+                                        ['class' => 'teacher-email-link', 'target' => '_blank', 'style' => 'text-decoration: none; display: inline-block;']
+                                    );
+                                } else {
+                                    $iconhtml .= $userpicture;
+                                }
+                                
+                                $iconhtml .= html_writer::end_tag('span');
+                                $teachericons[] = $iconhtml;
                             }
                         }
-                        $teachershtml = implode('<br>', $teacherlinks) . $debuginfo;
+                        $teachershtml = html_writer::div(implode(' ', $teachericons), 'teachers-icons-container') . $debuginfo;
                     } else {
                         if ($testmode) {
                             $teachershtml = '-' . $debuginfo;
