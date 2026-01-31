@@ -458,6 +458,51 @@ if ($action == 'viewprogram' && $programid > 0) {
                     .course-link:hover {
                         text-decoration: underline;
                     }
+                    .courses-table-container {
+                        position: relative;
+                    }
+                    .courses-table-fullscreen {
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        width: 100vw;
+                        height: 100vh;
+                        z-index: 9999;
+                        background: white;
+                        border-radius: 0;
+                        overflow: auto;
+                    }
+                    .courses-table-fullscreen table {
+                        min-width: 100%;
+                    }
+                    .fullscreen-toggle-btn {
+                        position: absolute;
+                        top: 10px;
+                        right: 10px;
+                        z-index: 10000;
+                        background: #007bff;
+                        color: white;
+                        border: none;
+                        border-radius: 5px;
+                        padding: 8px 16px;
+                        cursor: pointer;
+                        font-size: 14px;
+                        display: flex;
+                        align-items: center;
+                        gap: 5px;
+                        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                        transition: background 0.3s;
+                    }
+                    .fullscreen-toggle-btn:hover {
+                        background: #0056b3;
+                    }
+                    .courses-table-container:not(.fullscreen-mode) .fullscreen-toggle-btn {
+                        position: relative;
+                        top: auto;
+                        right: auto;
+                        margin-bottom: 10px;
+                        display: inline-block;
+                    }
                 ";
                 echo html_writer::end_tag('style');
                 
