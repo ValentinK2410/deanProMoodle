@@ -462,24 +462,14 @@ if ($action == 'viewprogram' && $programid > 0) {
                         position: relative;
                     }
                     .courses-table-fullscreen {
-                        position: fixed;
-                        top: 0;
-                        left: 0;
-                        width: 100vw;
-                        height: 100vh;
-                        z-index: 9999;
-                        background: white;
                         border-radius: 0;
                         overflow: auto;
+                        height: 100vh;
                     }
                     .courses-table-fullscreen table {
                         min-width: 100%;
                     }
                     .fullscreen-toggle-btn {
-                        position: absolute;
-                        top: 10px;
-                        right: 10px;
-                        z-index: 10000;
                         background: #007bff;
                         color: white;
                         border: none;
@@ -502,6 +492,21 @@ if ($action == 'viewprogram' && $programid > 0) {
                         right: auto;
                         margin-bottom: 10px;
                         display: inline-block;
+                    }
+                    .courses-table-container.fullscreen-mode .fullscreen-toggle-btn {
+                        position: fixed;
+                        top: 10px;
+                        right: 10px;
+                        z-index: 10000;
+                    }
+                    .courses-table-container.fullscreen-mode {
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        width: 100vw;
+                        height: 100vh;
+                        z-index: 9999;
+                        background: white;
                     }
                 ";
                 echo html_writer::end_tag('style');
