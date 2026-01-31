@@ -1111,7 +1111,7 @@ if ($action == 'viewprogram' && $programid > 0) {
                             if (!$hasgrade && !$hasfiles) {
                                 // Если название точно "Сдача письменной работы" - используем его с текстом "не сдано", иначе оригинальное название
                                 if (mb_strtolower(trim($assignment->name)) == 'сдача письменной работы') {
-                                    $statustext = 'Сдача письменной работы - не сдано';
+                                    $statustext = 'Письменная работа - не сдано';
                                 } else {
                                     $statustext = htmlspecialchars($assignment->name, ENT_QUOTES, 'UTF-8');
                                 }
