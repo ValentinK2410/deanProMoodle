@@ -753,10 +753,10 @@ if ($action == 'viewprogram' && $programid > 0) {
                         $completionstatus = 'Не завершен';
                         $completionclass = 'completion-status-not-completed';
                     } elseif ($finalgradepercent >= 70) {
-                        // Если нет заданий в курсе - не завершен
+                        // Если нет заданий в курсе, но оценка >= 70% - завершен полностью
                         if (!$hasassignments) {
-                            $completionstatus = 'Не завершен';
-                            $completionclass = 'completion-status-not-completed';
+                            $completionstatus = 'Завершен полностью';
+                            $completionclass = 'completion-status-completed';
                         } elseif (!$allassignmentsgraded) {
                             // Есть задания и не все оценены - частично завершен
                             $completionstatus = 'Завершен частично';
