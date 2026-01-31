@@ -977,14 +977,33 @@ if ($action == 'viewprogram' && $programid > 0) {
                             // Используем функцию для проверки оценки (включая принудительно проставленные)
                             $hasgrade = $checkAssignmentGrade($assignment->id, $USER->id);
                             
-                            // Показываем только если не сдано (нет оценки и нет файлов)
-                            if (!$hasgrade && !$hasfiles) {
-                                // Если название точно "Сдача письменной работы" - используем его с текстом "не сдано", иначе оригинальное название
-                                if (mb_strtolower(trim($assignment->name)) == 'сдача письменной работы') {
-                                    $statustext = 'Письменная работа - не сдано';
-                                } else {
-                                    $statustext = htmlspecialchars($assignment->name, ENT_QUOTES, 'UTF-8');
-                                }
+                            // Определяем текст для отображения
+                            if (mb_strtolower(trim($assignment->name)) == 'сдача письменной работы') {
+                                $basename = 'Письменная работа';
+                            } else {
+                                $basename = htmlspecialchars($assignment->name, ENT_QUOTES, 'UTF-8');
+                            }
+                            
+                            // Показываем письменную работу во всех состояниях
+                            if ($hasgrade) {
+                                // Есть оценка - зеленый "Письменная работа - сдано"
+                                $statustext = $basename . ' - сдано';
+                                $badgecontent = html_writer::link($assignmenturl, $statustext, [
+                                    'class' => 'assignment-status-link',
+                                    'target' => '_blank'
+                                ]);
+                                $statusitems[] = '<span class="badge assignment-status-item assignment-status-green">' . $badgecontent . '</span>';
+                            } elseif ($hasfiles) {
+                                // Файл загружен, но нет оценки - желтый "Письменная работа - не проверено"
+                                $statustext = $basename . ' - не проверено';
+                                $badgecontent = html_writer::link($assignmenturl, $statustext, [
+                                    'class' => 'assignment-status-link',
+                                    'target' => '_blank'
+                                ]);
+                                $statusitems[] = '<span class="badge assignment-status-item assignment-status-yellow">' . $badgecontent . '</span>';
+                            } else {
+                                // Нет файлов и нет оценки - красный "Письменная работа - не сдано"
+                                $statustext = $basename . ' - не сдано';
                                 $badgecontent = html_writer::link($assignmenturl, $statustext, [
                                     'class' => 'assignment-status-link',
                                     'target' => '_blank'
