@@ -854,20 +854,24 @@ if ($action == 'viewprogram' && $programid > 0) {
                     }
                     echo html_writer::tag('td', htmlspecialchars($credits, ENT_QUOTES, 'UTF-8'));
                     
-                    // Преподаватели с email-ссылками (только роль teacher, id 4)
+                    // Преподаватели с email-ссылками (только роль teacher)
                     $coursecontext = context_course::instance($course->id);
-                    // Используем только роль teacher (id 4)
-                    $teacherroleid = 4; // teacher role id
+                    // Получаем id роли teacher динамически
+                    $teacherroleid = $DB->get_field('role', 'id', ['shortname' => 'teacher']);
                     $teachershtml = '';
-                    $teacherusers = $DB->get_records_sql(
-                        "SELECT DISTINCT u.id, u.firstname, u.lastname, u.email
-                         FROM {user} u
-                         JOIN {role_assignments} ra ON ra.userid = u.id
-                         WHERE ra.contextid = ? AND ra.roleid = ?
-                         AND u.deleted = 0
-                         ORDER BY u.lastname, u.firstname",
-                        [$coursecontext->id, $teacherroleid]
-                    );
+                    if ($teacherroleid) {
+                        $teacherusers = $DB->get_records_sql(
+                            "SELECT DISTINCT u.id, u.firstname, u.lastname, u.email
+                             FROM {user} u
+                             JOIN {role_assignments} ra ON ra.userid = u.id
+                             WHERE ra.contextid = ? AND ra.roleid = ?
+                             AND u.deleted = 0
+                             ORDER BY u.lastname, u.firstname",
+                            [$coursecontext->id, $teacherroleid]
+                        );
+                    } else {
+                        $teacherusers = [];
+                    }
                     if (!empty($teacherusers)) {
                         $teacherlinks = [];
                         foreach ($teacherusers as $teacher) {
