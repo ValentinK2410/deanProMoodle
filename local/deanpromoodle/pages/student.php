@@ -810,9 +810,24 @@ if ($action == 'viewprogram' && $programid > 0) {
                     // Формируем бейдж с оценкой
                     $gradeBadgeContent = $gradeIcon . htmlspecialchars($gradeText, ENT_QUOTES, 'UTF-8');
                     
-                    // Если тестовый режим и есть числовая оценка, добавляем её
-                    if ($testmode && $numericGrade !== null) {
-                        $gradeBadgeContent .= ' <span class="grade-numeric-value">(' . $numericGrade . '%)</span>';
+                    // Если тестовый режим, показываем все цифры итоговой оценки
+                    if ($testmode) {
+                        $testInfo = [];
+                        if ($coursegrade !== null) {
+                            $testInfo[] = 'Оценка: ' . round($coursegrade, 2);
+                        }
+                        if ($courseitem && $courseitem->grademax > 0) {
+                            $testInfo[] = 'Макс: ' . round($courseitem->grademax, 2);
+                        }
+                        if ($finalgradepercent !== null) {
+                            $testInfo[] = 'Процент: ' . round($finalgradepercent, 2) . '%';
+                        }
+                        if ($courseitem && isset($courseitem->grademin)) {
+                            $testInfo[] = 'Мин: ' . round($courseitem->grademin, 2);
+                        }
+                        if (!empty($testInfo)) {
+                            $gradeBadgeContent .= ' <span class="grade-numeric-value" style="display: block; font-size: 11px; margin-top: 4px; opacity: 0.8;">' . implode(' | ', $testInfo) . '</span>';
+                        }
                     }
                     
                     $gradeBadge = '<span class="grade-badge ' . $gradeClass . '">' . $gradeBadgeContent . '</span>';
