@@ -423,11 +423,14 @@ if ($action == 'viewprogram' && $programid > 0) {
                         background: white;
                         border-radius: 8px;
                         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-                        overflow: hidden;
+                        overflow-x: auto;
+                        overflow-y: visible;
                     }
                     .courses-table table {
                         margin: 0;
                         width: 100%;
+                        min-width: 1200px;
+                        table-layout: auto;
                     }
                     .courses-table thead th {
                         background-color: #f8f9fa;
