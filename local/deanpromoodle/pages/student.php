@@ -626,6 +626,52 @@ if ($action == 'viewprogram' && $programid > 0) {
                         $courseitem = null;
                     }
                     
+                    // Вспомогательная функция для проверки наличия оценки за задание (включая принудительно проставленные)
+                    // Проверяет как assign_grades, так и gradebook для учета принудительно проставленных оценок
+                    global $CFG;
+                    $checkAssignmentGrade = function($assignmentid, $userid) use ($DB, $course, $CFG) {
+                        // Сначала проверяем assign_grades
+                        $grade = $DB->get_record('assign_grades', [
+                            'assignment' => $assignmentid,
+                            'userid' => $userid
+                        ]);
+                        
+                        if ($grade && $grade->grade !== null && $grade->grade >= 0) {
+                            return true; // Есть оценка в assign_grades
+                        }
+                        
+                        // Если нет оценки в assign_grades, проверяем через gradebook API
+                        // Это учитывает принудительно проставленные оценки
+                        try {
+                            require_once($CFG->dirroot . '/lib/gradelib.php');
+                            $cm = get_coursemodule_from_instance('assign', $assignmentid, $course->id);
+                            if ($cm) {
+                                $gradeitem = grade_item::fetch([
+                                    'itemtype' => 'mod',
+                                    'itemmodule' => 'assign',
+                                    'iteminstance' => $assignmentid,
+                                    'courseid' => $course->id
+                                ]);
+                                
+                                if ($gradeitem) {
+                                    $usergrade = grade_grade::fetch([
+                                        'itemid' => $gradeitem->id,
+                                        'userid' => $userid
+                                    ]);
+                                    
+                                    // Проверяем finalgrade, который учитывает принудительно проставленные оценки
+                                    if ($usergrade && $usergrade->finalgrade !== null && $usergrade->finalgrade >= 0) {
+                                        return true; // Есть оценка в gradebook (включая принудительно проставленную)
+                                    }
+                                }
+                            }
+                        } catch (\Exception $e) {
+                            // Игнорируем ошибки
+                        }
+                        
+                        return false; // Нет оценки
+                    };
+                    
                     // Функция для проверки, все ли задания имеют оценку
                     $allassignmentsgraded = true;
                     $hasassignments = false;
@@ -646,11 +692,8 @@ if ($action == 'viewprogram' && $programid > 0) {
                             // Проверяем отчеты о чтении
                             if (strpos($assignmentname, 'отчет') !== false && strpos($assignmentname, 'чтени') !== false) {
                                 $hasassignments = true;
-                                $grade = $DB->get_record('assign_grades', [
-                                    'assignment' => $assignment->id,
-                                    'userid' => $USER->id
-                                ]);
-                                if (!$grade || $grade->grade === null || $grade->grade < 0) {
+                                // Используем функцию для проверки оценки (включая принудительно проставленные)
+                                if (!$checkAssignmentGrade($assignment->id, $USER->id)) {
                                     $allassignmentsgraded = false;
                                 }
                             }
@@ -674,13 +717,8 @@ if ($action == 'viewprogram' && $programid > 0) {
                                     );
                                     $hasfiles = ($filecount > 0 || $textcount > 0);
                                 }
-                                // Проверяем оценку
-                                $grade = $DB->get_record('assign_grades', [
-                                    'assignment' => $assignment->id,
-                                    'userid' => $USER->id
-                                ]);
-                                // Письменная работа считается сданной, если есть оценка ИЛИ есть файлы
-                                if (!($grade && $grade->grade !== null && $grade->grade >= 0) && !$hasfiles) {
+                                // Письменная работа считается сданной, если есть оценка (включая принудительно проставленную) ИЛИ есть файлы
+                                if (!$checkAssignmentGrade($assignment->id, $USER->id) && !$hasfiles) {
                                     $allassignmentsgraded = false;
                                 }
                             }
@@ -894,17 +932,15 @@ if ($action == 'viewprogram' && $programid > 0) {
                                 $hasfiles = ($filecount > 0 || $textcount > 0);
                             }
                             
-                            $grade = $DB->get_record('assign_grades', [
-                                'assignment' => $assignment->id,
-                                'userid' => $USER->id
-                            ]);
+                            // Проверяем наличие оценки (включая принудительно проставленные)
+                            $hasgrade = $checkAssignmentGrade($assignment->id, $USER->id);
                             
                             $statusclass = '';
                             $statustext = '';
                             
                             // Логика согласно требованиям:
-                            // 1. Если есть оценка - зеленый "Чтение – сдано" (даже если файл не загружен)
-                            if ($grade && $grade->grade !== null && $grade->grade >= 0) {
+                            // 1. Если есть оценка (включая принудительно проставленную) - зеленый "Чтение – сдано" (даже если файл не загружен)
+                            if ($hasgrade) {
                                 $statusclass = 'assignment-status-green';
                                 $statustext = 'Чтение – сдано';
                             } elseif ($hasfiles) {
@@ -949,13 +985,11 @@ if ($action == 'viewprogram' && $programid > 0) {
                                 $hasfiles = ($filecount > 0 || $textcount > 0);
                             }
                             
-                            $grade = $DB->get_record('assign_grades', [
-                                'assignment' => $assignment->id,
-                                'userid' => $USER->id
-                            ]);
+                            // Проверяем наличие оценки (включая принудительно проставленные)
+                            $hasgrade = $checkAssignmentGrade($assignment->id, $USER->id);
                             
                             // Показываем только если не сдано (нет оценки и нет файлов)
-                            if (!($grade && $grade->grade !== null && $grade->grade >= 0) && !$hasfiles) {
+                            if (!$hasgrade && !$hasfiles) {
                                 // Если название точно "Сдача письменной работы" - используем его с текстом "не сдано", иначе оригинальное название
                                 if (mb_strtolower(trim($assignment->name)) == 'сдача письменной работы') {
                                     $statustext = 'Сдача письменной работы - не сдано';
@@ -995,17 +1029,15 @@ if ($action == 'viewprogram' && $programid > 0) {
                                 $hasfiles = ($filecount > 0 || $textcount > 0);
                             }
                             
-                            $grade = $DB->get_record('assign_grades', [
-                                'assignment' => $assignment->id,
-                                'userid' => $USER->id
-                            ]);
+                            // Проверяем наличие оценки (включая принудительно проставленные)
+                            $hasgrade = $checkAssignmentGrade($assignment->id, $USER->id);
                             
                             $statusclass = '';
                             $statustext = '';
                             
                             // Логика для остальных заданий:
-                            // 1. Если есть оценка - зеленый "Название – сдано"
-                            if ($grade && $grade->grade !== null && $grade->grade >= 0) {
+                            // 1. Если есть оценка (включая принудительно проставленную) - зеленый "Название – сдано"
+                            if ($hasgrade) {
                                 $statusclass = 'assignment-status-green';
                                 $statustext = htmlspecialchars($assignment->name, ENT_QUOTES, 'UTF-8') . ' – сдано';
                             } elseif ($hasfiles) {
