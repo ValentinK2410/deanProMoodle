@@ -860,13 +860,39 @@ if ($action == 'viewprogram' && $programid > 0) {
                     // Получаем id роли teacher динамически
                     $teacherroleid = $DB->get_field('role', 'id', ['shortname' => 'teacher']);
                     $teachershtml = '';
+                    $debuginfo = '';
                     if ($teacherroleid) {
-                        // Используем Moodle API для получения пользователей с ролью teacher
-                        // Это более надежный способ, который учитывает все контексты
-                        require_once($CFG->dirroot . '/lib/accesslib.php');
-                        $teacherusers = get_role_users($teacherroleid, $coursecontext, false, 'u.id, u.firstname, u.lastname, u.email', 'u.lastname, u.firstname');
+                        // Используем SQL запрос для получения преподавателей с ролью teacher
+                        // DISTINCT гарантирует, что каждый пользователь показывается только один раз,
+                        // даже если у него несколько ролей (например, teacher и editingteacher)
+                        $teacherusers = $DB->get_records_sql(
+                            "SELECT DISTINCT u.id, u.firstname, u.lastname, u.email
+                             FROM {user} u
+                             JOIN {role_assignments} ra ON ra.userid = u.id
+                             WHERE ra.contextid = ? AND ra.roleid = ?
+                             AND u.deleted = 0 AND u.suspended = 0
+                             ORDER BY u.lastname, u.firstname",
+                            [$coursecontext->id, $teacherroleid]
+                        );
+                        
+                        // Отладочная информация в тестовом режиме
+                        if ($testmode) {
+                            $debuginfo = [];
+                            $debuginfo[] = 'Контекст курса: ' . $coursecontext->id;
+                            $debuginfo[] = 'ID роли teacher: ' . $teacherroleid;
+                            $debuginfo[] = 'Найдено преподавателей: ' . count($teacherusers);
+                            if (!empty($teacherusers)) {
+                                $debuginfo[] = 'Преподаватели: ' . implode(', ', array_map(function($t) {
+                                    return fullname($t);
+                                }, $teacherusers));
+                            }
+                            $debuginfo = '<div style="font-size: 10px; color: #666; margin-top: 5px;">' . implode(' | ', $debuginfo) . '</div>';
+                        }
                     } else {
                         $teacherusers = [];
+                        if ($testmode) {
+                            $debuginfo = '<div style="font-size: 10px; color: #f00;">Роль teacher не найдена в системе</div>';
+                        }
                     }
                     if (!empty($teacherusers)) {
                         $teacherlinks = [];
@@ -876,16 +902,19 @@ if ($action == 'viewprogram' && $programid > 0) {
                                 $teacherlinks[] = html_writer::link(
                                     'mailto:' . htmlspecialchars($teacher->email, ENT_QUOTES, 'UTF-8'),
                                     htmlspecialchars($teachername, ENT_QUOTES, 'UTF-8'),
-                                    ['class' => 'teacher-email-link']
+                                    ['class' => 'teacher-email-link', 'target' => '_blank']
                                 );
                             } else {
                                 $teacherlinks[] = htmlspecialchars($teachername, ENT_QUOTES, 'UTF-8');
                             }
                         }
-                        $teachershtml = implode('', $teacherlinks);
-                    }
-                    if (empty($teachershtml)) {
-                        $teachershtml = '-';
+                        $teachershtml = implode('<br>', $teacherlinks) . $debuginfo;
+                    } else {
+                        if ($testmode) {
+                            $teachershtml = '-' . $debuginfo;
+                        } else {
+                            $teachershtml = '-';
+                        }
                     }
                     echo html_writer::tag('td', $teachershtml);
                     
