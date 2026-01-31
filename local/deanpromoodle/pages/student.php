@@ -861,17 +861,10 @@ if ($action == 'viewprogram' && $programid > 0) {
                     $teacherroleid = $DB->get_field('role', 'id', ['shortname' => 'teacher']);
                     $teachershtml = '';
                     if ($teacherroleid) {
-                        // DISTINCT гарантирует, что каждый пользователь показывается только один раз,
-                        // даже если у него несколько ролей (например, teacher и editingteacher)
-                        $teacherusers = $DB->get_records_sql(
-                            "SELECT DISTINCT u.id, u.firstname, u.lastname, u.email
-                             FROM {user} u
-                             JOIN {role_assignments} ra ON ra.userid = u.id
-                             WHERE ra.contextid = ? AND ra.roleid = ?
-                             AND u.deleted = 0
-                             ORDER BY u.lastname, u.firstname",
-                            [$coursecontext->id, $teacherroleid]
-                        );
+                        // Используем Moodle API для получения пользователей с ролью teacher
+                        // Это более надежный способ, который учитывает все контексты
+                        require_once($CFG->dirroot . '/lib/accesslib.php');
+                        $teacherusers = get_role_users($teacherroleid, $coursecontext, false, 'u.id, u.firstname, u.lastname, u.email', 'u.lastname, u.firstname');
                     } else {
                         $teacherusers = [];
                     }
