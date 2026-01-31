@@ -814,12 +814,18 @@ if ($action == 'viewprogram' && $programid > 0) {
                     if ($testmode) {
                         $testInfo = [];
                         if ($coursegrade !== null) {
-                            $testInfo[] = 'Оценка: ' . round($coursegrade, 2);
+                            $roundedGrade = round($coursegrade, 2);
+                            $testInfo[] = 'Оценка: ' . $roundedGrade;
                         }
                         if ($courseitem && $courseitem->grademax > 0) {
                             $testInfo[] = 'Макс: ' . round($courseitem->grademax, 2);
                         }
-                        if ($finalgradepercent !== null) {
+                        if ($finalgradepercent !== null && $coursegrade !== null && $courseitem && $courseitem->grademax > 0) {
+                            // Пересчитываем процент на основе округленной оценки
+                            $roundedGrade = round($coursegrade, 2);
+                            $recalculatedPercent = ($roundedGrade / $courseitem->grademax) * 100;
+                            $testInfo[] = 'Процент: ' . round($recalculatedPercent, 2) . '%';
+                        } elseif ($finalgradepercent !== null) {
                             $testInfo[] = 'Процент: ' . round($finalgradepercent, 2) . '%';
                         }
                         if ($courseitem && isset($courseitem->grademin)) {
