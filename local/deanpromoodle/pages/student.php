@@ -619,11 +619,11 @@ if ($action == 'viewprogram' && $programid > 0) {
                 echo html_writer::start_tag('thead');
                 echo html_writer::start_tag('tr');
                 echo html_writer::tag('th', 'Название курса', ['style' => 'width: 250px;']);
-                echo html_writer::tag('th', 'Статус завершения', ['style' => 'width: 150px;']);
-                echo html_writer::tag('th', 'Итоговая оценка', ['style' => 'width: 150px;']);
                 echo html_writer::tag('th', 'Количество академических кредитов', ['style' => 'width: 150px;']);
                 echo html_writer::tag('th', 'Преподаватели, к которым можно обратиться за разъяснениями', ['style' => 'width: 200px;']);
                 echo html_writer::tag('th', 'Задолженности по курсу', ['style' => 'width: 300px;']);
+                echo html_writer::tag('th', 'Статус завершения', ['style' => 'width: 150px;']);
+                echo html_writer::tag('th', 'Итоговая оценка', ['style' => 'width: 150px;']);
                 echo html_writer::tag('th', 'Перейти к курсу', ['style' => 'width: 100px; text-align: center;']);
                 echo html_writer::end_tag('tr');
                 echo html_writer::end_tag('thead');
@@ -654,6 +654,290 @@ if ($action == 'viewprogram' && $programid > 0) {
                             'target' => '_blank'
                         ])
                     );
+                    
+                    // Количество академических кредитов
+                    $credits = '-';
+                    try {
+                        $subject = $DB->get_record_sql(
+                            "SELECT s.credits
+                             FROM {local_deanpromoodle_subject_courses} sc
+                             JOIN {local_deanpromoodle_subjects} s ON s.id = sc.subjectid
+                             WHERE sc.courseid = ?
+                             LIMIT 1",
+                            [$course->id]
+                        );
+                        if ($subject && $subject->credits !== null && $subject->credits > 0) {
+                            $credits = (string)$subject->credits;
+                        }
+                    } catch (\Exception $e) {
+                        // Игнорируем ошибки
+                    }
+                    echo html_writer::tag('td', htmlspecialchars($credits, ENT_QUOTES, 'UTF-8'));
+                    
+                    // Преподаватели с email-ссылками (только роль teacher)
+                    // Показываем пользователей, у которых есть роль teacher, даже если у них есть и другие роли
+                    $coursecontext = context_course::instance($course->id);
+                    // Используем роль с id 3
+                    $teacherroleid = 3;
+                    $teachershtml = '';
+                    $debuginfo = '';
+                    // Используем SQL запрос для получения преподавателей с ролью teacher
+                    // DISTINCT гарантирует, что каждый пользователь показывается только один раз,
+                    // даже если у него несколько ролей (например, teacher и editingteacher)
+                    $teacherusers = $DB->get_records_sql(
+                        "SELECT DISTINCT u.id, u.firstname, u.lastname, u.email
+                         FROM {user} u
+                         JOIN {role_assignments} ra ON ra.userid = u.id
+                         WHERE ra.contextid = ? AND ra.roleid = ?
+                         AND u.deleted = 0 AND u.suspended = 0
+                         ORDER BY u.lastname, u.firstname",
+                        [$coursecontext->id, $teacherroleid]
+                    );
+                    
+                    // Отладочная информация в тестовом режиме
+                    if ($testmode) {
+                        $debuginfo = [];
+                        $debuginfo[] = 'Контекст курса: ' . $coursecontext->id;
+                        $debuginfo[] = 'ID роли: ' . $teacherroleid;
+                        $debuginfo[] = 'Найдено преподавателей: ' . count($teacherusers);
+                        if (!empty($teacherusers)) {
+                            $debuginfo[] = 'Преподаватели: ' . implode(', ', array_map(function($t) {
+                                return fullname($t);
+                            }, $teacherusers));
+                        }
+                        $debuginfo = '<div style="font-size: 10px; color: #666; margin-top: 5px;">' . implode(' | ', $debuginfo) . '</div>';
+                    }
+                    if (!empty($teacherusers)) {
+                        $teachericons = [];
+                        foreach ($teacherusers as $teacher) {
+                            $teachername = fullname($teacher);
+                            $teacherinfo = [];
+                            $teacherinfo[] = 'ФИО: ' . $teachername;
+                            if (!empty($teacher->email)) {
+                                $teacherinfo[] = 'Email: ' . htmlspecialchars($teacher->email, ENT_QUOTES, 'UTF-8');
+                            }
+                            $tooltiptext = implode("\n", $teacherinfo);
+                            
+                            // Получаем полный объект пользователя для user_picture
+                            $teacheruser = $DB->get_record('user', ['id' => $teacher->id]);
+                            if ($teacheruser) {
+                                // Отображаем иконку преподавателя
+                                $userpicture = $OUTPUT->user_picture($teacheruser, [
+                                    'size' => 35,
+                                    'class' => 'teacher-avatar',
+                                    'link' => false
+                                ]);
+                                
+                                // Обертываем в span с tooltip
+                                $iconcontent = '';
+                                if (!empty($teacher->email)) {
+                                    $iconcontent = html_writer::link(
+                                        'mailto:' . htmlspecialchars($teacher->email, ENT_QUOTES, 'UTF-8'),
+                                        $userpicture,
+                                        ['class' => 'teacher-email-link', 'target' => '_blank', 'style' => 'text-decoration: none; display: inline-block;']
+                                    );
+                                } else {
+                                    $iconcontent = $userpicture;
+                                }
+                                
+                                $iconhtml = html_writer::tag('span', $iconcontent, [
+                                    'class' => 'teacher-icon-wrapper',
+                                    'title' => $tooltiptext,
+                                    'data-toggle' => 'tooltip',
+                                    'data-placement' => 'top'
+                                ]);
+                                
+                                $teachericons[] = $iconhtml;
+                            }
+                        }
+                        $teachershtml = html_writer::div(implode(' ', $teachericons), 'teachers-icons-container') . $debuginfo;
+                    } else {
+                        if ($testmode) {
+                            $teachershtml = '-' . $debuginfo;
+                        } else {
+                            $teachershtml = '-';
+                        }
+                    }
+                    echo html_writer::tag('td', $teachershtml);
+                    
+                    // Задолженности по курсу
+                    $statushtml = '';
+                    $statusitems = [];
+                    
+                    // Получаем задания курса
+                    try {
+                        $assignments = get_all_instances_in_course('assign', $course, false);
+                    } catch (\Exception $e) {
+                        $assignments = [];
+                    }
+                    if (!is_array($assignments)) {
+                        $assignments = [];
+                    }
+                    
+                    foreach ($assignments as $assignment) {
+                        $assignmentname = mb_strtolower($assignment->name);
+                        
+                        // Определяем тип задания по названию
+                        $assignmenttype = '';
+                        if (strpos($assignmentname, 'отчет') !== false && strpos($assignmentname, 'чтени') !== false) {
+                            $assignmenttype = 'reading_report';
+                        } elseif (strpos($assignmentname, 'письменн') !== false) {
+                            $assignmenttype = 'written_work';
+                        }
+                        
+                        if ($assignmenttype == 'reading_report') {
+                            // Получаем cmid для ссылки
+                            $cm = get_coursemodule_from_instance('assign', $assignment->id, $course->id);
+                            if (!$cm) {
+                                continue; // Пропускаем, если модуль не найден
+                            }
+                            $assignmenturl = new moodle_url('/mod/assign/view.php', ['id' => $cm->id]);
+                            
+                            // Проверяем статус задания для студента
+                            // Получаем любую submission (не только submitted, но и draft и другие статусы)
+                            $submission = $DB->get_record('assign_submission', [
+                                'assignment' => $assignment->id,
+                                'userid' => $USER->id
+                            ]);
+                            
+                            // Проверяем, есть ли файлы или текст в submission
+                            $hasfiles = false;
+                            if ($submission) {
+                                // Проверяем наличие файлов через assignsubmission_file (плагин file)
+                                $filecount = $DB->count_records_sql(
+                                    "SELECT COUNT(*) FROM {assignsubmission_file} WHERE submission = ?",
+                                    [$submission->id]
+                                );
+                                
+                                // Проверяем наличие текста через assignsubmission_onlinetext (плагин onlinetext)
+                                $textcount = $DB->count_records_sql(
+                                    "SELECT COUNT(*) FROM {assignsubmission_onlinetext} WHERE submission = ? AND onlinetext IS NOT NULL AND onlinetext != ''",
+                                    [$submission->id]
+                                );
+                                
+                                $hasfiles = ($filecount > 0 || $textcount > 0);
+                            }
+                            
+                            // Используем функцию для проверки оценки (включая принудительно проставленные)
+                            $hasgrade = $checkAssignmentGrade($assignment->id, $USER->id);
+                            
+                            if ($hasgrade) {
+                                // Есть оценка - зеленый "Чтение – сдано"
+                                $badgecontent = html_writer::link($assignmenturl, 'Чтение – сдано', [
+                                    'class' => 'assignment-status-link',
+                                    'target' => '_blank'
+                                ]);
+                                $statusitems[] = '<span class="badge assignment-status-item assignment-status-green">' . $badgecontent . '</span>';
+                            } elseif ($hasfiles) {
+                                // Файл загружен, но нет оценки - желтый "Чтение – не проверено"
+                                $badgecontent = html_writer::link($assignmenturl, 'Чтение – не проверено', [
+                                    'class' => 'assignment-status-link',
+                                    'target' => '_blank'
+                                ]);
+                                $statusitems[] = '<span class="badge assignment-status-item assignment-status-yellow">' . $badgecontent . '</span>';
+                            } else {
+                                // Нет файлов и нет оценки - красный "Чтение – не сдано"
+                                $badgecontent = html_writer::link($assignmenturl, 'Чтение – не сдано', [
+                                    'class' => 'assignment-status-link',
+                                    'target' => '_blank'
+                                ]);
+                                $statusitems[] = '<span class="badge assignment-status-item assignment-status-red">' . $badgecontent . '</span>';
+                            }
+                        } elseif ($assignmenttype == 'written_work') {
+                            // Письменная работа
+                            $cm = get_coursemodule_from_instance('assign', $assignment->id, $course->id);
+                            if (!$cm) {
+                                continue;
+                            }
+                            $assignmenturl = new moodle_url('/mod/assign/view.php', ['id' => $cm->id]);
+                            
+                            $submission = $DB->get_record('assign_submission', [
+                                'assignment' => $assignment->id,
+                                'userid' => $USER->id
+                            ]);
+                            
+                            $hasfiles = false;
+                            if ($submission) {
+                                $filecount = $DB->count_records_sql(
+                                    "SELECT COUNT(*) FROM {assignsubmission_file} WHERE submission = ?",
+                                    [$submission->id]
+                                );
+                                $textcount = $DB->count_records_sql(
+                                    "SELECT COUNT(*) FROM {assignsubmission_onlinetext} WHERE submission = ? AND onlinetext IS NOT NULL AND onlinetext != ''",
+                                    [$submission->id]
+                                );
+                                $hasfiles = ($filecount > 0 || $textcount > 0);
+                            }
+                            
+                            // Используем функцию для проверки оценки (включая принудительно проставленные)
+                            $hasgrade = $checkAssignmentGrade($assignment->id, $USER->id);
+                            
+                            // Показываем только если не сдано (нет оценки и нет файлов)
+                            if (!$hasgrade && !$hasfiles) {
+                                // Если название точно "Сдача письменной работы" - используем его с текстом "не сдано", иначе оригинальное название
+                                if (mb_strtolower(trim($assignment->name)) == 'сдача письменной работы') {
+                                    $statustext = 'Письменная работа - не сдано';
+                                } else {
+                                    $statustext = htmlspecialchars($assignment->name, ENT_QUOTES, 'UTF-8');
+                                }
+                                $badgecontent = html_writer::link($assignmenturl, $statustext, [
+                                    'class' => 'assignment-status-link',
+                                    'target' => '_blank'
+                                ]);
+                                $statusitems[] = '<span class="badge assignment-status-item assignment-status-red">' . $badgecontent . '</span>';
+                            }
+                        }
+                    }
+                    
+                    // Получаем тесты (экзамены)
+                    try {
+                        $quizzes = get_all_instances_in_course('quiz', $course, false);
+                    } catch (\Exception $e) {
+                        $quizzes = [];
+                    }
+                    if (!is_array($quizzes)) {
+                        $quizzes = [];
+                    }
+                    
+                    foreach ($quizzes as $quiz) {
+                        $quizname = mb_strtolower($quiz->name);
+                        if (strpos($quizname, 'экзамен') !== false) {
+                            $cm = get_coursemodule_from_instance('quiz', $quiz->id, $course->id);
+                            if (!$cm) {
+                                continue;
+                            }
+                            $quizurl = new moodle_url('/mod/quiz/view.php', ['id' => $cm->id]);
+                            
+                            $grade = $DB->get_record('quiz_grades', [
+                                'quiz' => $quiz->id,
+                                'userid' => $USER->id
+                            ]);
+                            
+                            if ($grade && $grade->grade !== null && $grade->grade >= 0) {
+                                // Экзамен сдан - зеленый
+                                $badgecontent = html_writer::link($quizurl, 'Экзамен – сдан', [
+                                    'class' => 'assignment-status-link',
+                                    'target' => '_blank'
+                                ]);
+                                $statusitems[] = '<span class="badge assignment-status-item assignment-status-green">' . $badgecontent . '</span>';
+                            } else {
+                                // Экзамен не сдан - красный
+                                $badgecontent = html_writer::link($quizurl, 'Экзамен – не сдан', [
+                                    'class' => 'assignment-status-link',
+                                    'target' => '_blank'
+                                ]);
+                                $statusitems[] = '<span class="badge assignment-status-item assignment-status-red">' . $badgecontent . '</span>';
+                            }
+                        }
+                    }
+                    
+                    if (!empty($statusitems)) {
+                        $statushtml = implode(' ', $statusitems);
+                    } else {
+                        $statushtml = '<span class="text-muted">Нет домашних заданий</span>';
+                    }
+                    
+                    echo html_writer::tag('td', $statushtml);
                     
                     // Функция для получения итоговой оценки курса
                     // Используем grade_grade::fetch() для получения итоговой оценки с учетом всех переопределений (overridden)
@@ -887,111 +1171,6 @@ if ($action == 'viewprogram' && $programid > 0) {
                     
                     $gradeBadge = '<span class="grade-badge ' . $gradeClass . '">' . $gradeBadgeContent . '</span>';
                     echo html_writer::tag('td', $gradeBadge);
-                    
-                    // Количество академических кредитов
-                    $credits = '-';
-                    try {
-                        $subject = $DB->get_record_sql(
-                            "SELECT s.credits
-                             FROM {local_deanpromoodle_subject_courses} sc
-                             JOIN {local_deanpromoodle_subjects} s ON s.id = sc.subjectid
-                             WHERE sc.courseid = ?
-                             LIMIT 1",
-                            [$course->id]
-                        );
-                        if ($subject && $subject->credits !== null && $subject->credits > 0) {
-                            $credits = (string)$subject->credits;
-                        }
-                    } catch (\Exception $e) {
-                        // Игнорируем ошибки
-                    }
-                    echo html_writer::tag('td', htmlspecialchars($credits, ENT_QUOTES, 'UTF-8'));
-                    
-                    // Преподаватели с email-ссылками (только роль teacher)
-                    // Показываем пользователей, у которых есть роль teacher, даже если у них есть и другие роли
-                    $coursecontext = context_course::instance($course->id);
-                    // Используем роль с id 3
-                    $teacherroleid = 3;
-                    $teachershtml = '';
-                    $debuginfo = '';
-                    // Используем SQL запрос для получения преподавателей с ролью teacher
-                    // DISTINCT гарантирует, что каждый пользователь показывается только один раз,
-                    // даже если у него несколько ролей (например, teacher и editingteacher)
-                    $teacherusers = $DB->get_records_sql(
-                        "SELECT DISTINCT u.id, u.firstname, u.lastname, u.email
-                         FROM {user} u
-                         JOIN {role_assignments} ra ON ra.userid = u.id
-                         WHERE ra.contextid = ? AND ra.roleid = ?
-                         AND u.deleted = 0 AND u.suspended = 0
-                         ORDER BY u.lastname, u.firstname",
-                        [$coursecontext->id, $teacherroleid]
-                    );
-                    
-                    // Отладочная информация в тестовом режиме
-                    if ($testmode) {
-                        $debuginfo = [];
-                        $debuginfo[] = 'Контекст курса: ' . $coursecontext->id;
-                        $debuginfo[] = 'ID роли: ' . $teacherroleid;
-                        $debuginfo[] = 'Найдено преподавателей: ' . count($teacherusers);
-                        if (!empty($teacherusers)) {
-                            $debuginfo[] = 'Преподаватели: ' . implode(', ', array_map(function($t) {
-                                return fullname($t);
-                            }, $teacherusers));
-                        }
-                        $debuginfo = '<div style="font-size: 10px; color: #666; margin-top: 5px;">' . implode(' | ', $debuginfo) . '</div>';
-                    }
-                    if (!empty($teacherusers)) {
-                        $teachericons = [];
-                        foreach ($teacherusers as $teacher) {
-                            $teachername = fullname($teacher);
-                            $teacherinfo = [];
-                            $teacherinfo[] = 'ФИО: ' . $teachername;
-                            if (!empty($teacher->email)) {
-                                $teacherinfo[] = 'Email: ' . htmlspecialchars($teacher->email, ENT_QUOTES, 'UTF-8');
-                            }
-                            $tooltiptext = implode("\n", $teacherinfo);
-                            
-                            // Получаем полный объект пользователя для user_picture
-                            $teacheruser = $DB->get_record('user', ['id' => $teacher->id]);
-                            if ($teacheruser) {
-                                // Отображаем иконку преподавателя
-                                $userpicture = $OUTPUT->user_picture($teacheruser, [
-                                    'size' => 35,
-                                    'class' => 'teacher-avatar',
-                                    'link' => false
-                                ]);
-                                
-                                // Обертываем в span с tooltip
-                                $iconcontent = '';
-                                if (!empty($teacher->email)) {
-                                    $iconcontent = html_writer::link(
-                                        'mailto:' . htmlspecialchars($teacher->email, ENT_QUOTES, 'UTF-8'),
-                                        $userpicture,
-                                        ['class' => 'teacher-email-link', 'target' => '_blank', 'style' => 'text-decoration: none; display: inline-block;']
-                                    );
-                                } else {
-                                    $iconcontent = $userpicture;
-                                }
-                                
-                                $iconhtml = html_writer::tag('span', $iconcontent, [
-                                    'class' => 'teacher-icon-wrapper',
-                                    'title' => $tooltiptext,
-                                    'data-toggle' => 'tooltip',
-                                    'data-placement' => 'top'
-                                ]);
-                                
-                                $teachericons[] = $iconhtml;
-                            }
-                        }
-                        $teachershtml = html_writer::div(implode(' ', $teachericons), 'teachers-icons-container') . $debuginfo;
-                    } else {
-                        if ($testmode) {
-                            $teachershtml = '-' . $debuginfo;
-                        } else {
-                            $teachershtml = '-';
-                        }
-                    }
-                    echo html_writer::tag('td', $teachershtml);
                     
                     // Задолженности по курсу
                     $statushtml = '';
