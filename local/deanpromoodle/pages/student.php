@@ -857,42 +857,35 @@ if ($action == 'viewprogram' && $programid > 0) {
                     // Преподаватели с email-ссылками (только роль teacher)
                     // Показываем пользователей, у которых есть роль teacher, даже если у них есть и другие роли
                     $coursecontext = context_course::instance($course->id);
-                    // Получаем id роли teacher динамически
-                    $teacherroleid = $DB->get_field('role', 'id', ['shortname' => 'teacher']);
+                    // Используем роль с id 3
+                    $teacherroleid = 3;
                     $teachershtml = '';
                     $debuginfo = '';
-                    if ($teacherroleid) {
-                        // Используем SQL запрос для получения преподавателей с ролью teacher
-                        // DISTINCT гарантирует, что каждый пользователь показывается только один раз,
-                        // даже если у него несколько ролей (например, teacher и editingteacher)
-                        $teacherusers = $DB->get_records_sql(
-                            "SELECT DISTINCT u.id, u.firstname, u.lastname, u.email
-                             FROM {user} u
-                             JOIN {role_assignments} ra ON ra.userid = u.id
-                             WHERE ra.contextid = ? AND ra.roleid = ?
-                             AND u.deleted = 0 AND u.suspended = 0
-                             ORDER BY u.lastname, u.firstname",
-                            [$coursecontext->id, $teacherroleid]
-                        );
-                        
-                        // Отладочная информация в тестовом режиме
-                        if ($testmode) {
-                            $debuginfo = [];
-                            $debuginfo[] = 'Контекст курса: ' . $coursecontext->id;
-                            $debuginfo[] = 'ID роли teacher: ' . $teacherroleid;
-                            $debuginfo[] = 'Найдено преподавателей: ' . count($teacherusers);
-                            if (!empty($teacherusers)) {
-                                $debuginfo[] = 'Преподаватели: ' . implode(', ', array_map(function($t) {
-                                    return fullname($t);
-                                }, $teacherusers));
-                            }
-                            $debuginfo = '<div style="font-size: 10px; color: #666; margin-top: 5px;">' . implode(' | ', $debuginfo) . '</div>';
+                    // Используем SQL запрос для получения преподавателей с ролью teacher
+                    // DISTINCT гарантирует, что каждый пользователь показывается только один раз,
+                    // даже если у него несколько ролей (например, teacher и editingteacher)
+                    $teacherusers = $DB->get_records_sql(
+                        "SELECT DISTINCT u.id, u.firstname, u.lastname, u.email
+                         FROM {user} u
+                         JOIN {role_assignments} ra ON ra.userid = u.id
+                         WHERE ra.contextid = ? AND ra.roleid = ?
+                         AND u.deleted = 0 AND u.suspended = 0
+                         ORDER BY u.lastname, u.firstname",
+                        [$coursecontext->id, $teacherroleid]
+                    );
+                    
+                    // Отладочная информация в тестовом режиме
+                    if ($testmode) {
+                        $debuginfo = [];
+                        $debuginfo[] = 'Контекст курса: ' . $coursecontext->id;
+                        $debuginfo[] = 'ID роли: ' . $teacherroleid;
+                        $debuginfo[] = 'Найдено преподавателей: ' . count($teacherusers);
+                        if (!empty($teacherusers)) {
+                            $debuginfo[] = 'Преподаватели: ' . implode(', ', array_map(function($t) {
+                                return fullname($t);
+                            }, $teacherusers));
                         }
-                    } else {
-                        $teacherusers = [];
-                        if ($testmode) {
-                            $debuginfo = '<div style="font-size: 10px; color: #f00;">Роль teacher не найдена в системе</div>';
-                        }
+                        $debuginfo = '<div style="font-size: 10px; color: #666; margin-top: 5px;">' . implode(' | ', $debuginfo) . '</div>';
                     }
                     if (!empty($teacherusers)) {
                         $teacherlinks = [];
