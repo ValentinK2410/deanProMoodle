@@ -777,34 +777,40 @@ if ($action == 'viewprogram' && $programid > 0) {
                     $gradeIcon = '';
                     $numericGrade = null; // Числовая оценка для тестового режима
                     
+                    // В тестовом режиме используем округленную оценку для определения текста
+                    $percentForDisplay = $finalgradepercent;
+                    if ($testmode && $coursegrade !== null && $courseitem && $courseitem->grademax > 0) {
+                        $roundedGrade = round($coursegrade, 2);
+                        $percentForDisplay = ($roundedGrade / $courseitem->grademax) * 100;
+                    }
+                    
                     if ($finalgradepercent === null) {
                         // Если нет оценки вообще
                         $gradeText = 'нет оценки';
                         $gradeClass = 'grade-badge-no-grade';
                         $gradeIcon = '<i class="fas fa-minus-circle"></i>';
                         $numericGrade = null;
-                    } elseif ($finalgradepercent < 70) {
+                    } elseif ($percentForDisplay < 70) {
                         // Если оценка ниже 70% - показываем фактическую оценку из gradebook (только целые числа, без максимума)
-                        // Для тестового режима сохраняем процент
-                        $numericGrade = round($finalgradepercent, 1);
                         $gradeText = 'курс не пройден';
                         $gradeClass = 'grade-badge-failed';
                         $gradeIcon = '<i class="fas fa-times-circle"></i>';
-                    } elseif ($finalgradepercent >= 70 && $finalgradepercent < 80) {
+                        $numericGrade = round($percentForDisplay, 1);
+                    } elseif ($percentForDisplay >= 70 && $percentForDisplay < 80) {
                         $gradeText = '3 (удовлетворительно)';
                         $gradeClass = 'grade-badge-satisfactory';
                         $gradeIcon = '<i class="fas fa-check-circle"></i>';
-                        $numericGrade = round($finalgradepercent, 1);
-                    } elseif ($finalgradepercent >= 80 && $finalgradepercent < 90) {
+                        $numericGrade = round($percentForDisplay, 1);
+                    } elseif ($percentForDisplay >= 80 && $percentForDisplay < 90) {
                         $gradeText = '4 (хорошо)';
                         $gradeClass = 'grade-badge-good';
                         $gradeIcon = '<i class="fas fa-star"></i>';
-                        $numericGrade = round($finalgradepercent, 1);
-                    } elseif ($finalgradepercent >= 90) {
+                        $numericGrade = round($percentForDisplay, 1);
+                    } elseif ($percentForDisplay >= 90) {
                         $gradeText = '5 (отлично)';
                         $gradeClass = 'grade-badge-excellent';
                         $gradeIcon = '<i class="fas fa-trophy"></i>';
-                        $numericGrade = round($finalgradepercent, 1);
+                        $numericGrade = round($percentForDisplay, 1);
                     }
                     
                     // Формируем бейдж с оценкой
@@ -820,13 +826,9 @@ if ($action == 'viewprogram' && $programid > 0) {
                         if ($courseitem && $courseitem->grademax > 0) {
                             $testInfo[] = 'Макс: ' . round($courseitem->grademax, 2);
                         }
-                        if ($finalgradepercent !== null && $coursegrade !== null && $courseitem && $courseitem->grademax > 0) {
-                            // Пересчитываем процент на основе округленной оценки
-                            $roundedGrade = round($coursegrade, 2);
-                            $recalculatedPercent = ($roundedGrade / $courseitem->grademax) * 100;
-                            $testInfo[] = 'Процент: ' . round($recalculatedPercent, 2) . '%';
-                        } elseif ($finalgradepercent !== null) {
-                            $testInfo[] = 'Процент: ' . round($finalgradepercent, 2) . '%';
+                        if ($percentForDisplay !== null) {
+                            // Используем процент, рассчитанный на основе округленной оценки
+                            $testInfo[] = 'Процент: ' . round($percentForDisplay, 2) . '%';
                         }
                         if ($courseitem && isset($courseitem->grademin)) {
                             $testInfo[] = 'Мин: ' . round($courseitem->grademin, 2);
