@@ -163,7 +163,7 @@ if (strpos($pagetitle, '[[') !== false || $pagetitle == 'Student Dashboard') {
     $pagetitle = 'Панель студента'; // Fallback на русский
 }
 $PAGE->set_title($pagetitle);
-$PAGE->set_heading($pagetitle);
+$PAGE->set_heading(''); // Убираем стандартный заголовок
 $PAGE->set_pagelayout('standard');
 
 // Подключение CSS
@@ -171,9 +171,98 @@ $PAGE->requires->css('/local/deanpromoodle/styles.css');
 
 // Вывод страницы
 echo $OUTPUT->header();
-// Заголовок уже выводится через set_heading(), не нужно дублировать
 
 global $USER, $DB;
+
+// Красивый заголовок с фото студента вместо стандартного
+echo html_writer::start_tag('style');
+echo "
+    .student-profile-header-main {
+        display: flex;
+        align-items: center;
+        margin-bottom: 30px;
+        padding: 30px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        color: white;
+    }
+    .student-profile-photo-main {
+        margin-right: 25px;
+        border-radius: 50%;
+        border: 4px solid rgba(255,255,255,0.3);
+        overflow: hidden;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+    .student-profile-info-main {
+        flex: 1;
+    }
+    .student-profile-name-main {
+        margin: 0;
+        font-size: 2.2em;
+        font-weight: 600;
+        color: white;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        margin-bottom: 8px;
+    }
+    .student-profile-name-main a {
+        color: white;
+        text-decoration: none;
+        transition: opacity 0.3s;
+    }
+    .student-profile-name-main a:hover {
+        opacity: 0.9;
+        text-decoration: underline;
+    }
+    .student-profile-email-main {
+        display: flex;
+        align-items: center;
+        margin-top: 8px;
+        font-size: 1.1em;
+        opacity: 0.95;
+    }
+    .student-profile-email-main a {
+        color: white;
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        transition: opacity 0.3s;
+    }
+    .student-profile-email-main a:hover {
+        opacity: 0.8;
+        text-decoration: underline;
+    }
+    .student-profile-email-main a:before {
+        content: '✉';
+        margin-right: 8px;
+        font-size: 1.1em;
+    }
+";
+echo html_writer::end_tag('style');
+
+// Заголовок с информацией о студенте
+echo html_writer::start_div('student-profile-header-main');
+// Фото студента
+$userpicture = $OUTPUT->user_picture($USER, ['size' => 120, 'class' => 'userpicture']);
+echo html_writer::div($userpicture, 'student-profile-photo-main');
+// ФИО и email студента
+echo html_writer::start_div('student-profile-info-main');
+$profileurl = new moodle_url('/user/profile.php', ['id' => $USER->id]);
+echo html_writer::tag('h1', 
+    html_writer::link($profileurl, fullname($USER), [
+        'class' => 'student-profile-name-link',
+        'target' => '_blank'
+    ]),
+    ['class' => 'student-profile-name-main']
+);
+if (!empty($USER->email)) {
+    echo html_writer::div(
+        html_writer::link('mailto:' . htmlspecialchars($USER->email, ENT_QUOTES, 'UTF-8'), htmlspecialchars($USER->email, ENT_QUOTES, 'UTF-8')),
+        'student-profile-email-main'
+    );
+}
+echo html_writer::end_div(); // student-profile-info-main
+echo html_writer::end_div(); // student-profile-header-main
 
 // Вкладки
 $tabs = [];
