@@ -855,11 +855,14 @@ if ($action == 'viewprogram' && $programid > 0) {
                     echo html_writer::tag('td', htmlspecialchars($credits, ENT_QUOTES, 'UTF-8'));
                     
                     // Преподаватели с email-ссылками (только роль teacher)
+                    // Показываем пользователей, у которых есть роль teacher, даже если у них есть и другие роли
                     $coursecontext = context_course::instance($course->id);
                     // Получаем id роли teacher динамически
                     $teacherroleid = $DB->get_field('role', 'id', ['shortname' => 'teacher']);
                     $teachershtml = '';
                     if ($teacherroleid) {
+                        // DISTINCT гарантирует, что каждый пользователь показывается только один раз,
+                        // даже если у него несколько ролей (например, teacher и editingteacher)
                         $teacherusers = $DB->get_records_sql(
                             "SELECT DISTINCT u.id, u.firstname, u.lastname, u.email
                              FROM {user} u
