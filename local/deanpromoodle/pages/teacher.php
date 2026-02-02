@@ -770,7 +770,8 @@ switch ($tab) {
                     $prevurl->param('page', $page - 1);
                     echo html_writer::link($prevurl, '« Previous', ['class' => 'btn btn-sm']);
                 }
-                echo html_writer::span("Page " . ($page + 1) . " of " . $totalpages . " ($total items)", ['style' => 'margin: 0 15px;']);
+                $totalcount = is_array($total) ? count($total) : (int)$total;
+                echo html_writer::span("Page " . ($page + 1) . " of " . $totalpages . " ($totalcount items)", ['style' => 'margin: 0 15px;']);
                 if ($page < $totalpages - 1) {
                     $nexturl = clone $baseurl;
                     $nexturl->param('page', $page + 1);
@@ -1008,7 +1009,8 @@ switch ($tab) {
                     $prevurl->param('page', $page - 1);
                     echo html_writer::link($prevurl, '« Previous', ['class' => 'btn btn-sm']);
                 }
-                echo html_writer::span("Page " . ($page + 1) . " of " . $totalpages . " ($total items)", ['style' => 'margin: 0 15px;']);
+                $totalcount = is_array($total) ? count($total) : (int)$total;
+                echo html_writer::span("Page " . ($page + 1) . " of " . $totalpages . " ($totalcount items)", ['style' => 'margin: 0 15px;']);
                 if ($page < $totalpages - 1) {
                     $nexturl = clone $baseurl;
                     $nexturl->param('page', $page + 1);
@@ -1140,7 +1142,8 @@ switch ($tab) {
                     $prevurl->param('page', $page - 1);
                     echo html_writer::link($prevurl, '« Previous', ['class' => 'btn btn-sm']);
                 }
-                echo html_writer::span("Page " . ($page + 1) . " of " . $totalpages . " ($total items)", ['style' => 'margin: 0 15px;']);
+                $totalcount = is_array($total) ? count($total) : (int)$total;
+                echo html_writer::span("Page " . ($page + 1) . " of " . $totalpages . " ($totalcount items)", ['style' => 'margin: 0 15px;']);
                 if ($page < $totalpages - 1) {
                     $nexturl = clone $baseurl;
                     $nexturl->param('page', $page + 1);
