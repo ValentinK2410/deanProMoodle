@@ -770,8 +770,11 @@ switch ($tab) {
                     $prevurl->param('page', $page - 1);
                     echo html_writer::link($prevurl, '« Previous', ['class' => 'btn btn-sm']);
                 }
-                $totalcount = is_array($total) ? count($total) : (int)$total;
-                echo html_writer::span("Page " . ($page + 1) . " of " . $totalpages . " ($totalcount items)", ['style' => 'margin: 0 15px;']);
+                // Убеждаемся, что все переменные являются числами
+                $totalcount = isset($total) ? (is_array($total) ? count($total) : (int)$total) : 0;
+                $pagenum = (int)$page + 1;
+                $totalpagesnum = (int)$totalpages;
+                echo html_writer::span("Page " . $pagenum . " of " . $totalpagesnum . " ($totalcount items)", ['style' => 'margin: 0 15px;']);
                 if ($page < $totalpages - 1) {
                     $nexturl = clone $baseurl;
                     $nexturl->param('page', $page + 1);
@@ -1009,8 +1012,11 @@ switch ($tab) {
                     $prevurl->param('page', $page - 1);
                     echo html_writer::link($prevurl, '« Previous', ['class' => 'btn btn-sm']);
                 }
-                $totalcount = is_array($total) ? count($total) : (int)$total;
-                echo html_writer::span("Page " . ($page + 1) . " of " . $totalpages . " ($totalcount items)", ['style' => 'margin: 0 15px;']);
+                // Убеждаемся, что все переменные являются числами
+                $totalcount = isset($total) ? (is_array($total) ? count($total) : (int)$total) : 0;
+                $pagenum = (int)$page + 1;
+                $totalpagesnum = (int)$totalpages;
+                echo html_writer::span("Page " . $pagenum . " of " . $totalpagesnum . " ($totalcount items)", ['style' => 'margin: 0 15px;']);
                 if ($page < $totalpages - 1) {
                     $nexturl = clone $baseurl;
                     $nexturl->param('page', $page + 1);
@@ -1142,8 +1148,11 @@ switch ($tab) {
                     $prevurl->param('page', $page - 1);
                     echo html_writer::link($prevurl, '« Previous', ['class' => 'btn btn-sm']);
                 }
-                $totalcount = is_array($total) ? count($total) : (int)$total;
-                echo html_writer::span("Page " . ($page + 1) . " of " . $totalpages . " ($totalcount items)", ['style' => 'margin: 0 15px;']);
+                // Убеждаемся, что все переменные являются числами
+                $totalcount = isset($total) ? (is_array($total) ? count($total) : (int)$total) : 0;
+                $pagenum = (int)$page + 1;
+                $totalpagesnum = (int)$totalpages;
+                echo html_writer::span("Page " . $pagenum . " of " . $totalpagesnum . " ($totalcount items)", ['style' => 'margin: 0 15px;']);
                 if ($page < $totalpages - 1) {
                     $nexturl = clone $baseurl;
                     $nexturl->param('page', $page + 1);
