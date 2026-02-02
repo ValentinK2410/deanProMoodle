@@ -1693,7 +1693,8 @@ if ($action == 'viewprogram' && $programid > 0) {
                                     $phpspreadsheetpaths = [
                                         $CFG->libdir . '/phpspreadsheet/vendor/autoload.php',
                                         $CFG->dirroot . '/lib/phpspreadsheet/vendor/autoload.php',
-                                        $CFG->dirroot . '/vendor/phpoffice/phpspreadsheet/src/PhpSpreadsheet/IOFactory.php'
+                                        $CFG->dirroot . '/vendor/phpoffice/phpspreadsheet/src/PhpSpreadsheet/IOFactory.php',
+                                        $CFG->dirroot . '/vendor/autoload.php'
                                     ];
                                     
                                     $usePhpSpreadsheet = false;
@@ -1708,48 +1709,66 @@ if ($action == 'viewprogram' && $programid > 0) {
                                     }
                                     
                                     if ($usePhpSpreadsheet && ($fileext == 'xlsx' || $fileext == 'xls')) {
-                                        require_once($phpspreadsheetpath);
-                                        
-                                        // Используем PhpSpreadsheet для Excel файлов
-                                        if (strpos($phpspreadsheetpath, 'IOFactory.php') !== false) {
-                                            // Прямой путь к IOFactory
-                                            $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($file['tmp_name']);
-                                        } else {
-                                            // Через autoload
-                                            $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($file['tmp_name']);
-                                        }
-                                        $worksheet = $spreadsheet->getActiveSheet();
-                                        $rows = $worksheet->toArray();
-                                    } else {
-                                        // Альтернативный метод для CSV или если PhpSpreadsheet недоступна
-                                        if ($fileext == 'csv') {
-                                            if (($handle = fopen($file['tmp_name'], 'r')) !== false) {
-                                                // Определяем кодировку и разделитель
-                                                $firstline = fgets($handle);
-                                                rewind($handle);
-                                                
-                                                // Пробуем определить разделитель
-                                                $delimiter = ',';
-                                                if (strpos($firstline, ';') !== false) {
-                                                    $delimiter = ';';
-                                                } elseif (strpos($firstline, "\t") !== false) {
-                                                    $delimiter = "\t";
-                                                }
-                                                
-                                                while (($data = fgetcsv($handle, 1000, $delimiter)) !== false) {
-                                                    // Конвертируем из разных кодировок в UTF-8
-                                                    $data = array_map(function($field) {
-                                                        if (mb_detect_encoding($field, 'UTF-8', true) !== 'UTF-8') {
-                                                            return mb_convert_encoding($field, 'UTF-8', 'Windows-1251');
-                                                        }
-                                                        return $field;
-                                                    }, $data);
-                                                    $rows[] = $data;
-                                                }
-                                                fclose($handle);
+                                        try {
+                                            require_once($phpspreadsheetpath);
+                                            
+                                            // Используем PhpSpreadsheet для Excel файлов
+                                            if (strpos($phpspreadsheetpath, 'IOFactory.php') !== false) {
+                                                // Прямой путь к IOFactory
+                                                $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($file['tmp_name']);
+                                            } else {
+                                                // Через autoload
+                                                $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($file['tmp_name']);
                                             }
+                                            $worksheet = $spreadsheet->getActiveSheet();
+                                            $rows = $worksheet->toArray();
+                                        } catch (\Exception $e) {
+                                            // Если PhpSpreadsheet не работает, пробуем альтернативные методы
+                                            throw new Exception('Ошибка при чтении Excel файла через PhpSpreadsheet: ' . $e->getMessage() . '. Попробуйте сохранить файл как CSV.');
+                                        }
+                                    } elseif ($fileext == 'csv') {
+                                        // Обработка CSV файлов
+                                        if (($handle = fopen($file['tmp_name'], 'r')) !== false) {
+                                            // Определяем кодировку и разделитель
+                                            $firstline = fgets($handle);
+                                            rewind($handle);
+                                            
+                                            // Пробуем определить разделитель
+                                            $delimiter = ',';
+                                            if (strpos($firstline, ';') !== false) {
+                                                $delimiter = ';';
+                                            } elseif (strpos($firstline, "\t") !== false) {
+                                                $delimiter = "\t";
+                                            }
+                                            
+                                            while (($data = fgetcsv($handle, 1000, $delimiter)) !== false) {
+                                                // Конвертируем из разных кодировок в UTF-8
+                                                $data = array_map(function($field) {
+                                                    if (!empty($field)) {
+                                                        $encoding = mb_detect_encoding($field, ['UTF-8', 'Windows-1251', 'ISO-8859-1'], true);
+                                                        if ($encoding !== 'UTF-8' && $encoding !== false) {
+                                                            return mb_convert_encoding($field, 'UTF-8', $encoding);
+                                                        }
+                                                    }
+                                                    return $field;
+                                                }, $data);
+                                                $rows[] = $data;
+                                            }
+                                            fclose($handle);
+                                        }
+                                    } else {
+                                        // Для Excel файлов без PhpSpreadsheet пробуем альтернативные методы
+                                        // Метод 1: Попытка прочитать .xlsx как ZIP архив (только для чтения структуры)
+                                        if ($fileext == 'xlsx') {
+                                            // .xlsx файлы - это ZIP архивы с XML файлами
+                                            // Можно попробовать извлечь sharedStrings.xml, но это сложно
+                                            // Лучше предложить CSV
+                                            throw new Exception('PhpSpreadsheet не доступна для чтения Excel файлов. Пожалуйста, сохраните файл как CSV: в Excel выберите "Файл" → "Сохранить как" → выберите формат "CSV UTF-8 (разделитель - запятая)" и загрузите CSV файл.');
+                                        } elseif ($fileext == 'xls') {
+                                            // Старый формат Excel - еще сложнее без библиотеки
+                                            throw new Exception('PhpSpreadsheet не доступна для чтения старых Excel файлов (.xls). Пожалуйста, откройте файл в Excel и сохраните как CSV: "Файл" → "Сохранить как" → выберите формат "CSV UTF-8 (разделитель - запятая)" и загрузите CSV файл.');
                                         } else {
-                                            throw new Exception('PhpSpreadsheet не доступна. Пожалуйста, сохраните файл как CSV и загрузите снова.');
+                                            throw new Exception('Неподдерживаемый формат файла. Поддерживаются форматы: .xlsx, .xls, .csv');
                                         }
                                     }
                                     
