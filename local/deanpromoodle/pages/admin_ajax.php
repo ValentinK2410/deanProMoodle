@@ -1108,13 +1108,14 @@ if ($action == 'getteachercourses' && $teacherid > 0) {
         $params[] = $emailpattern;
     }
     
+    // Всегда добавляем JOIN для когорт, чтобы получить список групп для каждого студента
+    $cohortjoin = "LEFT JOIN {cohort_members} cm ON cm.userid = u.id
+                   LEFT JOIN {cohort} c ON c.id = cm.cohortid";
+    
     // Поиск по группе (когорте)
-    $cohortjoin = '';
     $cohortwhere = '';
     if (!empty($studentcohort)) {
         $cohortpattern = '%' . $DB->sql_like_escape($studentcohort) . '%';
-        $cohortjoin = "LEFT JOIN {cohort_members} cm ON cm.userid = u.id
-                       LEFT JOIN {cohort} c ON c.id = cm.cohortid";
         $cohortwhere = "OR c.name LIKE ?";
         $params[] = $cohortpattern;
     }
