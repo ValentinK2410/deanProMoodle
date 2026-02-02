@@ -537,23 +537,54 @@ switch ($tab) {
                 // Get submissions that need grading
                 // Ищем отправленные задания без оценки или с оценкой NULL
                 // Учитываем принудительно проставленные оценки (overridden)
+                // Также проверяем наличие файлов или текста в отправке
                 $submissions = $DB->get_records_sql(
                     "SELECT DISTINCT s.*, u.firstname, u.lastname, u.email, u.id as userid
                      FROM {assign_submission} s
                      JOIN {user} u ON u.id = s.userid
+                     LEFT JOIN {assign_grades} g ON g.assignment = s.assignment AND g.userid = s.userid
                      WHERE s.assignment = ? 
-                     AND s.status = 'submitted' 
+                     AND (s.status = 'submitted' OR s.status = 'draft')
                      AND s.timemodified > 0
-                     AND NOT EXISTS (
-                         SELECT 1 FROM {assign_grades} g 
-                         WHERE g.assignment = s.assignment 
-                         AND g.userid = s.userid
-                         AND g.grade IS NOT NULL
-                         AND g.grade >= 0
-                     )
+                     AND (g.id IS NULL OR g.grade IS NULL OR g.grade < 0)
                      ORDER BY s.timemodified DESC",
                     [$assignment->id]
                 );
+                
+                // Дополнительно проверяем наличие файлов или текста в отправке
+                // Фильтруем только те, где действительно есть что проверять
+                $submissionswithcontent = [];
+                foreach ($submissions as $submission) {
+                    // Проверяем наличие файлов
+                    $hasfiles = $DB->record_exists('assign_submission', [
+                        'id' => $submission->id,
+                        'assignment' => $assignment->id
+                    ]);
+                    
+                    // Проверяем наличие файлов через assignsubmission_file
+                    $filecount = $DB->count_records_sql(
+                        "SELECT COUNT(*)
+                         FROM {assignsubmission_file} af
+                         JOIN {files} f ON f.itemid = af.submission AND f.component = 'assignsubmission_file'
+                         WHERE af.assignment = ? AND af.submission = ? AND f.filesize > 0",
+                        [$assignment->id, $submission->id]
+                    );
+                    
+                    // Проверяем наличие текста через assignsubmission_onlinetext
+                    $hastext = $DB->record_exists_sql(
+                        "SELECT 1
+                         FROM {assignsubmission_onlinetext} ao
+                         WHERE ao.assignment = ? AND ao.submission = ? 
+                         AND (ao.onlinetext IS NOT NULL AND ao.onlinetext != '')",
+                        [$assignment->id, $submission->id]
+                    );
+                    
+                    // Если есть файлы или текст, добавляем в список
+                    if ($filecount > 0 || $hastext) {
+                        $submissionswithcontent[] = $submission;
+                    }
+                }
+                $submissions = $submissionswithcontent;
                 
                 foreach ($submissions as $submission) {
                     // Получаем ID модуля курса (cmid) для правильной ссылки
