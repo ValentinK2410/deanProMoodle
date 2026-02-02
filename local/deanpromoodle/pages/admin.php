@@ -6236,6 +6236,7 @@ switch ($tab) {
         
         // JavaScript для поиска студентов
         $ajaxurl = (new moodle_url('/local/deanpromoodle/pages/admin_ajax.php'))->out(false);
+        $studenturl = (new moodle_url('/local/deanpromoodle/pages/student.php'))->out(false);
         $PAGE->requires->js_init_code("
             (function() {
                 var searchTimeout;
@@ -6244,6 +6245,7 @@ switch ($tab) {
                 var searchBtn = document.getElementById('search-student-btn');
                 var clearBtn = document.getElementById('clear-search-btn');
                 var ajaxUrl = " . json_encode($ajaxurl) . ";
+                var studentUrl = " . json_encode($studenturl) . ";
                 
                 // Функция выполнения поиска
                 function performSearch() {
@@ -6269,34 +6271,42 @@ switch ($tab) {
                     var xhr = new XMLHttpRequest();
                     xhr.open('GET', ajaxUrl + '?action=searchstudents&' + params.join('&'), true);
                     xhr.onreadystatechange = function() {
-                        if (xhr.readyState === 4 && xhr.status === 200) {
-                            try {
-                                var response = JSON.parse(xhr.responseText);
-                                if (response.success && response.students && response.students.length > 0) {
-                                    var html = '<table class=\"table table-striped table-hover\"><thead><tr><th>ID</th><th>ФИО</th><th>Email</th><th>Группы</th><th>Действие</th></tr></thead><tbody>';
-                                    response.students.forEach(function(student) {
-                                        var fullname = (student.firstname || '') + ' ' + (student.lastname || '');
-                                        var cohorts = student.cohorts && student.cohorts.length > 0 ? student.cohorts.join(', ') : '-';
-                                        html += '<tr>';
-                                        html += '<td>' + student.id + '</td>';
-                                        html += '<td>' + (fullname.trim() || '-') + '</td>';
-                                        html += '<td>' + (student.email || '-') + '</td>';
-                                        html += '<td>' + cohorts + '</td>';
-                                        html += '<td><a href=\"/local/deanpromoodle/pages/student.php?studentid=' + student.id + '&tab=courses\" class=\"btn btn-sm btn-primary\" target=\"_blank\"><i class=\"fas fa-user\"></i> Перейти в личный кабинет</a></td>';
-                                        html += '</tr>';
-                                    });
-                                    html += '</tbody></table>';
-                                    html += '<div class=\"text-muted\" style=\"margin-top: 10px;\">Найдено студентов: ' + response.count + '</div>';
-                                    resultsDiv.innerHTML = html;
-                                } else {
-                                    resultsDiv.innerHTML = '<div class=\"alert alert-info\" style=\"text-align: center;\">Студенты не найдены</div>';
+                        if (xhr.readyState === 4) {
+                            if (xhr.status === 200) {
+                                try {
+                                    var response = JSON.parse(xhr.responseText);
+                                    if (response.success && response.students && response.students.length > 0) {
+                                        var html = '<table class=\"table table-striped table-hover\"><thead><tr><th>ID</th><th>ФИО</th><th>Email</th><th>Группы</th><th>Действие</th></tr></thead><tbody>';
+                                        response.students.forEach(function(student) {
+                                            var fullname = (student.firstname || '') + ' ' + (student.lastname || '');
+                                            var cohorts = student.cohorts && student.cohorts.length > 0 ? student.cohorts.join(', ') : '-';
+                                            html += '<tr>';
+                                            html += '<td>' + student.id + '</td>';
+                                            html += '<td>' + (fullname.trim() || '-') + '</td>';
+                                            html += '<td>' + (student.email || '-') + '</td>';
+                                            html += '<td>' + cohorts + '</td>';
+                                            html += '<td><a href=\"' + studentUrl + '?studentid=' + student.id + '&tab=courses\" class=\"btn btn-sm btn-primary\" target=\"_blank\"><i class=\"fas fa-user\"></i> Перейти в личный кабинет</a></td>';
+                                            html += '</tr>';
+                                        });
+                                        html += '</tbody></table>';
+                                        html += '<div class=\"text-muted\" style=\"margin-top: 10px;\">Найдено студентов: ' + response.count + '</div>';
+                                        resultsDiv.innerHTML = html;
+                                    } else {
+                                        resultsDiv.innerHTML = '<div class=\"alert alert-info\" style=\"text-align: center;\">Студенты не найдены</div>';
+                                    }
+                                } catch (e) {
+                                    console.error('Ошибка при обработке ответа:', e);
+                                    resultsDiv.innerHTML = '<div class=\"alert alert-danger\" style=\"text-align: center;\">Ошибка при обработке ответа: ' + e.message + '</div>';
                                 }
-                            } catch (e) {
-                                resultsDiv.innerHTML = '<div class=\"alert alert-danger\" style=\"text-align: center;\">Ошибка при обработке ответа: ' + e.message + '</div>';
+                            } else {
+                                console.error('Ошибка AJAX:', xhr.status, xhr.statusText);
+                                resultsDiv.innerHTML = '<div class=\"alert alert-danger\" style=\"text-align: center;\">Ошибка загрузки данных (HTTP ' + xhr.status + ')</div>';
                             }
-                        } else if (xhr.readyState === 4) {
-                            resultsDiv.innerHTML = '<div class=\"alert alert-danger\" style=\"text-align: center;\">Ошибка загрузки данных</div>';
                         }
+                    };
+                    xhr.onerror = function() {
+                        console.error('Ошибка сети при выполнении AJAX-запроса');
+                        resultsDiv.innerHTML = '<div class=\"alert alert-danger\" style=\"text-align: center;\">Ошибка сети при загрузке данных</div>';
                     };
                     xhr.send();
                 }
