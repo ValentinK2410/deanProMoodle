@@ -2131,31 +2131,33 @@ if ($action == 'viewprogram' && $programid > 0) {
                     }
                 }
                 
-                // Кнопка редактирования
-                if ($canedit && !$editmode) {
-                    $editurl = new moodle_url('/local/deanpromoodle/pages/student.php', [
-                        'tab' => 'programs',
-                        'subtab' => 'additional',
-                        'action' => 'edit',
-                        'studentid' => $viewingstudent->id
-                    ]);
-                    echo html_writer::start_div('', ['style' => 'margin-bottom: 20px;']);
-                    echo html_writer::link($editurl, 'Редактировать', ['class' => 'btn btn-primary']);
-                    echo html_writer::end_div();
-                }
-                
-                if ($editmode) {
+                // Кнопки действий (редактирование и импорт)
+                if ($canedit || ($isadmin || $isteacher)) {
+                    echo html_writer::start_div('', ['style' => 'margin-bottom: 20px; display: flex; gap: 10px;']);
+                    
+                    // Кнопка редактирования
+                    if ($canedit && !$editmode) {
+                        $editurl = new moodle_url('/local/deanpromoodle/pages/student.php', [
+                            'tab' => 'programs',
+                            'subtab' => 'additional',
+                            'action' => 'edit',
+                            'studentid' => $viewingstudent->id
+                        ]);
+                        echo html_writer::link($editurl, 'Редактировать', ['class' => 'btn btn-primary']);
+                    }
+                    
                     // Кнопка импорта из Excel (только для админов и преподавателей)
                     if ($isadmin || $isteacher) {
-                        echo html_writer::start_div('', ['style' => 'margin-bottom: 20px;']);
                         echo html_writer::link('#', 'Импорт из Excel', [
                             'class' => 'btn btn-success',
-                            'id' => 'import-excel-btn',
-                            'style' => 'margin-right: 10px;'
+                            'id' => 'import-excel-btn'
                         ]);
-                        echo html_writer::end_div();
-                        
-                        // Модальное окно для импорта Excel
+                    }
+                    
+                    echo html_writer::end_div();
+                    
+                    // Модальное окно для импорта Excel (только для админов и преподавателей)
+                    if ($isadmin || $isteacher) {
                         echo html_writer::start_div('modal fade', [
                             'id' => 'importExcelModal',
                             'tabindex' => '-1',
@@ -2253,7 +2255,9 @@ if ($action == 'viewprogram' && $programid > 0) {
                         ";
                         echo html_writer::end_tag('script');
                     }
-                    
+                }
+                
+                if ($editmode) {
                     // Форма редактирования - код формы будет добавлен ниже
                     $saveurl = new moodle_url('/local/deanpromoodle/pages/student.php', [
                         'tab' => 'programs',
