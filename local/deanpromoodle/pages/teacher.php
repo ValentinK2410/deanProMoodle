@@ -780,8 +780,20 @@ switch ($tab) {
                     $prevurl->param('page', $pagenum - 1);
                     echo html_writer::link($prevurl, '« Previous', ['class' => 'btn btn-sm']);
                 }
-                $pagetext = "Page " . (string)($pagenum + 1) . " of " . (string)$totalpagesnum . " (" . (string)$totalcount . " items)";
-                echo html_writer::span($pagetext, ['style' => 'margin: 0 15px;']);
+                // Убеждаемся, что все значения являются строками перед конкатенацией
+                $pagenumstr = (string)((int)$pagenum + 1);
+                $totalpagesnumstr = (string)(int)$totalpagesnum;
+                $totalcountstr = (string)(int)$totalcount;
+                $pagetext = "Page " . $pagenumstr . " of " . $totalpagesnumstr . " (" . $totalcountstr . " items)";
+                // Дополнительная проверка на случай, если $pagetext все еще массив
+                if (!is_string($pagetext)) {
+                    $pagetext = (string)$pagetext;
+                }
+                if (is_array($pagetext)) {
+                    $pagetext = '';
+                }
+                // Используем s() для безопасного вывода строки
+                echo html_writer::span(s($pagetext), ['style' => 'margin: 0 15px;']);
                 if ($pagenum < $totalpagesnum - 1) {
                     $nexturl = clone $baseurl;
                     $nexturl->param('page', $pagenum + 1);
@@ -1053,8 +1065,20 @@ switch ($tab) {
                     $prevurl->param('page', $pagenum - 1);
                     echo html_writer::link($prevurl, '« Previous', ['class' => 'btn btn-sm']);
                 }
-                $pagetext = "Page " . (string)($pagenum + 1) . " of " . (string)$totalpagesnum . " (" . (string)$totalcount . " items)";
-                echo html_writer::span($pagetext, ['style' => 'margin: 0 15px;']);
+                // Убеждаемся, что все значения являются строками перед конкатенацией
+                $pagenumstr = (string)((int)$pagenum + 1);
+                $totalpagesnumstr = (string)(int)$totalpagesnum;
+                $totalcountstr = (string)(int)$totalcount;
+                $pagetext = "Page " . $pagenumstr . " of " . $totalpagesnumstr . " (" . $totalcountstr . " items)";
+                // Дополнительная проверка на случай, если $pagetext все еще массив
+                if (!is_string($pagetext)) {
+                    $pagetext = (string)$pagetext;
+                }
+                if (is_array($pagetext)) {
+                    $pagetext = '';
+                }
+                // Используем s() для безопасного вывода строки
+                echo html_writer::span(s($pagetext), ['style' => 'margin: 0 15px;']);
                 if ($pagenum < $totalpagesnum - 1) {
                     $nexturl = clone $baseurl;
                     $nexturl->param('page', $pagenum + 1);
@@ -1196,8 +1220,20 @@ switch ($tab) {
                     $prevurl->param('page', $pagenum - 1);
                     echo html_writer::link($prevurl, '« Previous', ['class' => 'btn btn-sm']);
                 }
-                $pagetext = "Page " . (string)($pagenum + 1) . " of " . (string)$totalpagesnum . " (" . (string)$totalcount . " items)";
-                echo html_writer::span($pagetext, ['style' => 'margin: 0 15px;']);
+                // Убеждаемся, что все значения являются строками перед конкатенацией
+                $pagenumstr = (string)((int)$pagenum + 1);
+                $totalpagesnumstr = (string)(int)$totalpagesnum;
+                $totalcountstr = (string)(int)$totalcount;
+                $pagetext = "Page " . $pagenumstr . " of " . $totalpagesnumstr . " (" . $totalcountstr . " items)";
+                // Дополнительная проверка на случай, если $pagetext все еще массив
+                if (!is_string($pagetext)) {
+                    $pagetext = (string)$pagetext;
+                }
+                if (is_array($pagetext)) {
+                    $pagetext = '';
+                }
+                // Используем s() для безопасного вывода строки
+                echo html_writer::span(s($pagetext), ['style' => 'margin: 0 15px;']);
                 if ($pagenum < $totalpagesnum - 1) {
                     $nexturl = clone $baseurl;
                     $nexturl->param('page', $pagenum + 1);
