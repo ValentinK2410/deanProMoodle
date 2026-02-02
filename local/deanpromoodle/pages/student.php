@@ -2236,28 +2236,6 @@ if ($action == 'viewprogram' && $programid > 0) {
                                                 if (!empty($errors)) {
                                                     $message .= "<br><br><strong>Список студентов, не найденных в Moodle:</strong><br>";
                                                     
-                                                    // Кнопка для скачивания списка
-                                                    if (isset($notfoundstudents) && !empty($notfoundstudents)) {
-                                                        // Сохраняем данные в сессию для скачивания
-                                                        global $SESSION;
-                                                        $sessionkey = 'notfound_students_' . $USER->id;
-                                                        $SESSION->$sessionkey = ['students' => $notfoundstudents];
-                                                        
-                                                        $downloadurl = new moodle_url('/local/deanpromoodle/pages/student.php', [
-                                                            'tab' => 'programs',
-                                                            'subtab' => 'additional',
-                                                            'studentid' => $viewstudentid,
-                                                            'action' => 'downloadnotfound',
-                                                            'sesskey' => sesskey()
-                                                        ]);
-                                                        
-                                                        $message .= "<div style='margin-bottom: 15px;'>";
-                                                        $message .= html_writer::link($downloadurl, '📥 Скачать список не найденных студентов (CSV)', [
-                                                            'class' => 'btn btn-primary',
-                                                            'style' => 'margin-bottom: 10px;'
-                                                        ]);
-                                                        $message .= "</div>";
-                                                    }
                                                     
                                                     $message .= "<div style='max-height: 500px; overflow-y: auto; border: 1px solid #ddd; padding: 15px; margin-top: 10px; background: #f9f9f9;'>";
                                                     $message .= "<table style='width: 100%; border-collapse: collapse; font-size: 12px;'>";
