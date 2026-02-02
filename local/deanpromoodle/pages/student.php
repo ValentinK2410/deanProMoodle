@@ -1882,19 +1882,19 @@ if ($action == 'viewprogram' && $programid > 0) {
                                                     // Ищем студента в Moodle
                                                     $user = null;
                                                     
-                                                    // Сначала по email (точное совпадение)
+                                                    // ШАГ 1: Сначала ищем по email (точное совпадение)
                                                     if (!empty($email)) {
                                                         $user = $DB->get_record('user', ['email' => trim($email), 'deleted' => 0]);
                                                     }
                                                     
-                                                    // Если не найден по email, ищем по ФИО (более гибкий поиск)
+                                                    // ШАГ 2: Если по email не найден, ищем по ФИО
                                                     if (!$user) {
                                                         // Нормализуем данные для поиска
                                                         $searchfirstname = mb_strtolower(trim($firstname), 'UTF-8');
                                                         $searchlastname = mb_strtolower(trim($lastname), 'UTF-8');
                                                         $searchmiddlename = !empty($middlename) ? mb_strtolower(trim($middlename), 'UTF-8') : '';
                                                         
-                                                        // Поиск по ФИО с учетом отчества (точное совпадение)
+                                                        // Поиск по ФИО с учетом отчества (если отчество указано)
                                                         if (!empty($searchmiddlename)) {
                                                             $sql = "SELECT * FROM {user} 
                                                                     WHERE deleted = 0 
@@ -1903,7 +1903,7 @@ if ($action == 'viewprogram' && $programid > 0) {
                                                                     AND LOWER(TRIM(COALESCE(middlename, ''))) = ?";
                                                             $params = [$searchfirstname, $searchlastname, $searchmiddlename];
                                                         } else {
-                                                            // Если отчество не указано, ищем без учета отчества
+                                                            // Если отчество не указано, ищем только по имени и фамилии
                                                             $sql = "SELECT * FROM {user} 
                                                                     WHERE deleted = 0 
                                                                     AND LOWER(TRIM(firstname)) = ?
@@ -1915,42 +1915,25 @@ if ($action == 'viewprogram' && $programid > 0) {
                                                         $users = $DB->get_records_sql($sql, $params);
                                                         
                                                         if (count($users) == 1) {
+                                                            // Одно совпадение - используем его
                                                             $user = reset($users);
                                                         } elseif (count($users) > 1) {
-                                                            // Если несколько совпадений, пробуем найти по email из Excel
-                                                            foreach ($users as $candidate) {
-                                                                if (!empty($email) && mb_strtolower(trim($candidate->email)) == mb_strtolower(trim($email))) {
-                                                                    $user = $candidate;
-                                                                    break;
-                                                                }
-                                                            }
-                                                            // Если не нашли по email, используем первое совпадение
-                                                            if (!$user) {
-                                                                $user = reset($users);
-                                                            }
-                                                        }
-                                                        
-                                                        // Если все еще не найден, пробуем более мягкий поиск (только имя и фамилия, без отчества)
-                                                        if (!$user && !empty($searchmiddlename)) {
-                                                            $sql = "SELECT * FROM {user} 
-                                                                    WHERE deleted = 0 
-                                                                    AND LOWER(TRIM(firstname)) = ?
-                                                                    AND LOWER(TRIM(lastname)) = ?";
-                                                            $params = [$searchfirstname, $searchlastname];
-                                                            $users = $DB->get_records_sql($sql, $params);
-                                                            
-                                                            if (count($users) == 1) {
-                                                                $user = reset($users);
-                                                            } elseif (count($users) > 1) {
-                                                                // Если несколько совпадений, пробуем найти по email
-                                                                foreach ($users as $candidate) {
-                                                                    if (!empty($email) && mb_strtolower(trim($candidate->email)) == mb_strtolower(trim($email))) {
-                                                                        $user = $candidate;
-                                                                        break;
-                                                                    }
-                                                                }
-                                                                // Если не нашли по email, используем первое совпадение
-                                                                if (!$user) {
+                                                            // Несколько совпадений - используем первое
+                                                            $user = reset($users);
+                                                        } else {
+                                                            // Если не найдено с отчеством, пробуем без отчества (только имя и фамилия)
+                                                            if (!empty($searchmiddlename)) {
+                                                                $sql = "SELECT * FROM {user} 
+                                                                        WHERE deleted = 0 
+                                                                        AND LOWER(TRIM(firstname)) = ?
+                                                                        AND LOWER(TRIM(lastname)) = ?";
+                                                                $params = [$searchfirstname, $searchlastname];
+                                                                $users = $DB->get_records_sql($sql, $params);
+                                                                
+                                                                if (count($users) == 1) {
+                                                                    $user = reset($users);
+                                                                } elseif (count($users) > 1) {
+                                                                    // Несколько совпадений - используем первое
                                                                     $user = reset($users);
                                                                 }
                                                             }
