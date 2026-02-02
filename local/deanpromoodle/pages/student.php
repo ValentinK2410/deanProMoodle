@@ -1932,6 +1932,32 @@ if ($action == 'viewprogram' && $programid > 0) {
                                                     $data = new stdClass();
                                                     $data->userid = $user->id;
                                                     
+                                                    // Максимальные длины полей из схемы БД
+                                                    $fieldlengths = [
+                                                        'lastname' => 255,
+                                                        'firstname' => 255,
+                                                        'middlename' => 255,
+                                                        'status' => 100,
+                                                        'gender' => 10,
+                                                        'snils' => 20,
+                                                        'mobile' => 50,
+                                                        'email' => 255,
+                                                        'citizenship' => 100,
+                                                        'birthplace' => 255,
+                                                        'id_type' => 50,
+                                                        'passport_number' => 50,
+                                                        'passport_issued_by' => 255,
+                                                        'passport_division_code' => 20,
+                                                        'postal_index' => 20,
+                                                        'country' => 100,
+                                                        'region' => 255,
+                                                        'city' => 255,
+                                                        'street' => 255,
+                                                        'house_apartment' => 100,
+                                                        'previous_institution' => 255,
+                                                        'cohort' => 255
+                                                    ];
+                                                    
                                                     // Заполняем все поля из Excel
                                                     foreach ($columnindexes as $field => $index) {
                                                         if (isset($row[$index])) {
@@ -1941,6 +1967,10 @@ if ($action == 'viewprogram' && $programid > 0) {
                                                             if ($field == 'enrollment_year' || $field == 'previous_institution_year') {
                                                                 // Год - целое число
                                                                 $data->$field = !empty($value) ? (int)$value : 0;
+                                                                // Проверка диапазона года
+                                                                if ($data->$field < 1900 || $data->$field > 2100) {
+                                                                    $data->$field = 0;
+                                                                }
                                                             } elseif ($field == 'birthdate' || $field == 'passport_issue_date') {
                                                                 // Конвертируем дату в timestamp
                                                                 if (!empty($value)) {
@@ -1970,34 +2000,57 @@ if ($action == 'viewprogram' && $programid > 0) {
                                                                     $data->$field = 0;
                                                                 }
                                                             } else {
-                                                                // Обычные текстовые поля
+                                                                // Обычные текстовые поля - обрезаем до максимальной длины
+                                                                if (isset($fieldlengths[$field])) {
+                                                                    $value = mb_substr($value, 0, $fieldlengths[$field], 'UTF-8');
+                                                                }
                                                                 $data->$field = $value;
                                                             }
                                                         }
                                                     }
                                                     
                                                     // Устанавливаем обязательные поля, если они не были заполнены
-                                                    if (empty($data->lastname)) $data->lastname = $lastname;
-                                                    if (empty($data->firstname)) $data->firstname = $firstname;
-                                                    if (empty($data->middlename)) $data->middlename = $middlename;
-                                                    if (empty($data->email)) $data->email = $email;
+                                                    if (empty($data->lastname)) $data->lastname = mb_substr($lastname, 0, 255, 'UTF-8');
+                                                    if (empty($data->firstname)) $data->firstname = mb_substr($firstname, 0, 255, 'UTF-8');
+                                                    if (empty($data->middlename)) $data->middlename = mb_substr($middlename, 0, 255, 'UTF-8');
+                                                    if (empty($data->email)) $data->email = mb_substr($email, 0, 255, 'UTF-8');
                                                     
                                                     $data->timemodified = time();
                                                     
-                                                    // Проверяем, существует ли запись
-                                                    $existing = $DB->get_record('local_deanpromoodle_student_info', ['userid' => $user->id]);
-                                                    
-                                                    if ($existing) {
-                                                        // Обновляем существующую запись
-                                                        $data->id = $existing->id;
-                                                        $DB->update_record('local_deanpromoodle_student_info', $data);
-                                                    } else {
-                                                        // Создаем новую запись
-                                                        $data->timecreated = time();
-                                                        $DB->insert_record('local_deanpromoodle_student_info', $data);
+                                                    try {
+                                                        // Проверяем, существует ли запись
+                                                        $existing = $DB->get_record('local_deanpromoodle_student_info', ['userid' => $user->id]);
+                                                        
+                                                        if ($existing) {
+                                                            // Обновляем существующую запись
+                                                            $data->id = $existing->id;
+                                                            $DB->update_record('local_deanpromoodle_student_info', $data);
+                                                        } else {
+                                                            // Создаем новую запись
+                                                            $data->timecreated = time();
+                                                            $DB->insert_record('local_deanpromoodle_student_info', $data);
+                                                        }
+                                                        
+                                                        $imported++;
+                                                    } catch (\dml_exception $dbex) {
+                                                        // Ошибка при записи в БД для конкретного студента
+                                                        $skipped++;
+                                                        $errormsg = "Строка " . ($i + 1) . ": ошибка при сохранении данных для студента $lastname $firstname (ID: {$user->id})";
+                                                        if ($dbex->getMessage()) {
+                                                            $errormsg .= ": " . $dbex->getMessage();
+                                                        }
+                                                        $errors[] = $errormsg;
+                                                        continue;
+                                                    } catch (\Exception $dbex) {
+                                                        // Общая ошибка при записи в БД
+                                                        $skipped++;
+                                                        $errormsg = "Строка " . ($i + 1) . ": ошибка при сохранении данных для студента $lastname $firstname (ID: {$user->id})";
+                                                        if ($dbex->getMessage()) {
+                                                            $errormsg .= ": " . $dbex->getMessage();
+                                                        }
+                                                        $errors[] = $errormsg;
+                                                        continue;
                                                     }
-                                                    
-                                                    $imported++;
                                                 }
                                                 
                                                 $transaction->allow_commit();
@@ -2017,7 +2070,15 @@ if ($action == 'viewprogram' && $programid > 0) {
                                                 
                                             } catch (\Exception $e) {
                                                 $transaction->rollback($e);
-                                                echo html_writer::div('Ошибка при импорте: ' . $e->getMessage(), 'alert alert-danger');
+                                                $errormsg = 'Ошибка при импорте: ' . $e->getMessage();
+                                                if ($e->getCode()) {
+                                                    $errormsg .= ' (Код ошибки: ' . $e->getCode() . ')';
+                                                }
+                                                // Добавляем информацию о стеке вызовов для отладки
+                                                if (debugging()) {
+                                                    $errormsg .= '<br><small>Трассировка: ' . $e->getTraceAsString() . '</small>';
+                                                }
+                                                echo html_writer::div($errormsg, 'alert alert-danger');
                                             }
                                         }
                                     }
