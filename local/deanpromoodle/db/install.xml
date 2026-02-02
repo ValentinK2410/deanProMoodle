@@ -190,11 +190,10 @@
         <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
         <KEY NAME="postid_fk" TYPE="foreign" FIELDS="postid" REFTABLE="forum_posts" REFFIELDS="id"/>
         <KEY NAME="userid_fk" TYPE="foreign" FIELDS="userid" REFTABLE="user" REFFIELDS="id"/>
+        <KEY NAME="postuser" TYPE="unique" FIELDS="postid, userid"/>
       </KEYS>
       <INDEXES>
-        <INDEX NAME="postid" UNIQUE="false" FIELDS="postid"/>
         <INDEX NAME="userid" UNIQUE="false" FIELDS="userid"/>
-        <INDEX NAME="postuser" UNIQUE="true" FIELDS="postid, userid"/>
       </INDEXES>
     </TABLE>
   </TABLES>

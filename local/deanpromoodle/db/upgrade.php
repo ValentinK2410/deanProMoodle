@@ -165,10 +165,10 @@ function xmldb_local_deanpromoodle_upgrade($oldversion) {
             $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
             $table->add_key('postid_fk', XMLDB_KEY_FOREIGN, ['postid'], 'forum_posts', ['id']);
             $table->add_key('userid_fk', XMLDB_KEY_FOREIGN, ['userid'], 'user', ['id']);
+            $table->add_key('postuser', XMLDB_KEY_UNIQUE, ['postid', 'userid']);
             
-            $table->add_index('postid', XMLDB_INDEX_NOTUNIQUE, ['postid']);
+            // Добавляем только индекс для userid, так как внешние ключи уже создают индексы
             $table->add_index('userid', XMLDB_INDEX_NOTUNIQUE, ['userid']);
-            $table->add_index('postuser', XMLDB_INDEX_UNIQUE, ['postid', 'userid']);
             
             $dbman->create_table($table);
         }
