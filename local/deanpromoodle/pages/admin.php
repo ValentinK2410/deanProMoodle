@@ -1546,18 +1546,18 @@ switch ($tab) {
                                 echo html_writer::start_div('', ['style' => 'display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 5px;']);
                                 foreach ($subjectcourses as $sc) {
                                     $coursename = htmlspecialchars($sc->shortname ?: $sc->fullname, ENT_QUOTES, 'UTF-8');
-                                    echo html_writer::start_span('badge badge-secondary', [
+                                    $badgecontent = htmlspecialchars($coursename, ENT_QUOTES, 'UTF-8') . ' ' . 
+                                        html_writer::link('#', '<i class="fas fa-times"></i>', [
+                                            'class' => 'detach-course-from-subject-btn',
+                                            'data-subject-id' => $subject->id,
+                                            'data-course-id' => $sc->courseid,
+                                            'style' => 'color: white; text-decoration: none; margin-left: 5px;',
+                                            'title' => 'Открепить курс'
+                                        ]);
+                                    echo html_writer::tag('span', $badgecontent, [
+                                        'class' => 'badge badge-secondary',
                                         'style' => 'display: inline-flex; align-items: center; gap: 5px; padding: 4px 8px; margin: 2px;'
                                     ]);
-                                    echo htmlspecialchars($coursename, ENT_QUOTES, 'UTF-8');
-                                    echo html_writer::link('#', '<i class="fas fa-times"></i>', [
-                                        'class' => 'detach-course-from-subject-btn',
-                                        'data-subject-id' => $subject->id,
-                                        'data-course-id' => $sc->courseid,
-                                        'style' => 'color: white; text-decoration: none; margin-left: 5px;',
-                                        'title' => 'Открепить курс'
-                                    ]);
-                                    echo html_writer::end_span();
                                 }
                                 echo html_writer::end_div();
                             }
