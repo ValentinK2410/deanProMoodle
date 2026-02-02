@@ -620,6 +620,19 @@ switch ($tab) {
                             
                             // Если нет оценки или оценка NULL, добавляем в список
                             if (!$grade || $grade->grade === null || $grade->grade < 0) {
+                                // Убеждаемся, что объект участника содержит нужные поля для fullname()
+                                if (!isset($participant->firstname) || !isset($participant->lastname)) {
+                                    // Если полей нет, получаем пользователя из БД
+                                    $user = $DB->get_record('user', ['id' => $participant->id], 'id, firstname, lastname, email');
+                                    if ($user) {
+                                        $participant->firstname = $user->firstname;
+                                        $participant->lastname = $user->lastname;
+                                        if (!isset($participant->email)) {
+                                            $participant->email = $user->email;
+                                        }
+                                    }
+                                }
+                                
                                 $ungradedassignments[] = (object)[
                                     'id' => $submission->id,
                                     'assignmentid' => $assignment->id,
@@ -630,7 +643,7 @@ switch ($tab) {
                                     'courseshortname' => $course->shortname,
                                     'userid' => $participant->id,
                                     'studentname' => fullname($participant),
-                                    'email' => $participant->email,
+                                    'email' => isset($participant->email) ? $participant->email : '',
                                     'submitted' => userdate($submission->timemodified),
                                     'timemodified' => $submission->timemodified
                                 ];
