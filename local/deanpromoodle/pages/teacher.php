@@ -525,6 +525,7 @@ if (count($teachercourses) > 1) {
 switch ($tab) {
     case 'assignments':
         // Получение неоцененных заданий
+        require_once($CFG->dirroot . '/mod/assign/locallib.php');
         $ungradedassignments = [];
         foreach ($teachercourses as $course) {
             $coursecontext = context_course::instance($course->id);
@@ -532,48 +533,90 @@ switch ($tab) {
             
             foreach ($assignments as $assignment) {
                 $cm = get_coursemodule_from_instance('assign', $assignment->id, $course->id);
+                if (!$cm) {
+                    continue;
+                }
                 $assigncontext = context_module::instance($cm->id);
                 
-                // Get submissions that need grading
-                // Ищем отправленные задания без оценки или с оценкой NULL
-                // Учитываем принудительно проставленные оценки (overridden)
-                $submissions = $DB->get_records_sql(
-                    "SELECT DISTINCT s.*, u.firstname, u.lastname, u.email, u.id as userid
-                     FROM {assign_submission} s
-                     JOIN {user} u ON u.id = s.userid
-                     WHERE s.assignment = ? 
-                     AND s.status = 'submitted'
-                     AND s.timemodified > 0
-                     AND NOT EXISTS (
-                         SELECT 1 FROM {assign_grades} g 
-                         WHERE g.assignment = s.assignment 
-                         AND g.userid = s.userid
-                         AND g.grade IS NOT NULL
-                         AND g.grade >= 0
-                     )
-                     ORDER BY s.timemodified DESC",
-                    [$assignment->id]
-                );
-                
-                foreach ($submissions as $submission) {
-                    // Получаем ID модуля курса (cmid) для правильной ссылки
-                    $cm = get_coursemodule_from_instance('assign', $assignment->id, $course->id);
-                    $ungradedassignments[] = (object)[
-                        'id' => $submission->id,
-                        'assignmentid' => $assignment->id,
-                        'cmid' => $cm->id, // ID модуля курса для ссылки
-                        'assignmentname' => $assignment->name,
-                        'courseid' => $course->id,
-                        'coursename' => $course->fullname,
-                        'userid' => $submission->userid,
-                        'studentname' => fullname($submission),
-                        'email' => $submission->email,
-                        'submitted' => userdate($submission->timemodified),
-                        'timemodified' => $submission->timemodified
-                    ];
+                // Используем Moodle API для получения неоцененных заданий
+                try {
+                    $assignobj = new assign($assigncontext, $cm, $course);
+                    
+                    // Получаем всех участников курса
+                    $participants = $assignobj->list_participants(0, true);
+                    
+                    foreach ($participants as $participant) {
+                        // Проверяем статус отправки
+                        $submission = $assignobj->get_user_submission($participant->id, false);
+                        
+                        if ($submission && $submission->status == ASSIGN_SUBMISSION_STATUS_SUBMITTED) {
+                            // Проверяем наличие оценки
+                            $grade = $assignobj->get_user_grade($participant->id, false);
+                            
+                            // Если нет оценки или оценка NULL, добавляем в список
+                            if (!$grade || $grade->grade === null || $grade->grade < 0) {
+                                $ungradedassignments[] = (object)[
+                                    'id' => $submission->id,
+                                    'assignmentid' => $assignment->id,
+                                    'cmid' => $cm->id,
+                                    'assignmentname' => $assignment->name,
+                                    'courseid' => $course->id,
+                                    'coursename' => $course->fullname,
+                                    'userid' => $participant->id,
+                                    'studentname' => fullname($participant),
+                                    'email' => $participant->email,
+                                    'submitted' => userdate($submission->timemodified),
+                                    'timemodified' => $submission->timemodified
+                                ];
+                            }
+                        }
+                    }
+                } catch (Exception $e) {
+                    // Если не удалось использовать API, используем прямой SQL-запрос
+                    $submissions = $DB->get_records_sql(
+                        "SELECT DISTINCT s.*, u.firstname, u.lastname, u.email, u.id as userid
+                         FROM {assign_submission} s
+                         JOIN {user} u ON u.id = s.userid
+                         WHERE s.assignment = ? 
+                         AND s.status = 'submitted'
+                         AND s.timemodified > 0
+                         AND NOT EXISTS (
+                             SELECT 1 FROM {assign_grades} g 
+                             WHERE g.assignment = s.assignment 
+                             AND g.userid = s.userid
+                             AND g.grade IS NOT NULL
+                             AND g.grade >= 0
+                         )
+                         ORDER BY s.timemodified DESC",
+                        [$assignment->id]
+                    );
+                    
+                    foreach ($submissions as $submission) {
+                        $cm = get_coursemodule_from_instance('assign', $assignment->id, $course->id);
+                        if ($cm) {
+                            $ungradedassignments[] = (object)[
+                                'id' => $submission->id,
+                                'assignmentid' => $assignment->id,
+                                'cmid' => $cm->id,
+                                'assignmentname' => $assignment->name,
+                                'courseid' => $course->id,
+                                'coursename' => $course->fullname,
+                                'userid' => $submission->userid,
+                                'studentname' => fullname($submission),
+                                'email' => $submission->email,
+                                'submitted' => userdate($submission->timemodified),
+                                'timemodified' => $submission->timemodified
+                            ];
+                        }
+                    }
                 }
             }
         }
+        
+        // Сортируем по дате отправки (новые первыми)
+        usort($ungradedassignments, function($a, $b) {
+            return $b->timemodified - $a->timemodified;
+        });
         
         // Pagination
         $total = count($ungradedassignments);
