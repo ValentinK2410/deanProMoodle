@@ -212,7 +212,10 @@ foreach ($teachercourses as $course) {
              AND (s.timemodified > 0)
              AND NOT EXISTS (
                  SELECT 1 FROM {assign_grades} g 
-                 WHERE g.assignment = s.assignment AND g.userid = s.userid
+                 WHERE g.assignment = s.assignment 
+                 AND g.userid = s.userid
+                 AND g.grade IS NOT NULL
+                 AND g.grade >= 0
              )",
             [$assignment->id]
         );
@@ -657,6 +660,12 @@ switch ($tab) {
                     foreach ($submissions as $submission) {
                         $cm = get_coursemodule_from_instance('assign', $assignment->id, $course->id);
                         if ($cm) {
+                            // Создаем объект пользователя для правильного получения ФИО
+                            $user = new stdClass();
+                            $user->id = $submission->userid;
+                            $user->firstname = $submission->firstname;
+                            $user->lastname = $submission->lastname;
+                            
                             $ungradedassignments[] = (object)[
                                 'id' => $submission->id,
                                 'assignmentid' => $assignment->id,
@@ -666,7 +675,7 @@ switch ($tab) {
                                 'coursename' => $course->fullname,
                                 'courseshortname' => $course->shortname,
                                 'userid' => $submission->userid,
-                                'studentname' => fullname($submission),
+                                'studentname' => fullname($user),
                                 'email' => $submission->email,
                                 'submitted' => userdate($submission->timemodified),
                                 'timemodified' => $submission->timemodified
