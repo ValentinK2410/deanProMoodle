@@ -791,9 +791,9 @@ switch ($tab) {
                 $totalcountval = (int)$totalcount;
                 
                 echo '<div class="pagination-info">';
-                echo 'Страница <span class="current-page">' . $pagenumval . '</span>';
+                echo 'Страница <span class="current-page">' . $pagenumval . '</span> ';
                 echo '<span class="total-pages">из ' . $totalpagesnumval . '</span>';
-                echo '<span class="items-count">' . $totalcountval . ' записей</span>';
+                echo '<span class="items-count">| ' . $totalcountval . ' записей</span>';
                 echo '</div>';
                 
                 // Кнопка "Вперед"
@@ -1040,11 +1040,12 @@ switch ($tab) {
                 $posturl->set_anchor('p' . $postid); // Якорь для прокрутки к сообщению
                 $replystr = 'Ответить';
                 $noreplystr = 'Не требует ответа';
-                $actions = html_writer::link($posturl, $replystr, ['class' => 'btn btn-sm btn-primary', 'target' => '_blank', 'style' => 'margin-right: 8px;']);
+                $actions = html_writer::link($posturl, $replystr, ['class' => 'btn btn-sm btn-primary', 'target' => '_blank', 'style' => 'margin-right: 8px; margin-top: 5px;']);
                 $actions .= html_writer::link('#', $noreplystr, [
                     'class' => 'btn btn-sm btn-secondary forum-no-reply-btn',
                     'data-postid' => $postid,
-                    'onclick' => 'return false;'
+                    'onclick' => 'return false;',
+                    'style' => 'margin-top: 5px;'
                 ]);
                 echo html_writer::tag('td', $actions);
                 echo html_writer::end_tag('tr');
@@ -1082,9 +1083,9 @@ switch ($tab) {
                 $totalcountval = (int)$totalcount;
                 
                 echo '<div class="pagination-info">';
-                echo 'Страница <span class="current-page">' . $pagenumval . '</span>';
+                echo 'Страница <span class="current-page">' . $pagenumval . '</span> ';
                 echo '<span class="total-pages">из ' . $totalpagesnumval . '</span>';
-                echo '<span class="items-count">' . $totalcountval . ' записей</span>';
+                echo '<span class="items-count">| ' . $totalcountval . ' записей</span>';
                 echo '</div>';
                 
                 // Кнопка "Вперед"
@@ -1243,9 +1244,9 @@ switch ($tab) {
                 $totalcountval = (int)$totalcount;
                 
                 echo '<div class="pagination-info">';
-                echo 'Страница <span class="current-page">' . $pagenumval . '</span>';
+                echo 'Страница <span class="current-page">' . $pagenumval . '</span> ';
                 echo '<span class="total-pages">из ' . $totalpagesnumval . '</span>';
-                echo '<span class="items-count">' . $totalcountval . ' записей</span>';
+                echo '<span class="items-count">| ' . $totalcountval . ' записей</span>';
                 echo '</div>';
                 
                 // Кнопка "Вперед"
