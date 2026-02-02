@@ -39,8 +39,47 @@ require_login();
 $action = optional_param('action', '', PARAM_ALPHA);
 $programid = optional_param('programid', 0, PARAM_INT);
 
-// Для действия getprogramsubjectsforstudent разрешаем доступ студентам
-if ($action == 'getprogramsubjectsforstudent') {
+// Для действия searchstudents разрешаем доступ администраторам и преподавателям
+if ($action == 'searchstudents') {
+    $context = context_system::instance();
+    $hasaccess = false;
+    
+    // Проверяем админский доступ
+    if (has_capability('local/deanpromoodle:viewadmin', $context) || 
+        has_capability('moodle/site:config', $context)) {
+        $hasaccess = true;
+    } else {
+        // Проверяем доступ преподавателя
+        global $USER;
+        $teacherroles = ['teacher', 'editingteacher', 'coursecreator'];
+        $roles = get_user_roles($context, $USER->id, false);
+        foreach ($roles as $role) {
+            if (in_array($role->shortname, $teacherroles)) {
+                $hasaccess = true;
+                break;
+            }
+        }
+        
+        if (!$hasaccess) {
+            $systemcontext = context_system::instance();
+            $systemroles = get_user_roles($systemcontext, $USER->id, false);
+            foreach ($systemroles as $role) {
+                if (in_array($role->shortname, $teacherroles)) {
+                    $hasaccess = true;
+                    break;
+                }
+            }
+        }
+    }
+    
+    if (!$hasaccess) {
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'error' => 'Access denied']);
+        exit;
+    }
+    
+    header('Content-Type: application/json');
+} elseif ($action == 'getprogramsubjectsforstudent') {
     // Проверяем, что пользователь имеет доступ к студенческой странице
     $context = context_system::instance();
     $hasaccess = false;
@@ -1026,6 +1065,115 @@ if ($action == 'getteachercourses' && $teacherid > 0) {
     echo json_encode([
         'success' => true,
         'subjects' => $formattedsubjects
+    ]);
+} elseif ($action == 'searchstudents') {
+    // Поиск студентов по ID, ФИО, Email или Группе
+    global $DB;
+    
+    $studentid = optional_param('studentid', 0, PARAM_INT);
+    $studentname = optional_param('studentname', '', PARAM_TEXT);
+    $studentemail = optional_param('studentemail', '', PARAM_TEXT);
+    $studentcohort = optional_param('studentcohort', '', PARAM_TEXT);
+    
+    // Получаем ID роли студента
+    $studentroleid = $DB->get_field('role', 'id', ['shortname' => 'student']);
+    if (!$studentroleid) {
+        echo json_encode(['success' => false, 'error' => 'Роль студента не найдена']);
+        exit;
+    }
+    
+    // Формируем условия поиска
+    $conditions = [];
+    $params = [];
+    
+    // Поиск по ID
+    if ($studentid > 0) {
+        $conditions[] = "u.id = ?";
+        $params[] = $studentid;
+    }
+    
+    // Поиск по ФИО
+    if (!empty($studentname)) {
+        $searchpattern = '%' . $DB->sql_like_escape($studentname) . '%';
+        $conditions[] = "(u.firstname LIKE ? OR u.lastname LIKE ? OR CONCAT(u.firstname, ' ', u.lastname) LIKE ?)";
+        $params[] = $searchpattern;
+        $params[] = $searchpattern;
+        $params[] = $searchpattern;
+    }
+    
+    // Поиск по Email
+    if (!empty($studentemail)) {
+        $emailpattern = '%' . $DB->sql_like_escape($studentemail) . '%';
+        $conditions[] = "u.email LIKE ?";
+        $params[] = $emailpattern;
+    }
+    
+    // Поиск по группе (когорте)
+    $cohortjoin = '';
+    $cohortwhere = '';
+    if (!empty($studentcohort)) {
+        $cohortpattern = '%' . $DB->sql_like_escape($studentcohort) . '%';
+        $cohortjoin = "LEFT JOIN {cohort_members} cm ON cm.userid = u.id
+                       LEFT JOIN {cohort} c ON c.id = cm.cohortid";
+        $cohortwhere = "OR c.name LIKE ?";
+        $params[] = $cohortpattern;
+    }
+    
+    // Если нет условий поиска, возвращаем пустой результат
+    if (empty($conditions) && empty($studentcohort)) {
+        echo json_encode(['success' => true, 'students' => [], 'count' => 0]);
+        exit;
+    }
+    
+    $whereclause = '';
+    if (!empty($conditions)) {
+        $whereclause = 'AND (' . implode(' OR ', $conditions) . ')';
+    }
+    if (!empty($cohortwhere)) {
+        if (!empty($whereclause)) {
+            $whereclause .= ' ' . $cohortwhere;
+        } else {
+            $whereclause = 'AND ' . ltrim($cohortwhere, 'OR ');
+        }
+    }
+    
+    // SQL запрос для поиска студентов
+    $sql = "SELECT DISTINCT u.id, u.firstname, u.lastname, u.email,
+                   GROUP_CONCAT(DISTINCT c.name ORDER BY c.name SEPARATOR ', ') as cohortnames
+            FROM {user} u
+            INNER JOIN {role_assignments} ra ON ra.userid = u.id
+            INNER JOIN {role} r ON r.id = ra.roleid
+            " . $cohortjoin . "
+            WHERE u.deleted = 0
+              AND r.shortname = 'student'
+              " . $whereclause . "
+            GROUP BY u.id, u.firstname, u.lastname, u.email
+            ORDER BY u.lastname, u.firstname
+            LIMIT 50";
+    
+    $students = $DB->get_records_sql($sql, $params);
+    
+    // Форматируем результаты
+    $formattedstudents = [];
+    foreach ($students as $student) {
+        $cohorts = [];
+        if (!empty($student->cohortnames)) {
+            $cohorts = array_map('trim', explode(',', $student->cohortnames));
+        }
+        
+        $formattedstudents[] = [
+            'id' => (int)$student->id,
+            'firstname' => $student->firstname ?: '',
+            'lastname' => $student->lastname ?: '',
+            'email' => $student->email ?: '',
+            'cohorts' => $cohorts
+        ];
+    }
+    
+    echo json_encode([
+        'success' => true,
+        'students' => $formattedstudents,
+        'count' => count($formattedstudents)
     ]);
 } else {
     echo json_encode(['success' => false, 'error' => 'Invalid action or parameters']);

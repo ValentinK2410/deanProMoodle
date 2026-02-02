@@ -69,6 +69,7 @@ if (!$hasaccess) {
     require_capability('local/deanpromoodle:viewadmin', $context);
 }
 
+
 // Проверка роли пользователя и редирект при необходимости
 global $USER;
 $isadmin = false;
@@ -202,6 +203,9 @@ $tabs[] = new tabobject('categories',
 $tabs[] = new tabobject('cohorts', 
     new moodle_url('/local/deanpromoodle/pages/admin.php', ['tab' => 'cohorts']),
     'Когорты');
+$tabs[] = new tabobject('searchstudent', 
+    new moodle_url('/local/deanpromoodle/pages/admin.php', ['tab' => 'searchstudent']),
+    'Поиск студента');
 
 echo $OUTPUT->tabtree($tabs, $tab);
 
@@ -6136,6 +6140,199 @@ switch ($tab) {
         } catch (\Exception $e) {
             echo html_writer::div('Ошибка: ' . $e->getMessage(), 'alert alert-danger');
         }
+        
+        echo html_writer::end_div();
+        break;
+    
+    case 'searchstudent':
+        // Вкладка "Поиск студента"
+        echo html_writer::start_div('local-deanpromoodle-admin-content', ['style' => 'margin-bottom: 30px;']);
+        echo html_writer::tag('h2', 'Поиск студента', ['style' => 'margin-bottom: 20px;']);
+        
+        // Форма поиска
+        echo html_writer::start_tag('form', [
+            'id' => 'student-search-form',
+            'class' => 'form-horizontal',
+            'style' => 'background-color: #f5f5f5; padding: 20px; border-radius: 5px; margin-bottom: 20px;'
+        ]);
+        
+        echo html_writer::start_div('row');
+        
+        // Поле ID
+        echo html_writer::start_div('col-md-3');
+        echo html_writer::label('ID студента', 'student-id-search');
+        echo html_writer::empty_tag('input', [
+            'type' => 'number',
+            'id' => 'student-id-search',
+            'name' => 'studentid',
+            'class' => 'form-control',
+            'placeholder' => 'ID студента',
+            'min' => '1'
+        ]);
+        echo html_writer::end_div();
+        
+        // Поле ФИО
+        echo html_writer::start_div('col-md-3');
+        echo html_writer::label('ФИО', 'student-name-search');
+        echo html_writer::empty_tag('input', [
+            'type' => 'text',
+            'id' => 'student-name-search',
+            'name' => 'studentname',
+            'class' => 'form-control',
+            'placeholder' => 'Имя или фамилия'
+        ]);
+        echo html_writer::end_div();
+        
+        // Поле Email
+        echo html_writer::start_div('col-md-3');
+        echo html_writer::label('Email', 'student-email-search');
+        echo html_writer::empty_tag('input', [
+            'type' => 'email',
+            'id' => 'student-email-search',
+            'name' => 'studentemail',
+            'class' => 'form-control',
+            'placeholder' => 'Email студента'
+        ]);
+        echo html_writer::end_div();
+        
+        // Поле Группа
+        echo html_writer::start_div('col-md-3');
+        echo html_writer::label('Группа', 'student-cohort-search');
+        echo html_writer::empty_tag('input', [
+            'type' => 'text',
+            'id' => 'student-cohort-search',
+            'name' => 'studentcohort',
+            'class' => 'form-control',
+            'placeholder' => 'Название группы'
+        ]);
+        echo html_writer::end_div();
+        
+        echo html_writer::end_div(); // row
+        
+        echo html_writer::start_div('row', ['style' => 'margin-top: 15px;']);
+        echo html_writer::start_div('col-md-12');
+        echo html_writer::empty_tag('input', [
+            'type' => 'button',
+            'id' => 'search-student-btn',
+            'value' => 'Найти',
+            'class' => 'btn btn-primary',
+            'style' => 'margin-right: 10px;'
+        ]);
+        echo html_writer::empty_tag('input', [
+            'type' => 'button',
+            'id' => 'clear-search-btn',
+            'value' => 'Очистить',
+            'class' => 'btn btn-secondary'
+        ]);
+        echo html_writer::end_div();
+        echo html_writer::end_div(); // row
+        
+        echo html_writer::end_tag('form');
+        
+        // Область результатов поиска
+        echo html_writer::start_div('', ['id' => 'student-search-results', 'style' => 'margin-top: 20px;']);
+        echo html_writer::div('Введите критерии поиска и нажмите "Найти"', 'text-muted', ['style' => 'text-align: center; padding: 20px;']);
+        echo html_writer::end_div();
+        
+        // JavaScript для поиска студентов
+        $PAGE->requires->js_init_code("
+            (function() {
+                var searchTimeout;
+                var searchInputs = ['student-id-search', 'student-name-search', 'student-email-search', 'student-cohort-search'];
+                var resultsDiv = document.getElementById('student-search-results');
+                var searchBtn = document.getElementById('search-student-btn');
+                var clearBtn = document.getElementById('clear-search-btn');
+                
+                // Функция выполнения поиска
+                function performSearch() {
+                    var studentid = document.getElementById('student-id-search').value.trim();
+                    var studentname = document.getElementById('student-name-search').value.trim();
+                    var studentemail = document.getElementById('student-email-search').value.trim();
+                    var studentcohort = document.getElementById('student-cohort-search').value.trim();
+                    
+                    // Если все поля пустые, не выполняем поиск
+                    if (!studentid && !studentname && !studentemail && !studentcohort) {
+                        resultsDiv.innerHTML = '<div class=\"text-muted\" style=\"text-align: center; padding: 20px;\">Введите критерии поиска и нажмите \"Найти\"</div>';
+                        return;
+                    }
+                    
+                    resultsDiv.innerHTML = '<div class=\"text-center\" style=\"padding: 20px;\"><i class=\"fa fa-spinner fa-spin\"></i> Поиск...</div>';
+                    
+                    var params = [];
+                    if (studentid) params.push('studentid=' + encodeURIComponent(studentid));
+                    if (studentname) params.push('studentname=' + encodeURIComponent(studentname));
+                    if (studentemail) params.push('studentemail=' + encodeURIComponent(studentemail));
+                    if (studentcohort) params.push('studentcohort=' + encodeURIComponent(studentcohort));
+                    
+                    var xhr = new XMLHttpRequest();
+                    xhr.open('GET', '/local/deanpromoodle/pages/admin_ajax.php?action=searchstudents&' + params.join('&'), true);
+                    xhr.onreadystatechange = function() {
+                        if (xhr.readyState === 4 && xhr.status === 200) {
+                            try {
+                                var response = JSON.parse(xhr.responseText);
+                                if (response.success && response.students && response.students.length > 0) {
+                                    var html = '<table class=\"table table-striped table-hover\"><thead><tr><th>ID</th><th>ФИО</th><th>Email</th><th>Группы</th><th>Действие</th></tr></thead><tbody>';
+                                    response.students.forEach(function(student) {
+                                        var fullname = (student.firstname || '') + ' ' + (student.lastname || '');
+                                        var cohorts = student.cohorts && student.cohorts.length > 0 ? student.cohorts.join(', ') : '-';
+                                        html += '<tr>';
+                                        html += '<td>' + student.id + '</td>';
+                                        html += '<td>' + (fullname.trim() || '-') + '</td>';
+                                        html += '<td>' + (student.email || '-') + '</td>';
+                                        html += '<td>' + cohorts + '</td>';
+                                        html += '<td><a href=\"/local/deanpromoodle/pages/student.php?studentid=' + student.id + '&tab=courses\" class=\"btn btn-sm btn-primary\" target=\"_blank\"><i class=\"fas fa-user\"></i> Перейти в личный кабинет</a></td>';
+                                        html += '</tr>';
+                                    });
+                                    html += '</tbody></table>';
+                                    html += '<div class=\"text-muted\" style=\"margin-top: 10px;\">Найдено студентов: ' + response.count + '</div>';
+                                    resultsDiv.innerHTML = html;
+                                } else {
+                                    resultsDiv.innerHTML = '<div class=\"alert alert-info\" style=\"text-align: center;\">Студенты не найдены</div>';
+                                }
+                            } catch (e) {
+                                resultsDiv.innerHTML = '<div class=\"alert alert-danger\" style=\"text-align: center;\">Ошибка при обработке ответа: ' + e.message + '</div>';
+                            }
+                        } else if (xhr.readyState === 4) {
+                            resultsDiv.innerHTML = '<div class=\"alert alert-danger\" style=\"text-align: center;\">Ошибка загрузки данных</div>';
+                        }
+                    };
+                    xhr.send();
+                }
+                
+                // Обработчик кнопки поиска
+                if (searchBtn) {
+                    searchBtn.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        performSearch();
+                    });
+                }
+                
+                // Обработчик кнопки очистки
+                if (clearBtn) {
+                    clearBtn.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        searchInputs.forEach(function(inputId) {
+                            var input = document.getElementById(inputId);
+                            if (input) input.value = '';
+                        });
+                        resultsDiv.innerHTML = '<div class=\"text-muted\" style=\"text-align: center; padding: 20px;\">Введите критерии поиска и нажмите \"Найти\"</div>';
+                    });
+                }
+                
+                // AJAX-поиск при вводе (debounce 500ms)
+                searchInputs.forEach(function(inputId) {
+                    var input = document.getElementById(inputId);
+                    if (input) {
+                        input.addEventListener('input', function() {
+                            clearTimeout(searchTimeout);
+                            searchTimeout = setTimeout(function() {
+                                performSearch();
+                            }, 500);
+                        });
+                    }
+                });
+            })();
+        ");
         
         echo html_writer::end_div();
         break;

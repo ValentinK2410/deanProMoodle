@@ -144,6 +144,63 @@ $subtab = optional_param('subtab', 'programs', PARAM_ALPHA); // programs, additi
 $action = optional_param('action', '', PARAM_ALPHA); // viewprogram
 $programid = optional_param('programid', 0, PARAM_INT);
 $testmode = optional_param('test', false, PARAM_BOOL); // Параметр для тестирования - показывать цифровую оценку
+$studentid = optional_param('studentid', 0, PARAM_INT); // ID студента для просмотра (для админов и преподавателей)
+
+// Определяем, какого студента просматриваем
+$viewingstudent = $USER;
+$isviewingotherstudent = false;
+
+// Если передан studentid, проверяем права доступа
+if ($studentid > 0) {
+    // Проверяем, является ли текущий пользователь администратором или преподавателем
+    $isadmin = has_capability('moodle/site:config', $context) || 
+               has_capability('local/deanpromoodle:viewadmin', $context);
+    
+    $isteacher = false;
+    if (!$isadmin) {
+        $teacherroles = ['teacher', 'editingteacher', 'coursecreator'];
+        $roles = get_user_roles($context, $USER->id, false);
+        foreach ($roles as $role) {
+            if (in_array($role->shortname, $teacherroles)) {
+                $isteacher = true;
+                break;
+            }
+        }
+        if (!$isteacher) {
+            $systemcontext = context_system::instance();
+            $systemroles = get_user_roles($systemcontext, $USER->id, false);
+            foreach ($systemroles as $role) {
+                if (in_array($role->shortname, $teacherroles)) {
+                    $isteacher = true;
+                    break;
+                }
+            }
+        }
+    }
+    
+    if ($isadmin || $isteacher) {
+        // Админ или преподаватель может просматривать данные студента
+        $viewingstudent = $DB->get_record('user', ['id' => $studentid, 'deleted' => 0]);
+        if (!$viewingstudent) {
+            print_error('studentnotfound', 'local_deanpromoodle');
+        }
+        $isviewingotherstudent = true;
+        // Не делаем редирект для админа/преподавателя при просмотре другого студента
+    } else {
+        // Для студентов - редирект, если пытаются посмотреть другого студента
+        if ($studentid != $USER->id) {
+            redirect(new moodle_url('/local/deanpromoodle/pages/student.php'));
+        }
+    }
+} else {
+    // Обычная логика редиректа для админа/преподавателя (если не просматривают другого студента)
+    if ($isadmin) {
+        redirect(new moodle_url('/local/deanpromoodle/pages/admin.php'));
+    }
+    if ($isteacher && !$isadmin) {
+        redirect(new moodle_url('/local/deanpromoodle/pages/teacher.php'));
+    }
+}
 
 // Студент может заходить на любые вкладки страницы student.php
 
@@ -154,6 +211,9 @@ if ($action) {
 }
 if ($programid > 0) {
     $urlparams['programid'] = $programid;
+}
+if ($studentid > 0) {
+    $urlparams['studentid'] = $studentid;
 }
 $PAGE->set_url(new moodle_url('/local/deanpromoodle/pages/student.php', $urlparams));
 $PAGE->set_context(context_system::instance());
@@ -173,6 +233,14 @@ $PAGE->requires->css('/local/deanpromoodle/styles.css');
 echo $OUTPUT->header();
 
 global $USER, $DB;
+
+// Индикатор просмотра другого студента (для админов и преподавателей)
+if ($isviewingotherstudent) {
+    $studentfullname = fullname($viewingstudent);
+    echo html_writer::start_div('alert alert-info', ['style' => 'margin-bottom: 20px; background-color: #d1ecf1; border-color: #bee5eb; color: #0c5460;']);
+    echo html_writer::tag('strong', 'Просмотр данных студента: ') . htmlspecialchars($studentfullname, ENT_QUOTES, 'UTF-8');
+    echo html_writer::end_div();
+}
 
 // Красивый заголовок с фото студента вместо стандартного
 echo html_writer::start_tag('style');
@@ -243,21 +311,21 @@ echo html_writer::end_tag('style');
 // Заголовок с информацией о студенте
 echo html_writer::start_div('student-profile-header-main');
 // Фото студента
-$userpicture = $OUTPUT->user_picture($USER, ['size' => 120, 'class' => 'userpicture']);
+$userpicture = $OUTPUT->user_picture($viewingstudent, ['size' => 120, 'class' => 'userpicture']);
 echo html_writer::div($userpicture, 'student-profile-photo-main');
 // ФИО и email студента
 echo html_writer::start_div('student-profile-info-main');
-$profileurl = new moodle_url('/user/profile.php', ['id' => $USER->id]);
+$profileurl = new moodle_url('/user/profile.php', ['id' => $viewingstudent->id]);
 echo html_writer::tag('h1', 
-    html_writer::link($profileurl, fullname($USER), [
+    html_writer::link($profileurl, fullname($viewingstudent), [
         'class' => 'student-profile-name-link',
         'target' => '_blank'
     ]),
     ['class' => 'student-profile-name-main']
 );
-if (!empty($USER->email)) {
+if (!empty($viewingstudent->email)) {
     echo html_writer::div(
-        html_writer::link('mailto:' . htmlspecialchars($USER->email, ENT_QUOTES, 'UTF-8'), htmlspecialchars($USER->email, ENT_QUOTES, 'UTF-8')),
+        html_writer::link('mailto:' . htmlspecialchars($viewingstudent->email, ENT_QUOTES, 'UTF-8'), htmlspecialchars($viewingstudent->email, ENT_QUOTES, 'UTF-8')),
         'student-profile-email-main'
     );
 }
@@ -285,8 +353,12 @@ if ($action == 'viewprogram' && $programid > 0) {
     
     // Кнопка "Назад"
     echo html_writer::start_div('', ['style' => 'margin-bottom: 20px;']);
+    $backurlparams = ['tab' => 'programs'];
+    if ($studentid > 0) {
+        $backurlparams['studentid'] = $studentid;
+    }
     echo html_writer::link(
-        new moodle_url('/local/deanpromoodle/pages/student.php', ['tab' => 'programs']),
+        new moodle_url('/local/deanpromoodle/pages/student.php', $backurlparams),
         '<i class="fas fa-arrow-left"></i> Назад к программам',
         ['class' => 'btn btn-secondary', 'style' => 'text-decoration: none;', 'target' => '_blank']
     );
@@ -305,7 +377,7 @@ if ($action == 'viewprogram' && $programid > 0) {
                  FROM {cohort_members} cm
                  JOIN {cohort} c ON c.id = cm.cohortid
                  WHERE cm.userid = ?",
-                [$USER->id]
+                [$viewingstudent->id]
             );
             
             $cohortids = array_keys($studentcohorts);
@@ -328,7 +400,22 @@ if ($action == 'viewprogram' && $programid > 0) {
                 
                 // Получаем предметы программы через AJAX или напрямую
                 require_once($CFG->libdir . '/enrollib.php');
-                $mycourses = enrol_get_my_courses(['id']);
+                // Получаем курсы для просматриваемого студента
+                $studentroleid = $DB->get_field('role', 'id', ['shortname' => 'student']);
+                if ($studentroleid) {
+                    $mycourses = $DB->get_records_sql(
+                        "SELECT DISTINCT c.id
+                         FROM {course} c
+                         JOIN {enrol} e ON e.courseid = c.id
+                         JOIN {user_enrolments} ue ON ue.enrolid = e.id
+                         JOIN {context} ctx ON ctx.instanceid = c.id AND ctx.contextlevel = 50
+                         JOIN {role_assignments} ra ON ra.userid = ue.userid AND ra.contextid = ctx.id
+                         WHERE ue.userid = ? AND ra.roleid = ? AND ue.status = 0 AND e.status = 0",
+                        [$viewingstudent->id, $studentroleid]
+                    );
+                } else {
+                    $mycourses = [];
+                }
                 $mycourseids = array_keys($mycourses);
                 
                 // Получаем предметы программы
@@ -498,8 +585,24 @@ if ($action == 'viewprogram' && $programid > 0) {
         echo html_writer::start_div('local-deanpromoodle-student-content', ['style' => 'margin-top: 20px;']);
         
         try {
-            // Получаем все курсы, на которые записан студент
-            $mycourses = enrol_get_my_courses(['id', 'fullname', 'shortname', 'summary', 'startdate', 'enddate', 'visible']);
+            // Получаем все курсы, на которые записан просматриваемый студент
+            require_once($CFG->libdir . '/enrollib.php');
+            $studentroleid = $DB->get_field('role', 'id', ['shortname' => 'student']);
+            if ($studentroleid) {
+                $mycourses = $DB->get_records_sql(
+                    "SELECT DISTINCT c.id, c.fullname, c.shortname, c.summary, c.startdate, c.enddate, c.visible
+                     FROM {course} c
+                     JOIN {enrol} e ON e.courseid = c.id
+                     JOIN {user_enrolments} ue ON ue.enrolid = e.id
+                     JOIN {context} ctx ON ctx.instanceid = c.id AND ctx.contextlevel = 50
+                     JOIN {role_assignments} ra ON ra.userid = ue.userid AND ra.contextid = ctx.id
+                     WHERE ue.userid = ? AND ra.roleid = ? AND ue.status = 0 AND e.status = 0
+                     ORDER BY c.fullname",
+                    [$viewingstudent->id, $studentroleid]
+                );
+            } else {
+                $mycourses = [];
+            }
             
             if (empty($mycourses)) {
                 echo html_writer::div('Вы не записаны ни на один курс.', 'alert alert-info');
@@ -990,7 +1093,7 @@ if ($action == 'viewprogram' && $programid > 0) {
                             // Получаем любую submission (не только submitted, но и draft и другие статусы)
                             $submission = $DB->get_record('assign_submission', [
                                 'assignment' => $assignment->id,
-                                'userid' => $USER->id
+                                'userid' => $viewingstudent->id
                             ]);
                             
                             // Проверяем, есть ли файлы или текст в submission
@@ -1012,7 +1115,7 @@ if ($action == 'viewprogram' && $programid > 0) {
                             }
                             
                             // Используем функцию для проверки оценки (включая принудительно проставленные)
-                            $hasgrade = $checkAssignmentGrade($assignment->id, $USER->id);
+                            $hasgrade = $checkAssignmentGrade($assignment->id, $viewingstudent->id);
                             
                             if ($hasgrade) {
                                 // Есть оценка - зеленый "Чтение – сдано"
@@ -1046,7 +1149,7 @@ if ($action == 'viewprogram' && $programid > 0) {
                             
                             $submission = $DB->get_record('assign_submission', [
                                 'assignment' => $assignment->id,
-                                'userid' => $USER->id
+                                'userid' => $viewingstudent->id
                             ]);
                             
                             $hasfiles = false;
@@ -1063,7 +1166,7 @@ if ($action == 'viewprogram' && $programid > 0) {
                             }
                             
                             // Используем функцию для проверки оценки (включая принудительно проставленные)
-                            $hasgrade = $checkAssignmentGrade($assignment->id, $USER->id);
+                            $hasgrade = $checkAssignmentGrade($assignment->id, $viewingstudent->id);
                             
                             // Определяем текст для отображения
                             if (mb_strtolower(trim($assignment->name)) == 'сдача письменной работы') {
@@ -1122,7 +1225,7 @@ if ($action == 'viewprogram' && $programid > 0) {
                             
                             $grade = $DB->get_record('quiz_grades', [
                                 'quiz' => $quiz->id,
-                                'userid' => $USER->id
+                                'userid' => $viewingstudent->id
                             ]);
                             
                             if ($grade && $grade->grade !== null && $grade->grade >= 0) {
@@ -1160,7 +1263,7 @@ if ($action == 'viewprogram' && $programid > 0) {
                     try {
                         $courseitem = grade_item::fetch_course_item($course->id);
                         if ($courseitem) {
-                            $usergrade = grade_grade::fetch(['itemid' => $courseitem->id, 'userid' => $USER->id]);
+                            $usergrade = grade_grade::fetch(['itemid' => $courseitem->id, 'userid' => $viewingstudent->id]);
                             if ($usergrade && $usergrade->finalgrade !== null) {
                                 // finalgrade уже учитывает переопределенные (overridden) оценки в Moodle
                                 // Это финальная оценка с учетом всех принудительно проставленных оценок
@@ -1196,7 +1299,7 @@ if ($action == 'viewprogram' && $programid > 0) {
                             if (strpos($assignmentname, 'отчет') !== false && strpos($assignmentname, 'чтени') !== false) {
                                 $hasassignments = true;
                                 // Используем функцию для проверки оценки (включая принудительно проставленные)
-                                if (!$checkAssignmentGrade($assignment->id, $USER->id)) {
+                                if (!$checkAssignmentGrade($assignment->id, $viewingstudent->id)) {
                                     $allassignmentsgraded = false;
                                 }
                             }
@@ -1206,7 +1309,7 @@ if ($action == 'viewprogram' && $programid > 0) {
                                 // Проверяем наличие файлов или текста
                                 $submission = $DB->get_record('assign_submission', [
                                     'assignment' => $assignment->id,
-                                    'userid' => $USER->id
+                                    'userid' => $viewingstudent->id
                                 ]);
                                 $hasfiles = false;
                                 if ($submission) {
@@ -1221,7 +1324,7 @@ if ($action == 'viewprogram' && $programid > 0) {
                                     $hasfiles = ($filecount > 0 || $textcount > 0);
                                 }
                                 // Письменная работа считается сданной, если есть оценка (включая принудительно проставленную) ИЛИ есть файлы
-                                if (!$checkAssignmentGrade($assignment->id, $USER->id) && !$hasfiles) {
+                                if (!$checkAssignmentGrade($assignment->id, $viewingstudent->id) && !$hasfiles) {
                                     $allassignmentsgraded = false;
                                 }
                             }
@@ -1234,7 +1337,7 @@ if ($action == 'viewprogram' && $programid > 0) {
                                 $hasassignments = true;
                                 $grade = $DB->get_record('quiz_grades', [
                                     'quiz' => $quiz->id,
-                                    'userid' => $USER->id
+                                    'userid' => $viewingstudent->id
                                 ]);
                                 if (!$grade || $grade->grade === null || $grade->grade < 0) {
                                     $allassignmentsgraded = false;
@@ -1368,11 +1471,16 @@ if ($action == 'viewprogram' && $programid > 0) {
         
         // Подвкладки
         $subtabs = [];
+        $subtaburlparams = ['tab' => 'programs', 'subtab' => 'programs'];
+        if ($studentid > 0) {
+            $subtaburlparams['studentid'] = $studentid;
+        }
         $subtabs[] = new tabobject('programs', 
-            new moodle_url('/local/deanpromoodle/pages/student.php', ['tab' => 'programs', 'subtab' => 'programs']),
+            new moodle_url('/local/deanpromoodle/pages/student.php', $subtaburlparams),
             'Программы');
+        $subtaburlparams['subtab'] = 'additional';
         $subtabs[] = new tabobject('additional', 
-            new moodle_url('/local/deanpromoodle/pages/student.php', ['tab' => 'programs', 'subtab' => 'additional']),
+            new moodle_url('/local/deanpromoodle/pages/student.php', $subtaburlparams),
             'Дополнительные данные');
         
         echo $OUTPUT->tabtree($subtabs, $subtab);
@@ -1483,10 +1591,14 @@ if ($action == 'viewprogram' && $programid > 0) {
                         
                         // Название программы (кликабельное - открывает новую страницу)
                         $programname = htmlspecialchars($program->name, ENT_QUOTES, 'UTF-8');
-                        $programurl = new moodle_url('/local/deanpromoodle/pages/student.php', [
+                        $programurlparams = [
                             'action' => 'viewprogram',
                             'programid' => $program->id
-                        ]);
+                        ];
+                        if ($studentid > 0) {
+                            $programurlparams['studentid'] = $studentid;
+                        }
+                        $programurl = new moodle_url('/local/deanpromoodle/pages/student.php', $programurlparams);
                         echo html_writer::start_tag('td');
                         echo html_writer::link($programurl, $programname, [
                             'style' => 'font-weight: 500; color: #007bff; text-decoration: none;',
@@ -1550,7 +1662,7 @@ if ($action == 'viewprogram' && $programid > 0) {
             // Подвкладка "Дополнительные данные"
             try {
                 // Получаем данные из таблицы local_deanpromoodle_student_info
-                $studentinfo = $DB->get_record('local_deanpromoodle_student_info', ['userid' => $USER->id]);
+                $studentinfo = $DB->get_record('local_deanpromoodle_student_info', ['userid' => $viewingstudent->id]);
                 
                 // Группа (cohort) - сначала из таблицы, если нет - из cohort_members
                 $cohortdisplay = '';
@@ -1564,7 +1676,7 @@ if ($action == 'viewprogram' && $programid > 0) {
                          JOIN {cohort} c ON c.id = cm.cohortid
                          WHERE cm.userid = ?
                          ORDER BY c.name ASC",
-                        [$USER->id]
+                        [$viewingstudent->id]
                     );
                     if (!empty($studentcohorts)) {
                         $cohortnames = [];
@@ -1586,7 +1698,7 @@ if ($action == 'viewprogram' && $programid > 0) {
                          FROM {user_enrolments} ue
                          JOIN {enrol} e ON e.id = ue.enrolid
                          WHERE ue.userid = ? AND ue.status = 0 AND e.status = 0",
-                        [$USER->id]
+                        [$viewingstudent->id]
                     );
                     if (!empty($enrollments)) {
                         $enrollment = reset($enrollments);
@@ -1623,8 +1735,8 @@ if ($action == 'viewprogram' && $programid > 0) {
                     }
                 }
                 // Fallback: получаем адрес из профиля пользователя
-                if ($addressdisplay === '-' && !empty($USER->address)) {
-                    $addressdisplay = htmlspecialchars($USER->address, ENT_QUOTES, 'UTF-8');
+                if ($addressdisplay === '-' && !empty($viewingstudent->address)) {
+                    $addressdisplay = htmlspecialchars($viewingstudent->address, ENT_QUOTES, 'UTF-8');
                 }
                 
                 // СНИЛС - сначала из таблицы, если нет - из профиля
@@ -1633,10 +1745,10 @@ if ($action == 'viewprogram' && $programid > 0) {
                     $snilsdisplay = htmlspecialchars($studentinfo->snils, ENT_QUOTES, 'UTF-8');
                 } else {
                     // Fallback: получаем СНИЛС (может быть в idnumber или в customfield)
-                    $snils = $USER->idnumber ? $USER->idnumber : '';
+                    $snils = $viewingstudent->idnumber ? $viewingstudent->idnumber : '';
                     if (empty($snils)) {
                         require_once($CFG->dirroot . '/user/profile/lib.php');
-                        $userfields = profile_user_record($USER->id);
+                        $userfields = profile_user_record($viewingstudent->id);
                         if (isset($userfields->snils)) {
                             $snils = $userfields->snils;
                         }
@@ -1718,7 +1830,11 @@ if ($action == 'viewprogram' && $programid > 0) {
             
         default:
             // По умолчанию показываем программы
-            redirect(new moodle_url('/local/deanpromoodle/pages/student.php', ['tab' => 'programs', 'subtab' => 'programs']));
+            $redirectparams = ['tab' => 'programs', 'subtab' => 'programs'];
+            if ($studentid > 0) {
+                $redirectparams['studentid'] = $studentid;
+            }
+            redirect(new moodle_url('/local/deanpromoodle/pages/student.php', $redirectparams));
             break;
         }
         
@@ -1727,7 +1843,11 @@ if ($action == 'viewprogram' && $programid > 0) {
     
     default:
         // По умолчанию показываем курсы
-        redirect(new moodle_url('/local/deanpromoodle/pages/student.php', ['tab' => 'courses']));
+        $redirectparams = ['tab' => 'courses'];
+        if ($studentid > 0) {
+            $redirectparams['studentid'] = $studentid;
+        }
+        redirect(new moodle_url('/local/deanpromoodle/pages/student.php', $redirectparams));
         break;
     }
 }
