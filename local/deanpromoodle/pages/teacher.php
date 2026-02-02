@@ -781,17 +781,18 @@ switch ($tab) {
                     echo html_writer::link($prevurl, '« Previous', ['class' => 'btn btn-sm']);
                 }
                 // Убеждаемся, что все значения являются строками перед конкатенацией
-                $pagenumstr = (string)((int)$pagenum + 1);
-                $totalpagesnumstr = (string)(int)$totalpagesnum;
-                $totalcountstr = (string)(int)$totalcount;
-                $pagetext = "Page " . $pagenumstr . " of " . $totalpagesnumstr . " (" . $totalcountstr . " items)";
-                // Дополнительная проверка на случай, если $pagetext все еще массив
-                if (!is_string($pagetext)) {
-                    $pagetext = (string)$pagetext;
+                $pagenumval = (int)$pagenum + 1;
+                $totalpagesnumval = (int)$totalpagesnum;
+                $totalcountval = (int)$totalcount;
+                
+                // Формируем строку напрямую, избегая проблем с типами
+                $pagetext = "Page " . $pagenumval . " of " . $totalpagesnumval . " (" . $totalcountval . " items)";
+                
+                // Финальная проверка - убеждаемся, что это строка
+                if (!is_string($pagetext) || is_array($pagetext)) {
+                    $pagetext = "Page " . (string)$pagenumval . " of " . (string)$totalpagesnumval . " (" . (string)$totalcountval . " items)";
                 }
-                if (is_array($pagetext)) {
-                    $pagetext = '';
-                }
+                
                 // Используем s() для безопасного вывода строки
                 echo html_writer::span(s($pagetext), ['style' => 'margin: 0 15px;']);
                 if ($pagenum < $totalpagesnum - 1) {
@@ -1066,17 +1067,18 @@ switch ($tab) {
                     echo html_writer::link($prevurl, '« Previous', ['class' => 'btn btn-sm']);
                 }
                 // Убеждаемся, что все значения являются строками перед конкатенацией
-                $pagenumstr = (string)((int)$pagenum + 1);
-                $totalpagesnumstr = (string)(int)$totalpagesnum;
-                $totalcountstr = (string)(int)$totalcount;
-                $pagetext = "Page " . $pagenumstr . " of " . $totalpagesnumstr . " (" . $totalcountstr . " items)";
-                // Дополнительная проверка на случай, если $pagetext все еще массив
-                if (!is_string($pagetext)) {
-                    $pagetext = (string)$pagetext;
+                $pagenumval = (int)$pagenum + 1;
+                $totalpagesnumval = (int)$totalpagesnum;
+                $totalcountval = (int)$totalcount;
+                
+                // Формируем строку напрямую, избегая проблем с типами
+                $pagetext = "Page " . $pagenumval . " of " . $totalpagesnumval . " (" . $totalcountval . " items)";
+                
+                // Финальная проверка - убеждаемся, что это строка
+                if (!is_string($pagetext) || is_array($pagetext)) {
+                    $pagetext = "Page " . (string)$pagenumval . " of " . (string)$totalpagesnumval . " (" . (string)$totalcountval . " items)";
                 }
-                if (is_array($pagetext)) {
-                    $pagetext = '';
-                }
+                
                 // Используем s() для безопасного вывода строки
                 echo html_writer::span(s($pagetext), ['style' => 'margin: 0 15px;']);
                 if ($pagenum < $totalpagesnum - 1) {
@@ -1221,17 +1223,18 @@ switch ($tab) {
                     echo html_writer::link($prevurl, '« Previous', ['class' => 'btn btn-sm']);
                 }
                 // Убеждаемся, что все значения являются строками перед конкатенацией
-                $pagenumstr = (string)((int)$pagenum + 1);
-                $totalpagesnumstr = (string)(int)$totalpagesnum;
-                $totalcountstr = (string)(int)$totalcount;
-                $pagetext = "Page " . $pagenumstr . " of " . $totalpagesnumstr . " (" . $totalcountstr . " items)";
-                // Дополнительная проверка на случай, если $pagetext все еще массив
-                if (!is_string($pagetext)) {
-                    $pagetext = (string)$pagetext;
+                $pagenumval = (int)$pagenum + 1;
+                $totalpagesnumval = (int)$totalpagesnum;
+                $totalcountval = (int)$totalcount;
+                
+                // Формируем строку напрямую, избегая проблем с типами
+                $pagetext = "Page " . $pagenumval . " of " . $totalpagesnumval . " (" . $totalcountval . " items)";
+                
+                // Финальная проверка - убеждаемся, что это строка
+                if (!is_string($pagetext) || is_array($pagetext)) {
+                    $pagetext = "Page " . (string)$pagenumval . " of " . (string)$totalpagesnumval . " (" . (string)$totalcountval . " items)";
                 }
-                if (is_array($pagetext)) {
-                    $pagetext = '';
-                }
+                
                 // Используем s() для безопасного вывода строки
                 echo html_writer::span(s($pagetext), ['style' => 'margin: 0 15px;']);
                 if ($pagenum < $totalpagesnum - 1) {
