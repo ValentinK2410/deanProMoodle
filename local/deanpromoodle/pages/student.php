@@ -1671,56 +1671,57 @@ if ($action == 'viewprogram' && $programid > 0) {
                 if ($action == 'downloadnotfound' && ($isadmin || $isteacher)) {
                     require_sesskey();
                     
-                    $notfounddata = optional_param('notfounddata', '', PARAM_RAW);
+                    // Получаем данные из сессии
+                    $sessionkey = 'notfound_students_' . $USER->id;
+                    $notfounddata = $SESSION->$sessionkey;
                     
-                    if (!empty($notfounddata)) {
-                        $data = json_decode($notfounddata, true);
+                    if (!empty($notfounddata) && is_array($notfounddata) && isset($notfounddata['students'])) {
+                        // Устанавливаем заголовки для скачивания CSV
+                        header('Content-Type: text/csv; charset=UTF-8');
+                        header('Content-Disposition: attachment; filename="not_found_students_' . date('Y-m-d_H-i-s') . '.csv"');
                         
-                        if ($data && isset($data['students'])) {
-                            // Устанавливаем заголовки для скачивания CSV
-                            header('Content-Type: text/csv; charset=UTF-8');
-                            header('Content-Disposition: attachment; filename="not_found_students_' . date('Y-m-d_H-i-s') . '.csv"');
+                        // Добавляем BOM для правильного отображения кириллицы в Excel
+                        echo "\xEF\xBB\xBF";
+                        
+                        // Открываем поток вывода
+                        $output = fopen('php://output', 'w');
+                        
+                        // Заголовки CSV
+                        fputcsv($output, [
+                            '№ строки',
+                            'Фамилия',
+                            'Имя',
+                            'Отчество',
+                            'Email',
+                            'Группа',
+                            'Попытки поиска'
+                        ], ';');
+                        
+                        // Записываем данные
+                        foreach ($notfounddata['students'] as $student) {
+                            $lastname = isset($student['lastname']) ? $student['lastname'] : '';
+                            $firstname = isset($student['firstname']) ? $student['firstname'] : '';
+                            $middlename = isset($student['middlename']) ? $student['middlename'] : '';
                             
-                            // Добавляем BOM для правильного отображения кириллицы в Excel
-                            echo "\xEF\xBB\xBF";
+                            // Объединяем попытки поиска в одну строку
+                            $attempts = isset($student['attempts']) ? str_replace(['<br>', '<br />'], '; ', strip_tags($student['attempts'])) : '';
                             
-                            // Открываем поток вывода
-                            $output = fopen('php://output', 'w');
-                            
-                            // Заголовки CSV
                             fputcsv($output, [
-                                '№ строки',
-                                'Фамилия',
-                                'Имя',
-                                'Отчество',
-                                'Email',
-                                'Группа',
-                                'Попытки поиска'
+                                isset($student['row']) ? $student['row'] : '',
+                                $lastname,
+                                $firstname,
+                                $middlename,
+                                isset($student['email']) ? $student['email'] : '',
+                                isset($student['cohort']) ? $student['cohort'] : '',
+                                $attempts
                             ], ';');
-                            
-                            // Записываем данные
-                            foreach ($data['students'] as $student) {
-                                $lastname = isset($student['lastname']) ? $student['lastname'] : '';
-                                $firstname = isset($student['firstname']) ? $student['firstname'] : '';
-                                $middlename = isset($student['middlename']) ? $student['middlename'] : '';
-                                
-                                // Объединяем попытки поиска в одну строку
-                                $attempts = isset($student['attempts']) ? str_replace(['<br>', '<br />'], '; ', strip_tags($student['attempts'])) : '';
-                                
-                                fputcsv($output, [
-                                    isset($student['row']) ? $student['row'] : '',
-                                    $lastname,
-                                    $firstname,
-                                    $middlename,
-                                    isset($student['email']) ? $student['email'] : '',
-                                    isset($student['cohort']) ? $student['cohort'] : '',
-                                    $attempts
-                                ], ';');
-                            }
-                            
-                            fclose($output);
-                            exit;
                         }
+                        
+                        fclose($output);
+                        
+                        // Очищаем данные из сессии после скачивания
+                        unset($SESSION->$sessionkey);
+                        exit;
                     }
                     
                     echo html_writer::div('Ошибка: данные для скачивания не найдены', 'alert alert-danger');
@@ -2237,7 +2238,11 @@ if ($action == 'viewprogram' && $programid > 0) {
                                                     
                                                     // Кнопка для скачивания списка
                                                     if (isset($notfoundstudents) && !empty($notfoundstudents)) {
-                                                        $downloaddata = json_encode(['students' => $notfoundstudents], JSON_UNESCAPED_UNICODE);
+                                                        // Сохраняем данные в сессию для скачивания
+                                                        global $SESSION;
+                                                        $sessionkey = 'notfound_students_' . $USER->id;
+                                                        $SESSION->$sessionkey = ['students' => $notfoundstudents];
+                                                        
                                                         $downloadurl = new moodle_url('/local/deanpromoodle/pages/student.php', [
                                                             'tab' => 'programs',
                                                             'subtab' => 'additional',
@@ -2247,46 +2252,10 @@ if ($action == 'viewprogram' && $programid > 0) {
                                                         ]);
                                                         
                                                         $message .= "<div style='margin-bottom: 15px;'>";
-                                                        $message .= html_writer::link('#', '📥 Скачать список не найденных студентов (CSV)', [
+                                                        $message .= html_writer::link($downloadurl, '📥 Скачать список не найденных студентов (CSV)', [
                                                             'class' => 'btn btn-primary',
-                                                            'id' => 'download-notfound-btn',
-                                                            'data-notfound' => htmlspecialchars($downloaddata, ENT_QUOTES, 'UTF-8'),
                                                             'style' => 'margin-bottom: 10px;'
                                                         ]);
-                                                        
-                                                        // JavaScript для скачивания
-                                                        $message .= html_writer::start_tag('script');
-                                                        $message .= "
-                                                        document.addEventListener('DOMContentLoaded', function() {
-                                                            var btn = document.getElementById('download-notfound-btn');
-                                                            if (btn) {
-                                                                btn.addEventListener('click', function(e) {
-                                                                    e.preventDefault();
-                                                                    var data = btn.getAttribute('data-notfound');
-                                                                    var form = document.createElement('form');
-                                                                    form.method = 'POST';
-                                                                    form.action = '" . $downloadurl->out(false) . "';
-                                                                    
-                                                                    var inputData = document.createElement('input');
-                                                                    inputData.type = 'hidden';
-                                                                    inputData.name = 'notfounddata';
-                                                                    inputData.value = data;
-                                                                    form.appendChild(inputData);
-                                                                    
-                                                                    var inputSesskey = document.createElement('input');
-                                                                    inputSesskey.type = 'hidden';
-                                                                    inputSesskey.name = 'sesskey';
-                                                                    inputSesskey.value = '" . sesskey() . "';
-                                                                    form.appendChild(inputSesskey);
-                                                                    
-                                                                    document.body.appendChild(form);
-                                                                    form.submit();
-                                                                    document.body.removeChild(form);
-                                                                });
-                                                            }
-                                                        });
-                                                        ";
-                                                        $message .= html_writer::end_tag('script');
                                                         $message .= "</div>";
                                                     }
                                                     
