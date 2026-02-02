@@ -1092,6 +1092,7 @@ switch ($tab) {
         echo html_writer::end_div();
         
         // JavaScript для поиска студентов
+        $ajaxurl = (new moodle_url('/local/deanpromoodle/pages/admin_ajax.php'))->out(false);
         $PAGE->requires->js_init_code("
             (function() {
                 var searchTimeout;
@@ -1099,6 +1100,7 @@ switch ($tab) {
                 var resultsDiv = document.getElementById('student-search-results');
                 var searchBtn = document.getElementById('search-student-btn');
                 var clearBtn = document.getElementById('clear-search-btn');
+                var ajaxUrl = " . json_encode($ajaxurl) . ";
                 
                 // Функция выполнения поиска
                 function performSearch() {
@@ -1122,7 +1124,7 @@ switch ($tab) {
                     if (studentcohort) params.push('studentcohort=' + encodeURIComponent(studentcohort));
                     
                     var xhr = new XMLHttpRequest();
-                    xhr.open('GET', '/local/deanpromoodle/pages/admin_ajax.php?action=searchstudents&' + params.join('&'), true);
+                    xhr.open('GET', ajaxUrl + '?action=searchstudents&' + params.join('&'), true);
                     xhr.onreadystatechange = function() {
                         if (xhr.readyState === 4 && xhr.status === 200) {
                             try {
