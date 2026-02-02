@@ -193,7 +193,6 @@
         <KEY NAME="postuser" TYPE="unique" FIELDS="postid, userid"/>
       </KEYS>
       <INDEXES>
-        <INDEX NAME="userid" UNIQUE="false" FIELDS="userid"/>
       </INDEXES>
     </TABLE>
   </TABLES>
