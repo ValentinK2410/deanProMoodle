@@ -88,6 +88,7 @@ $action = optional_param('action', '', PARAM_ALPHA); // viewprogram
 $programid = optional_param('programid', 0, PARAM_INT);
 $testmode = optional_param('test', false, PARAM_BOOL); // Параметр для тестирования - показывать цифровую оценку
 $studentid = optional_param('studentid', 0, PARAM_INT); // ID студента для просмотра (для админов и преподавателей)
+$userimportsetting = optional_param('userimportsetting', false, PARAM_BOOL); // Параметр для показа кнопки импорта из Excel
 
 // Проверка роли пользователя и редирект при необходимости
 global $USER, $DB;
@@ -2510,8 +2511,8 @@ if ($action == 'viewprogram' && $programid > 0) {
                         echo html_writer::link($editurl, 'Редактировать', ['class' => 'btn btn-primary']);
                     }
                     
-                    // Кнопка импорта из Excel (только для админов и преподавателей)
-                    if ($isadmin || $isteacher) {
+                    // Кнопка импорта из Excel (только для админов и преподавателей и только если userimportsetting=true)
+                    if (($isadmin || $isteacher) && $userimportsetting) {
                         echo html_writer::link('#', 'Импорт из Excel', [
                             'class' => 'btn btn-success',
                             'id' => 'import-excel-btn'
@@ -2520,8 +2521,8 @@ if ($action == 'viewprogram' && $programid > 0) {
                     
                     echo html_writer::end_div();
                     
-                    // Модальное окно для импорта Excel (только для админов и преподавателей)
-                    if ($isadmin || $isteacher) {
+                    // Модальное окно для импорта Excel (только для админов и преподавателей и только если userimportsetting=true)
+                    if (($isadmin || $isteacher) && $userimportsetting) {
                         echo html_writer::start_div('modal fade', [
                             'id' => 'importExcelModal',
                             'tabindex' => '-1',
