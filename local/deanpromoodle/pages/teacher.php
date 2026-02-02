@@ -916,23 +916,31 @@ switch ($tab) {
                 $message = $fullmessage;
             }
             
+            // Убеждаемся, что все значения являются строками/числами, а не массивами
+            $studentname = fullname($post);
+            if (is_array($studentname)) {
+                $studentname = isset($post->firstname) && isset($post->lastname) 
+                    ? trim($post->firstname . ' ' . $post->lastname) 
+                    : '';
+            }
+            
             $unrepliedposts[] = (object)[
-                'id' => $post->id,
-                'forumid' => $post->forum,
-                'forumname' => $post->forumname,
-                'discussionid' => $post->discussion,
-                'discussionname' => $post->discussionname,
-                'courseid' => $post->courseid,
-                'coursename' => $course->fullname,
-                'courseshortname' => $course->shortname,
-                'userid' => $post->userid,
-                'studentname' => fullname($post),
-                'email' => $post->email,
-                'subject' => $post->subject,
-                'message' => $message,
-                'fullmessage' => $fullmessage,
-                'posted' => userdate($post->created),
-                'created' => $post->created
+                'id' => isset($post->id) ? (int)$post->id : 0,
+                'forumid' => isset($post->forum) ? (int)$post->forum : 0,
+                'forumname' => isset($post->forumname) && !is_array($post->forumname) ? (string)$post->forumname : '',
+                'discussionid' => isset($post->discussion) ? (int)$post->discussion : 0,
+                'discussionname' => isset($post->discussionname) && !is_array($post->discussionname) ? (string)$post->discussionname : '',
+                'courseid' => isset($post->courseid) ? (int)$post->courseid : 0,
+                'coursename' => isset($course->fullname) && !is_array($course->fullname) ? (string)$course->fullname : '',
+                'courseshortname' => isset($course->shortname) && !is_array($course->shortname) ? (string)$course->shortname : '',
+                'userid' => isset($post->userid) ? (int)$post->userid : 0,
+                'studentname' => (string)$studentname,
+                'email' => isset($post->email) && !is_array($post->email) ? (string)$post->email : '',
+                'subject' => isset($post->subject) && !is_array($post->subject) ? (string)$post->subject : '',
+                'message' => (string)$message,
+                'fullmessage' => (string)$fullmessage,
+                'posted' => isset($post->created) ? userdate($post->created) : '',
+                'created' => isset($post->created) ? (int)$post->created : 0
             ];
         }
         
