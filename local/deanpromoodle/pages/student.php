@@ -142,15 +142,12 @@ if ($studentid > 0) {
         }
     }
 } else {
-    // Если studentid не передан, проверяем роли и делаем редирект при необходимости
+    // Если studentid не передан, проверяем роли
     // Проверяем, является ли пользователь админом
-    if (has_capability('moodle/site:config', $context) || has_capability('local/deanpromoodle:viewadmin', $context)) {
-        $isadmin = true;
-        // Админ не может заходить на страницу студента - редирект на admin.php
-        redirect(new moodle_url('/local/deanpromoodle/pages/admin.php'));
-    }
+    $isadmin = has_capability('moodle/site:config', $context) || has_capability('local/deanpromoodle:viewadmin', $context);
     
     // Проверяем, является ли пользователь преподавателем
+    $isteacher = false;
     $teacherroles = ['teacher', 'editingteacher', 'coursecreator'];
     $roles = get_user_roles($context, $USER->id, false);
     foreach ($roles as $role) {
@@ -170,12 +167,8 @@ if ($studentid > 0) {
         }
     }
     
-    if ($isteacher && !$isadmin) {
-        // Преподаватель не может заходить на страницу студента - редирект на teacher.php
-        redirect(new moodle_url('/local/deanpromoodle/pages/teacher.php'));
-    }
-    
     // Проверяем, является ли пользователь студентом
+    $isstudent = false;
     $studentroles = ['student'];
     foreach ($roles as $role) {
         if (in_array($role->shortname, $studentroles)) {
@@ -193,6 +186,20 @@ if ($studentid > 0) {
             }
         }
     }
+    
+    // Если пользователь только админ или только преподаватель (без роли студента), делаем редирект
+    if ($isadmin && !$isstudent) {
+        // Админ без роли студента - редирект на admin.php
+        redirect(new moodle_url('/local/deanpromoodle/pages/admin.php'));
+    }
+    
+    if ($isteacher && !$isadmin && !$isstudent) {
+        // Преподаватель без роли студента - редирект на teacher.php
+        redirect(new moodle_url('/local/deanpromoodle/pages/teacher.php'));
+    }
+    
+    // Если пользователь имеет роль студента (даже если он также админ или преподаватель), разрешаем просмотр
+    // В этом случае он будет видеть свою собственную страницу студента
 }
 
 // Студент может заходить на любые вкладки страницы student.php
