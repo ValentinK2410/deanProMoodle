@@ -1667,6 +1667,65 @@ if ($action == 'viewprogram' && $programid > 0) {
                 }
                 
                 // Обработка импорта Excel
+                // Обработка скачивания списка не найденных студентов
+                if ($action == 'downloadnotfound' && ($isadmin || $isteacher)) {
+                    require_sesskey();
+                    
+                    $notfounddata = optional_param('notfounddata', '', PARAM_RAW);
+                    
+                    if (!empty($notfounddata)) {
+                        $data = json_decode($notfounddata, true);
+                        
+                        if ($data && isset($data['students'])) {
+                            // Устанавливаем заголовки для скачивания CSV
+                            header('Content-Type: text/csv; charset=UTF-8');
+                            header('Content-Disposition: attachment; filename="not_found_students_' . date('Y-m-d_H-i-s') . '.csv"');
+                            
+                            // Добавляем BOM для правильного отображения кириллицы в Excel
+                            echo "\xEF\xBB\xBF";
+                            
+                            // Открываем поток вывода
+                            $output = fopen('php://output', 'w');
+                            
+                            // Заголовки CSV
+                            fputcsv($output, [
+                                '№ строки',
+                                'Фамилия',
+                                'Имя',
+                                'Отчество',
+                                'Email',
+                                'Группа',
+                                'Попытки поиска'
+                            ], ';');
+                            
+                            // Записываем данные
+                            foreach ($data['students'] as $student) {
+                                $lastname = isset($student['lastname']) ? $student['lastname'] : '';
+                                $firstname = isset($student['firstname']) ? $student['firstname'] : '';
+                                $middlename = isset($student['middlename']) ? $student['middlename'] : '';
+                                
+                                // Объединяем попытки поиска в одну строку
+                                $attempts = isset($student['attempts']) ? str_replace(['<br>', '<br />'], '; ', strip_tags($student['attempts'])) : '';
+                                
+                                fputcsv($output, [
+                                    isset($student['row']) ? $student['row'] : '',
+                                    $lastname,
+                                    $firstname,
+                                    $middlename,
+                                    isset($student['email']) ? $student['email'] : '',
+                                    isset($student['cohort']) ? $student['cohort'] : '',
+                                    $attempts
+                                ], ';');
+                            }
+                            
+                            fclose($output);
+                            exit;
+                        }
+                    }
+                    
+                    echo html_writer::div('Ошибка: данные для скачивания не найдены', 'alert alert-danger');
+                }
+                
                 if ($action == 'importexcel' && ($isadmin || $isteacher)) {
                     require_sesskey();
                     
@@ -2020,6 +2079,22 @@ if ($action == 'viewprogram' && $programid > 0) {
                                                         
                                                         $errormsg = implode(" | ", $searchdetails) . "\n" . implode(" | ", $attempts);
                                                         $errors[] = $errormsg;
+                                                        
+                                                        // Сохраняем данные для скачивания
+                                                        if (!isset($notfoundstudents)) {
+                                                            $notfoundstudents = [];
+                                                        }
+                                                        $notfoundstudents[] = [
+                                                            'row' => $i + 1,
+                                                            'lastname' => $lastname,
+                                                            'firstname' => $firstname,
+                                                            'middlename' => $middlename,
+                                                            'fio' => trim("$lastname $firstname $middlename"),
+                                                            'email' => $email ?: 'не указан',
+                                                            'cohort' => $cohort ?: 'не указана',
+                                                            'attempts' => implode('; ', $attempts)
+                                                        ];
+                                                        
                                                         continue;
                                                     }
                                                     
@@ -2159,54 +2234,125 @@ if ($action == 'viewprogram' && $programid > 0) {
                                                 // Показываем детальную информацию о пропущенных записях
                                                 if (!empty($errors)) {
                                                     $message .= "<br><br><strong>Список студентов, не найденных в Moodle:</strong><br>";
+                                                    
+                                                    // Кнопка для скачивания списка
+                                                    if (isset($notfoundstudents) && !empty($notfoundstudents)) {
+                                                        $downloaddata = json_encode(['students' => $notfoundstudents], JSON_UNESCAPED_UNICODE);
+                                                        $downloadurl = new moodle_url('/local/deanpromoodle/pages/student.php', [
+                                                            'tab' => 'programs',
+                                                            'subtab' => 'additional',
+                                                            'studentid' => $viewstudentid,
+                                                            'action' => 'downloadnotfound',
+                                                            'sesskey' => sesskey()
+                                                        ]);
+                                                        
+                                                        $message .= "<div style='margin-bottom: 15px;'>";
+                                                        $message .= html_writer::link('#', '📥 Скачать список не найденных студентов (CSV)', [
+                                                            'class' => 'btn btn-primary',
+                                                            'id' => 'download-notfound-btn',
+                                                            'data-notfound' => htmlspecialchars($downloaddata, ENT_QUOTES, 'UTF-8'),
+                                                            'style' => 'margin-bottom: 10px;'
+                                                        ]);
+                                                        
+                                                        // JavaScript для скачивания
+                                                        $message .= html_writer::start_tag('script');
+                                                        $message .= "
+                                                        document.addEventListener('DOMContentLoaded', function() {
+                                                            var btn = document.getElementById('download-notfound-btn');
+                                                            if (btn) {
+                                                                btn.addEventListener('click', function(e) {
+                                                                    e.preventDefault();
+                                                                    var data = btn.getAttribute('data-notfound');
+                                                                    var form = document.createElement('form');
+                                                                    form.method = 'POST';
+                                                                    form.action = '" . $downloadurl->out(false) . "';
+                                                                    
+                                                                    var inputData = document.createElement('input');
+                                                                    inputData.type = 'hidden';
+                                                                    inputData.name = 'notfounddata';
+                                                                    inputData.value = data;
+                                                                    form.appendChild(inputData);
+                                                                    
+                                                                    var inputSesskey = document.createElement('input');
+                                                                    inputSesskey.type = 'hidden';
+                                                                    inputSesskey.name = 'sesskey';
+                                                                    inputSesskey.value = '" . sesskey() . "';
+                                                                    form.appendChild(inputSesskey);
+                                                                    
+                                                                    document.body.appendChild(form);
+                                                                    form.submit();
+                                                                    document.body.removeChild(form);
+                                                                });
+                                                            }
+                                                        });
+                                                        ";
+                                                        $message .= html_writer::end_tag('script');
+                                                        $message .= "</div>";
+                                                    }
+                                                    
                                                     $message .= "<div style='max-height: 500px; overflow-y: auto; border: 1px solid #ddd; padding: 15px; margin-top: 10px; background: #f9f9f9;'>";
                                                     $message .= "<table style='width: 100%; border-collapse: collapse; font-size: 12px;'>";
                                                     $message .= "<thead><tr style='background: #e9ecef; border-bottom: 2px solid #ddd;'>";
                                                     $message .= "<th style='padding: 8px; text-align: left; border: 1px solid #ddd;'>№ строки</th>";
                                                     $message .= "<th style='padding: 8px; text-align: left; border: 1px solid #ddd;'>ФИО из Excel</th>";
                                                     $message .= "<th style='padding: 8px; text-align: left; border: 1px solid #ddd;'>Email из Excel</th>";
+                                                    $message .= "<th style='padding: 8px; text-align: left; border: 1px solid #ddd;'>Группа из Excel</th>";
                                                     $message .= "<th style='padding: 8px; text-align: left; border: 1px solid #ddd;'>Попытки поиска</th>";
                                                     $message .= "</tr></thead><tbody>";
                                                     
-                                                    $displayed = 0;
-                                                    foreach ($errors as $error) {
-                                                        // Показываем все записи без ограничений
-                                                        
-                                                        // Парсим сообщение об ошибке
-                                                        $parts = explode(" | ", $error);
-                                                        $rowNum = "";
-                                                        $fio = "";
-                                                        $email = "";
-                                                        $attempts = "";
-                                                        
-                                                        foreach ($parts as $part) {
-                                                            if (strpos($part, "Строка") !== false) {
-                                                                $rowNum = trim(str_replace("Строка", "", $part));
-                                                            } elseif (strpos($part, "ФИО из Excel:") !== false) {
-                                                                $fio = trim(str_replace("ФИО из Excel:", "", $part));
-                                                            } elseif (strpos($part, "Email из Excel:") !== false) {
-                                                                $email = trim(str_replace("Email из Excel:", "", $part));
-                                                            } elseif (strpos($part, "Поиск") !== false) {
-                                                                $attempts .= ($attempts ? "<br>" : "") . htmlspecialchars($part, ENT_QUOTES, 'UTF-8');
+                                                    // Используем данные из $notfoundstudents, если они есть
+                                                    if (isset($notfoundstudents) && !empty($notfoundstudents)) {
+                                                        foreach ($notfoundstudents as $student) {
+                                                            $message .= "<tr style='border-bottom: 1px solid #ddd;'>";
+                                                            $message .= "<td style='padding: 8px; border: 1px solid #ddd;'>" . htmlspecialchars($student['row'], ENT_QUOTES, 'UTF-8') . "</td>";
+                                                            $message .= "<td style='padding: 8px; border: 1px solid #ddd;'>" . htmlspecialchars($student['fio'], ENT_QUOTES, 'UTF-8') . "</td>";
+                                                            $message .= "<td style='padding: 8px; border: 1px solid #ddd;'>" . htmlspecialchars($student['email'], ENT_QUOTES, 'UTF-8') . "</td>";
+                                                            $message .= "<td style='padding: 8px; border: 1px solid #ddd;'>" . htmlspecialchars($student['cohort'], ENT_QUOTES, 'UTF-8') . "</td>";
+                                                            $message .= "<td style='padding: 8px; border: 1px solid #ddd; font-size: 11px;'>" . htmlspecialchars($student['attempts'], ENT_QUOTES, 'UTF-8') . "</td>";
+                                                            $message .= "</tr>";
+                                                        }
+                                                    } else {
+                                                        // Fallback на старый формат, если $notfoundstudents не создан
+                                                        foreach ($errors as $error) {
+                                                            // Парсим сообщение об ошибке
+                                                            $parts = explode(" | ", $error);
+                                                            $rowNum = "";
+                                                            $fio = "";
+                                                            $email = "";
+                                                            $cohort = "";
+                                                            $attempts = "";
+                                                            
+                                                            foreach ($parts as $part) {
+                                                                if (strpos($part, "Строка") !== false) {
+                                                                    $rowNum = trim(str_replace("Строка", "", $part));
+                                                                } elseif (strpos($part, "ФИО из Excel:") !== false) {
+                                                                    $fio = trim(str_replace("ФИО из Excel:", "", $part));
+                                                                } elseif (strpos($part, "Email из Excel:") !== false) {
+                                                                    $email = trim(str_replace("Email из Excel:", "", $part));
+                                                                } elseif (strpos($part, "Группа из Excel:") !== false) {
+                                                                    $cohort = trim(str_replace("Группа из Excel:", "", $part));
+                                                                } elseif (strpos($part, "Поиск") !== false) {
+                                                                    $attempts .= ($attempts ? "<br>" : "") . htmlspecialchars($part, ENT_QUOTES, 'UTF-8');
+                                                                }
                                                             }
+                                                            
+                                                            // Если формат не распознан, показываем как есть
+                                                            if (empty($rowNum)) {
+                                                                $rowNum = "?";
+                                                                $fio = htmlspecialchars($error, ENT_QUOTES, 'UTF-8');
+                                                                $email = "-";
+                                                                $cohort = "-";
+                                                                $attempts = "-";
+                                                            }
+                                                            
+                                                            $message .= "<tr style='border-bottom: 1px solid #ddd;'>";
+                                                            $message .= "<td style='padding: 8px; border: 1px solid #ddd;'>" . htmlspecialchars($rowNum, ENT_QUOTES, 'UTF-8') . "</td>";
+                                                            $message .= "<td style='padding: 8px; border: 1px solid #ddd;'>" . htmlspecialchars($fio, ENT_QUOTES, 'UTF-8') . "</td>";
+                                                            $message .= "<td style='padding: 8px; border: 1px solid #ddd;'>" . htmlspecialchars($email, ENT_QUOTES, 'UTF-8') . "</td>";
+                                                            $message .= "<td style='padding: 8px; border: 1px solid #ddd;'>" . htmlspecialchars($cohort, ENT_QUOTES, 'UTF-8') . "</td>";
+                                                            $message .= "<td style='padding: 8px; border: 1px solid #ddd; font-size: 11px;'>" . $attempts . "</td>";
+                                                            $message .= "</tr>";
                                                         }
-                                                        
-                                                        // Если формат не распознан, показываем как есть
-                                                        if (empty($rowNum)) {
-                                                            $rowNum = "?";
-                                                            $fio = htmlspecialchars($error, ENT_QUOTES, 'UTF-8');
-                                                            $email = "-";
-                                                            $attempts = "-";
-                                                        }
-                                                        
-                                                        $message .= "<tr style='border-bottom: 1px solid #ddd;'>";
-                                                        $message .= "<td style='padding: 8px; border: 1px solid #ddd;'>" . htmlspecialchars($rowNum, ENT_QUOTES, 'UTF-8') . "</td>";
-                                                        $message .= "<td style='padding: 8px; border: 1px solid #ddd;'>" . htmlspecialchars($fio, ENT_QUOTES, 'UTF-8') . "</td>";
-                                                        $message .= "<td style='padding: 8px; border: 1px solid #ddd;'>" . htmlspecialchars($email, ENT_QUOTES, 'UTF-8') . "</td>";
-                                                        $message .= "<td style='padding: 8px; border: 1px solid #ddd; font-size: 11px;'>" . $attempts . "</td>";
-                                                        $message .= "</tr>";
-                                                        
-                                                        $displayed++;
                                                     }
                                                     
                                                     $message .= "</tbody></table></div>";
