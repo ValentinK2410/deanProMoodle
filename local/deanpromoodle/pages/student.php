@@ -1666,6 +1666,318 @@ if ($action == 'viewprogram' && $programid > 0) {
                     $canedit = true;
                 }
                 
+                // Обработка импорта Excel
+                if ($action == 'importexcel' && ($isadmin || $isteacher)) {
+                    require_sesskey();
+                    
+                    $importsubmitted = optional_param('import_submit', 0, PARAM_INT);
+                    if ($importsubmitted) {
+                        $file = $_FILES['excelfile'] ?? null;
+                        if (!$file || $file['error'] !== UPLOAD_ERR_OK) {
+                            echo html_writer::div('Ошибка загрузки файла. Убедитесь, что файл выбран и не превышает максимальный размер.', 'alert alert-danger');
+                        } else {
+                            // Проверяем тип файла
+                            $fileext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+                            if (!in_array($fileext, ['xlsx', 'xls', 'csv'])) {
+                                echo html_writer::div('Неверный тип файла. Загрузите файл в формате Excel (.xlsx, .xls) или CSV.', 'alert alert-danger');
+                            } else {
+                                // Парсим файл
+                                $imported = 0;
+                                $skipped = 0;
+                                $errors = [];
+                                
+                                try {
+                                    $rows = [];
+                                    
+                                    // Проверяем доступность PhpSpreadsheet
+                                    $phpspreadsheetpaths = [
+                                        $CFG->libdir . '/phpspreadsheet/vendor/autoload.php',
+                                        $CFG->dirroot . '/lib/phpspreadsheet/vendor/autoload.php',
+                                        $CFG->dirroot . '/vendor/phpoffice/phpspreadsheet/src/PhpSpreadsheet/IOFactory.php'
+                                    ];
+                                    
+                                    $usePhpSpreadsheet = false;
+                                    $phpspreadsheetpath = null;
+                                    
+                                    foreach ($phpspreadsheetpaths as $path) {
+                                        if (file_exists($path)) {
+                                            $phpspreadsheetpath = $path;
+                                            $usePhpSpreadsheet = true;
+                                            break;
+                                        }
+                                    }
+                                    
+                                    if ($usePhpSpreadsheet && ($fileext == 'xlsx' || $fileext == 'xls')) {
+                                        require_once($phpspreadsheetpath);
+                                        
+                                        // Используем PhpSpreadsheet для Excel файлов
+                                        if (strpos($phpspreadsheetpath, 'IOFactory.php') !== false) {
+                                            // Прямой путь к IOFactory
+                                            $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($file['tmp_name']);
+                                        } else {
+                                            // Через autoload
+                                            $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($file['tmp_name']);
+                                        }
+                                        $worksheet = $spreadsheet->getActiveSheet();
+                                        $rows = $worksheet->toArray();
+                                    } else {
+                                        // Альтернативный метод для CSV или если PhpSpreadsheet недоступна
+                                        if ($fileext == 'csv') {
+                                            if (($handle = fopen($file['tmp_name'], 'r')) !== false) {
+                                                // Определяем кодировку и разделитель
+                                                $firstline = fgets($handle);
+                                                rewind($handle);
+                                                
+                                                // Пробуем определить разделитель
+                                                $delimiter = ',';
+                                                if (strpos($firstline, ';') !== false) {
+                                                    $delimiter = ';';
+                                                } elseif (strpos($firstline, "\t") !== false) {
+                                                    $delimiter = "\t";
+                                                }
+                                                
+                                                while (($data = fgetcsv($handle, 1000, $delimiter)) !== false) {
+                                                    // Конвертируем из разных кодировок в UTF-8
+                                                    $data = array_map(function($field) {
+                                                        if (mb_detect_encoding($field, 'UTF-8', true) !== 'UTF-8') {
+                                                            return mb_convert_encoding($field, 'UTF-8', 'Windows-1251');
+                                                        }
+                                                        return $field;
+                                                    }, $data);
+                                                    $rows[] = $data;
+                                                }
+                                                fclose($handle);
+                                            }
+                                        } else {
+                                            throw new Exception('PhpSpreadsheet не доступна. Пожалуйста, сохраните файл как CSV и загрузите снова.');
+                                        }
+                                    }
+                                    
+                                    if (empty($rows) || count($rows) < 2) {
+                                        echo html_writer::div('Файл пуст или содержит только заголовки.', 'alert alert-warning');
+                                    } else {
+                                        // Первая строка - заголовки
+                                        $headers = array_map('trim', array_map('mb_strtolower', $rows[0], ['UTF-8']));
+                                        
+                                        // Маппинг названий колонок (разные варианты написания)
+                                        $columnmap = [
+                                            'lastname' => ['фамилия', 'фамилия студента', 'lastname', 'surname'],
+                                            'firstname' => ['имя', 'имя студента', 'firstname', 'name'],
+                                            'middlename' => ['отчество', 'отчество студента', 'middlename', 'patronymic'],
+                                            'email' => ['email', 'e-mail', 'электронная почта', 'почта'],
+                                            'status' => ['статус', 'status'],
+                                            'enrollment_year' => ['год_поступления', 'год поступления', 'enrollment_year', 'year'],
+                                            'gender' => ['пол', 'gender', 'sex'],
+                                            'birthdate' => ['дата_рождения', 'дата рождения', 'birthdate', 'birth_date', 'дата рождения'],
+                                            'snils' => ['снилс', 'снилс студента', 'snils'],
+                                            'mobile' => ['мобильный', 'мобильный телефон', 'mobile', 'phone', 'телефон'],
+                                            'citizenship' => ['гражданство', 'citizenship'],
+                                            'birthplace' => ['место рождения', 'место_рождения', 'birthplace', 'birth_place'],
+                                            'id_type' => ['тип_удостоверения', 'тип удостоверения', 'id_type', 'document_type'],
+                                            'passport_number' => ['номер паспорта', 'номер_паспорта', 'passport_number', 'passport'],
+                                            'passport_issued_by' => ['кем выдан паспорт', 'кем_выдан_паспорт', 'passport_issued_by', 'issued_by'],
+                                            'passport_issue_date' => ['дата выдачи паспорта', 'дата_выдачи_паспорта', 'passport_issue_date', 'issue_date'],
+                                            'passport_division_code' => ['код подразделения', 'код_подразделения', 'passport_division_code', 'division_code'],
+                                            'postal_index' => ['индекс', 'почтовый индекс', 'postal_index', 'index'],
+                                            'country' => ['страна', 'country'],
+                                            'region' => ['регион/область', 'регион', 'область', 'region'],
+                                            'city' => ['город', 'city'],
+                                            'street' => ['улица', 'street'],
+                                            'house_apartment' => ['дом/квартира', 'дом', 'квартира', 'house_apartment', 'address'],
+                                            'previous_institution' => ['предыдущее учебное заведение', 'предыдущее_учебное_заведение', 'previous_institution'],
+                                            'previous_institution_year' => ['год окончания предыдущего учебного заведения', 'год_окончания_предыдущего_учебного_заведения', 'previous_institution_year'],
+                                            'cohort' => ['группа', 'cohort', 'group']
+                                        ];
+                                        
+                                        // Находим индексы колонок
+                                        $columnindexes = [];
+                                        foreach ($columnmap as $field => $variants) {
+                                            foreach ($variants as $variant) {
+                                                $index = array_search($variant, $headers);
+                                                if ($index !== false) {
+                                                    $columnindexes[$field] = $index;
+                                                    break; // Используем первое найденное совпадение
+                                                }
+                                            }
+                                        }
+                                        
+                                        // Проверяем обязательные поля
+                                        if (!isset($columnindexes['lastname']) || !isset($columnindexes['firstname']) || !isset($columnindexes['email'])) {
+                                            echo html_writer::div('В файле отсутствуют обязательные колонки: Фамилия, Имя или Email.', 'alert alert-danger');
+                                        } else {
+                                            $transaction = $DB->start_delegated_transaction();
+                                            try {
+                                                // Обрабатываем каждую строку данных
+                                                for ($i = 1; $i < count($rows); $i++) {
+                                                    $row = $rows[$i];
+                                                    
+                                                    // Пропускаем пустые строки
+                                                    if (empty(array_filter($row))) {
+                                                        continue;
+                                                    }
+                                                    
+                                                    // Извлекаем данные
+                                                    $lastname = isset($columnindexes['lastname']) && isset($row[$columnindexes['lastname']]) ? trim($row[$columnindexes['lastname']]) : '';
+                                                    $firstname = isset($columnindexes['firstname']) && isset($row[$columnindexes['firstname']]) ? trim($row[$columnindexes['firstname']]) : '';
+                                                    $middlename = isset($columnindexes['middlename']) && isset($row[$columnindexes['middlename']]) ? trim($row[$columnindexes['middlename']]) : '';
+                                                    $email = isset($columnindexes['email']) && isset($row[$columnindexes['email']]) ? trim($row[$columnindexes['email']]) : '';
+                                                    
+                                                    if (empty($lastname) || empty($firstname) || empty($email)) {
+                                                        $skipped++;
+                                                        $errors[] = "Строка " . ($i + 1) . ": отсутствуют обязательные данные (ФИО или Email)";
+                                                        continue;
+                                                    }
+                                                    
+                                                    // Ищем студента в Moodle
+                                                    $user = null;
+                                                    
+                                                    // Сначала по email (точное совпадение)
+                                                    if (!empty($email)) {
+                                                        $user = $DB->get_record('user', ['email' => trim($email), 'deleted' => 0]);
+                                                    }
+                                                    
+                                                    // Если не найден по email, ищем по ФИО
+                                                    if (!$user) {
+                                                        // Нормализуем данные для поиска
+                                                        $searchfirstname = mb_strtolower(trim($firstname), 'UTF-8');
+                                                        $searchlastname = mb_strtolower(trim($lastname), 'UTF-8');
+                                                        $searchmiddlename = !empty($middlename) ? mb_strtolower(trim($middlename), 'UTF-8') : '';
+                                                        
+                                                        // Поиск по ФИО с учетом отчества
+                                                        if (!empty($searchmiddlename)) {
+                                                            $sql = "SELECT * FROM {user} 
+                                                                    WHERE deleted = 0 
+                                                                    AND LOWER(TRIM(firstname)) = ?
+                                                                    AND LOWER(TRIM(lastname)) = ?
+                                                                    AND LOWER(TRIM(COALESCE(middlename, ''))) = ?";
+                                                            $params = [$searchfirstname, $searchlastname, $searchmiddlename];
+                                                        } else {
+                                                            // Если отчество не указано, ищем без учета отчества
+                                                            $sql = "SELECT * FROM {user} 
+                                                                    WHERE deleted = 0 
+                                                                    AND LOWER(TRIM(firstname)) = ?
+                                                                    AND LOWER(TRIM(lastname)) = ?
+                                                                    AND (middlename IS NULL OR middlename = '' OR LOWER(TRIM(middlename)) = '')";
+                                                            $params = [$searchfirstname, $searchlastname];
+                                                        }
+                                                        
+                                                        $users = $DB->get_records_sql($sql, $params);
+                                                        if (count($users) == 1) {
+                                                            $user = reset($users);
+                                                        } elseif (count($users) > 1) {
+                                                            // Если несколько совпадений, пробуем найти по email из Excel
+                                                            // или используем первое совпадение
+                                                            $user = reset($users);
+                                                        }
+                                                    }
+                                                    
+                                                    if (!$user) {
+                                                        $skipped++;
+                                                        $errors[] = "Строка " . ($i + 1) . ": студент не найден в Moodle (ФИО: $lastname $firstname $middlename, Email: $email)";
+                                                        continue;
+                                                    }
+                                                    
+                                                    // Подготавливаем данные для импорта
+                                                    $data = new stdClass();
+                                                    $data->userid = $user->id;
+                                                    
+                                                    // Заполняем все поля из Excel
+                                                    foreach ($columnindexes as $field => $index) {
+                                                        if (isset($row[$index])) {
+                                                            $value = trim($row[$index]);
+                                                            
+                                                            // Обработка специальных полей
+                                                            if ($field == 'enrollment_year' || $field == 'previous_institution_year') {
+                                                                // Год - целое число
+                                                                $data->$field = !empty($value) ? (int)$value : 0;
+                                                            } elseif ($field == 'birthdate' || $field == 'passport_issue_date') {
+                                                                // Конвертируем дату в timestamp
+                                                                if (!empty($value)) {
+                                                                    $timestamp = false;
+                                                                    
+                                                                    // Если значение - число (формат Excel)
+                                                                    if (is_numeric($value) && $value > 0) {
+                                                                        // Excel дата (число дней с 1900-01-01)
+                                                                        if ($value > 1 && $value < 100000) {
+                                                                            $timestamp = ($value - 25569) * 86400; // Excel epoch to Unix timestamp
+                                                                        }
+                                                                    }
+                                                                    
+                                                                    // Если не получилось, пробуем парсить как строку
+                                                                    if ($timestamp === false) {
+                                                                        // Пробуем разные форматы даты
+                                                                        $timestamp = strtotime($value);
+                                                                        
+                                                                        // Если не получилось, пробуем форматы типа DD.MM.YYYY
+                                                                        if ($timestamp === false && preg_match('/^(\d{1,2})[.\/](\d{1,2})[.\/](\d{4})$/', $value, $matches)) {
+                                                                            $timestamp = mktime(0, 0, 0, $matches[2], $matches[1], $matches[3]);
+                                                                        }
+                                                                    }
+                                                                    
+                                                                    $data->$field = $timestamp !== false && $timestamp > 0 ? $timestamp : 0;
+                                                                } else {
+                                                                    $data->$field = 0;
+                                                                }
+                                                            } else {
+                                                                // Обычные текстовые поля
+                                                                $data->$field = $value;
+                                                            }
+                                                        }
+                                                    }
+                                                    
+                                                    // Устанавливаем обязательные поля, если они не были заполнены
+                                                    if (empty($data->lastname)) $data->lastname = $lastname;
+                                                    if (empty($data->firstname)) $data->firstname = $firstname;
+                                                    if (empty($data->middlename)) $data->middlename = $middlename;
+                                                    if (empty($data->email)) $data->email = $email;
+                                                    
+                                                    $data->timemodified = time();
+                                                    
+                                                    // Проверяем, существует ли запись
+                                                    $existing = $DB->get_record('local_deanpromoodle_student_info', ['userid' => $user->id]);
+                                                    
+                                                    if ($existing) {
+                                                        // Обновляем существующую запись
+                                                        $data->id = $existing->id;
+                                                        $DB->update_record('local_deanpromoodle_student_info', $data);
+                                                    } else {
+                                                        // Создаем новую запись
+                                                        $data->timecreated = time();
+                                                        $DB->insert_record('local_deanpromoodle_student_info', $data);
+                                                    }
+                                                    
+                                                    $imported++;
+                                                }
+                                                
+                                                $transaction->allow_commit();
+                                                
+                                                // Формируем сообщение об успехе
+                                                $message = "Импорт завершен. Успешно импортировано: $imported";
+                                                if ($skipped > 0) {
+                                                    $message .= ", пропущено: $skipped";
+                                                }
+                                                if (!empty($errors) && count($errors) <= 10) {
+                                                    $message .= ". Ошибки: " . implode('; ', array_slice($errors, 0, 10));
+                                                    if (count($errors) > 10) {
+                                                        $message .= ' и еще ' . (count($errors) - 10) . ' ошибок';
+                                                    }
+                                                }
+                                                echo html_writer::div($message, 'alert alert-success');
+                                                
+                                            } catch (\Exception $e) {
+                                                $transaction->rollback($e);
+                                                echo html_writer::div('Ошибка при импорте: ' . $e->getMessage(), 'alert alert-danger');
+                                            }
+                                        }
+                                    }
+                                } catch (\Exception $e) {
+                                    echo html_writer::div('Ошибка при обработке файла: ' . $e->getMessage(), 'alert alert-danger');
+                                }
+                            }
+                        }
+                    }
+                }
+                
                 // Обработка сохранения формы
                 if ($action == 'save' && $canedit) {
                     require_sesskey();
@@ -1833,6 +2145,115 @@ if ($action == 'viewprogram' && $programid > 0) {
                 }
                 
                 if ($editmode) {
+                    // Кнопка импорта из Excel (только для админов и преподавателей)
+                    if ($isadmin || $isteacher) {
+                        echo html_writer::start_div('', ['style' => 'margin-bottom: 20px;']);
+                        echo html_writer::link('#', 'Импорт из Excel', [
+                            'class' => 'btn btn-success',
+                            'id' => 'import-excel-btn',
+                            'style' => 'margin-right: 10px;'
+                        ]);
+                        echo html_writer::end_div();
+                        
+                        // Модальное окно для импорта Excel
+                        echo html_writer::start_div('modal fade', [
+                            'id' => 'importExcelModal',
+                            'tabindex' => '-1',
+                            'role' => 'dialog',
+                            'aria-labelledby' => 'importExcelModalLabel',
+                            'aria-hidden' => 'true'
+                        ]);
+                        echo html_writer::start_div('modal-dialog', ['role' => 'document']);
+                        echo html_writer::start_div('modal-content');
+                        
+                        // Заголовок модального окна
+                        echo html_writer::start_div('modal-header');
+                        echo html_writer::tag('h5', 'Импорт данных из Excel', ['class' => 'modal-title', 'id' => 'importExcelModalLabel']);
+                        echo html_writer::tag('button', '×', [
+                            'type' => 'button',
+                            'class' => 'close',
+                            'data-dismiss' => 'modal',
+                            'aria-label' => 'Close',
+                            'onclick' => 'jQuery(\'#importExcelModal\').modal(\'hide\');'
+                        ]);
+                        echo html_writer::end_div();
+                        
+                        // Тело модального окна
+                        echo html_writer::start_div('modal-body');
+                        $importurl = new moodle_url('/local/deanpromoodle/pages/student.php', [
+                            'tab' => 'programs',
+                            'subtab' => 'additional',
+                            'action' => 'importexcel',
+                            'studentid' => $viewingstudent->id
+                        ]);
+                        echo html_writer::start_tag('form', [
+                            'method' => 'post',
+                            'action' => $importurl,
+                            'enctype' => 'multipart/form-data'
+                        ]);
+                        echo html_writer::input_hidden_params($importurl);
+                        echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'sesskey', 'value' => sesskey()]);
+                        echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'import_submit', 'value' => '1']);
+                        
+                        echo html_writer::start_div('form-group');
+                        echo html_writer::tag('label', 'Выберите Excel файл (.xlsx, .xls) или CSV файл', ['for' => 'excelfile']);
+                        echo html_writer::empty_tag('input', [
+                            'type' => 'file',
+                            'name' => 'excelfile',
+                            'id' => 'excelfile',
+                            'class' => 'form-control',
+                            'accept' => '.xlsx,.xls,.csv',
+                            'required' => true
+                        ]);
+                        echo html_writer::tag('small', 'Файл должен содержать колонки: Фамилия, Имя, Отчество, Email и другие поля из таблицы личной информации.', ['class' => 'form-text text-muted']);
+                        echo html_writer::end_div();
+                        
+                        echo html_writer::start_div('modal-footer');
+                        echo html_writer::empty_tag('input', [
+                            'type' => 'submit',
+                            'value' => 'Импортировать',
+                            'class' => 'btn btn-primary'
+                        ]);
+                        echo html_writer::tag('button', 'Отмена', [
+                            'type' => 'button',
+                            'class' => 'btn btn-secondary',
+                            'data-dismiss' => 'modal',
+                            'onclick' => 'jQuery(\'#importExcelModal\').modal(\'hide\');'
+                        ]);
+                        echo html_writer::end_div();
+                        
+                        echo html_writer::end_tag('form');
+                        echo html_writer::end_div(); // modal-body
+                        echo html_writer::end_div(); // modal-content
+                        echo html_writer::end_div(); // modal-dialog
+                        echo html_writer::end_div(); // modal
+                        
+                        // JavaScript для открытия модального окна
+                        echo html_writer::start_tag('script');
+                        echo "
+                        document.addEventListener('DOMContentLoaded', function() {
+                            var importBtn = document.getElementById('import-excel-btn');
+                            if (importBtn) {
+                                importBtn.addEventListener('click', function(e) {
+                                    e.preventDefault();
+                                    // Используем jQuery если доступен, иначе Bootstrap 5
+                                    if (typeof jQuery !== 'undefined' && jQuery.fn.modal) {
+                                        jQuery('#importExcelModal').modal('show');
+                                    } else if (typeof bootstrap !== 'undefined') {
+                                        var modal = new bootstrap.Modal(document.getElementById('importExcelModal'));
+                                        modal.show();
+                                    } else {
+                                        var modal = document.getElementById('importExcelModal');
+                                        modal.style.display = 'block';
+                                        modal.classList.add('show');
+                                    }
+                                });
+                            }
+                        });
+                        ";
+                        echo html_writer::end_tag('script');
+                    }
+                    
                     // Форма редактирования - код формы будет добавлен ниже
                     $saveurl = new moodle_url('/local/deanpromoodle/pages/student.php', [
                         'tab' => 'programs',
