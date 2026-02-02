@@ -1776,53 +1776,85 @@ if ($action == 'viewprogram' && $programid > 0) {
                                         echo html_writer::div('Файл пуст или содержит только заголовки.', 'alert alert-warning');
                                     } else {
                                         // Первая строка - заголовки
-                                        $headers = array_map('trim', array_map('mb_strtolower', $rows[0], ['UTF-8']));
+                                        // Нормализуем заголовки: убираем пробелы, приводим к нижнему регистру, заменяем подчеркивания на пробелы
+                                        $headers = array_map(function($header) {
+                                            $header = trim($header);
+                                            $header = mb_strtolower($header, 'UTF-8');
+                                            // Заменяем множественные пробелы и подчеркивания на одинарные пробелы
+                                            $header = preg_replace('/[\s_]+/u', ' ', $header);
+                                            return trim($header);
+                                        }, $rows[0]);
                                         
                                         // Маппинг названий колонок (разные варианты написания)
                                         $columnmap = [
-                                            'lastname' => ['фамилия', 'фамилия студента', 'lastname', 'surname'],
-                                            'firstname' => ['имя', 'имя студента', 'firstname', 'name'],
-                                            'middlename' => ['отчество', 'отчество студента', 'middlename', 'patronymic'],
-                                            'email' => ['email', 'e-mail', 'электронная почта', 'почта'],
+                                            'lastname' => ['фамилия', 'фамилия студента', 'lastname', 'surname', 'last name', 'фамилиястудента'],
+                                            'firstname' => ['имя', 'имя студента', 'firstname', 'name', 'first name', 'имястудента'],
+                                            'middlename' => ['отчество', 'отчество студента', 'middlename', 'patronymic', 'middle name', 'отчествостудента'],
+                                            'email' => ['email', 'e-mail', 'электронная почта', 'почта', 'e mail', 'эл почта', 'электроннаяпочта'],
                                             'status' => ['статус', 'status'],
-                                            'enrollment_year' => ['год_поступления', 'год поступления', 'enrollment_year', 'year'],
+                                            'enrollment_year' => ['год поступления', 'годпоступления', 'enrollment year', 'enrollment_year', 'year', 'год поступления', 'год_поступления'],
                                             'gender' => ['пол', 'gender', 'sex'],
-                                            'birthdate' => ['дата_рождения', 'дата рождения', 'birthdate', 'birth_date', 'дата рождения'],
-                                            'snils' => ['снилс', 'снилс студента', 'snils'],
-                                            'mobile' => ['мобильный', 'мобильный телефон', 'mobile', 'phone', 'телефон'],
+                                            'birthdate' => ['дата рождения', 'датарождения', 'birthdate', 'birth date', 'birth_date', 'дата рождения', 'дата_рождения'],
+                                            'snils' => ['снилс', 'снилс студента', 'snils', 'снилсстудента'],
+                                            'mobile' => ['мобильный', 'мобильный телефон', 'mobile', 'phone', 'телефон', 'мобильныйтелефон', 'моб телефон'],
                                             'citizenship' => ['гражданство', 'citizenship'],
-                                            'birthplace' => ['место рождения', 'место_рождения', 'birthplace', 'birth_place'],
-                                            'id_type' => ['тип_удостоверения', 'тип удостоверения', 'id_type', 'document_type'],
-                                            'passport_number' => ['номер паспорта', 'номер_паспорта', 'passport_number', 'passport'],
-                                            'passport_issued_by' => ['кем выдан паспорт', 'кем_выдан_паспорт', 'passport_issued_by', 'issued_by'],
-                                            'passport_issue_date' => ['дата выдачи паспорта', 'дата_выдачи_паспорта', 'passport_issue_date', 'issue_date'],
-                                            'passport_division_code' => ['код подразделения', 'код_подразделения', 'passport_division_code', 'division_code'],
-                                            'postal_index' => ['индекс', 'почтовый индекс', 'postal_index', 'index'],
+                                            'birthplace' => ['место рождения', 'место рождения', 'месторождения', 'birthplace', 'birth place', 'birth_place'],
+                                            'id_type' => ['тип удостоверения', 'типудостоверения', 'id type', 'id_type', 'document type', 'document_type', 'тип документа'],
+                                            'passport_number' => ['номер паспорта', 'номерпаспорта', 'passport number', 'passport_number', 'passport', 'номер паспорта', 'номер_паспорта'],
+                                            'passport_issued_by' => ['кем выдан паспорт', 'кемвыданпаспорт', 'passport issued by', 'passport_issued_by', 'issued by', 'issued_by', 'кем выдан'],
+                                            'passport_issue_date' => ['дата выдачи паспорта', 'датавыдачипаспорта', 'passport issue date', 'passport_issue_date', 'issue date', 'issue_date', 'дата выдачи'],
+                                            'passport_division_code' => ['код подразделения', 'кодподразделения', 'passport division code', 'passport_division_code', 'division code', 'division_code', 'код подразделения'],
+                                            'postal_index' => ['индекс', 'почтовый индекс', 'postal index', 'postal_index', 'index', 'почтовыйиндекс', 'почтовый индекс'],
                                             'country' => ['страна', 'country'],
-                                            'region' => ['регион/область', 'регион', 'область', 'region'],
+                                            'region' => ['регион область', 'регион', 'область', 'region', 'регион/область', 'регион область'],
                                             'city' => ['город', 'city'],
                                             'street' => ['улица', 'street'],
-                                            'house_apartment' => ['дом/квартира', 'дом', 'квартира', 'house_apartment', 'address'],
-                                            'previous_institution' => ['предыдущее учебное заведение', 'предыдущее_учебное_заведение', 'previous_institution'],
-                                            'previous_institution_year' => ['год окончания предыдущего учебного заведения', 'год_окончания_предыдущего_учебного_заведения', 'previous_institution_year'],
+                                            'house_apartment' => ['дом квартира', 'дом', 'квартира', 'house apartment', 'house_apartment', 'address', 'дом/квартира', 'дом квартира'],
+                                            'previous_institution' => ['предыдущее учебное заведение', 'предыдущееучебноезаведение', 'previous institution', 'previous_institution', 'предыдущее заведение'],
+                                            'previous_institution_year' => ['год окончания предыдущего учебного заведения', 'годокончанияпредыдущегоучебногозаведения', 'previous institution year', 'previous_institution_year', 'год окончания'],
                                             'cohort' => ['группа', 'cohort', 'group']
                                         ];
                                         
-                                        // Находим индексы колонок
+                                        // Находим индексы колонок с более гибким поиском
                                         $columnindexes = [];
                                         foreach ($columnmap as $field => $variants) {
                                             foreach ($variants as $variant) {
-                                                $index = array_search($variant, $headers);
+                                                // Нормализуем вариант для поиска
+                                                $normalizedvariant = preg_replace('/[\s_]+/u', ' ', trim(mb_strtolower($variant, 'UTF-8')));
+                                                
+                                                // Ищем точное совпадение
+                                                $index = array_search($normalizedvariant, $headers);
                                                 if ($index !== false) {
                                                     $columnindexes[$field] = $index;
                                                     break; // Используем первое найденное совпадение
                                                 }
+                                                
+                                                // Если не найдено, пробуем частичное совпадение
+                                                foreach ($headers as $idx => $header) {
+                                                    if (strpos($header, $normalizedvariant) !== false || strpos($normalizedvariant, $header) !== false) {
+                                                        $columnindexes[$field] = $idx;
+                                                        break 2; // Выходим из обоих циклов
+                                                    }
+                                                }
                                             }
                                         }
                                         
+                                        // Отладочная информация о найденных колонках
+                                        $foundcolumns = [];
+                                        $missingcolumns = [];
+                                        if (isset($columnindexes['lastname'])) $foundcolumns[] = 'Фамилия';
+                                        else $missingcolumns[] = 'Фамилия';
+                                        if (isset($columnindexes['firstname'])) $foundcolumns[] = 'Имя';
+                                        else $missingcolumns[] = 'Имя';
+                                        if (isset($columnindexes['email'])) $foundcolumns[] = 'Email';
+                                        else $missingcolumns[] = 'Email';
+                                        
                                         // Проверяем обязательные поля
                                         if (!isset($columnindexes['lastname']) || !isset($columnindexes['firstname']) || !isset($columnindexes['email'])) {
-                                            echo html_writer::div('В файле отсутствуют обязательные колонки: Фамилия, Имя или Email.', 'alert alert-danger');
+                                            $errorMsg = 'В файле отсутствуют обязательные колонки: ' . implode(', ', $missingcolumns) . '.';
+                                            $errorMsg .= '<br>Найденные колонки: ' . (empty($foundcolumns) ? 'нет' : implode(', ', $foundcolumns)) . '.';
+                                            $errorMsg .= '<br>Заголовки в файле: ' . implode(', ', array_slice($rows[0], 0, 10)) . (count($rows[0]) > 10 ? '...' : '');
+                                            echo html_writer::div($errorMsg, 'alert alert-danger');
                                         } else {
                                             $transaction = $DB->start_delegated_transaction();
                                             try {
