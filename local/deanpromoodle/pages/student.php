@@ -1233,12 +1233,43 @@ if ($action == 'viewprogram' && $programid > 0) {
                         if (strpos($quizname, 'экзамен') !== false) {
                             $quizurl = new moodle_url('/mod/quiz/view.php', ['id' => $cm->id]);
                             
+                            // Проверяем оценку через quiz_grades
                             $grade = $DB->get_record('quiz_grades', [
                                 'quiz' => $quiz->id,
                                 'userid' => $viewingstudent->id
                             ]);
                             
+                            $hasgrade = false;
                             if ($grade && $grade->grade !== null && $grade->grade >= 0) {
+                                $hasgrade = true;
+                            } else {
+                                // Если нет оценки в quiz_grades, проверяем через gradebook API (учитывает принудительно проставленные оценки)
+                                try {
+                                    require_once($CFG->dirroot . '/lib/gradelib.php');
+                                    $gradeitem = grade_item::fetch([
+                                        'itemtype' => 'mod',
+                                        'itemmodule' => 'quiz',
+                                        'iteminstance' => $quiz->id,
+                                        'courseid' => $course->id
+                                    ]);
+                                    
+                                    if ($gradeitem) {
+                                        $usergrade = grade_grade::fetch([
+                                            'itemid' => $gradeitem->id,
+                                            'userid' => $viewingstudent->id
+                                        ]);
+                                        
+                                        // Проверяем finalgrade, который учитывает принудительно проставленные оценки
+                                        if ($usergrade && $usergrade->finalgrade !== null && $usergrade->finalgrade >= 0) {
+                                            $hasgrade = true;
+                                        }
+                                    }
+                                } catch (\Exception $e) {
+                                    // Игнорируем ошибки
+                                }
+                            }
+                            
+                            if ($hasgrade) {
                                 // Экзамен сдан - зеленый
                                 $badgecontent = html_writer::link($quizurl, 'Экзамен – сдан', [
                                     'class' => 'assignment-status-link',
@@ -1357,11 +1388,44 @@ if ($action == 'viewprogram' && $programid > 0) {
                             $quizname = mb_strtolower($quiz->name);
                             if (strpos($quizname, 'экзамен') !== false) {
                                 $hasassignments = true;
+                                
+                                // Проверяем оценку через quiz_grades
                                 $grade = $DB->get_record('quiz_grades', [
                                     'quiz' => $quiz->id,
                                     'userid' => $viewingstudent->id
                                 ]);
-                                if (!$grade || $grade->grade === null || $grade->grade < 0) {
+                                
+                                $hasgrade = false;
+                                if ($grade && $grade->grade !== null && $grade->grade >= 0) {
+                                    $hasgrade = true;
+                                } else {
+                                    // Если нет оценки в quiz_grades, проверяем через gradebook API (учитывает принудительно проставленные оценки)
+                                    try {
+                                        require_once($CFG->dirroot . '/lib/gradelib.php');
+                                        $gradeitem = grade_item::fetch([
+                                            'itemtype' => 'mod',
+                                            'itemmodule' => 'quiz',
+                                            'iteminstance' => $quiz->id,
+                                            'courseid' => $course->id
+                                        ]);
+                                        
+                                        if ($gradeitem) {
+                                            $usergrade = grade_grade::fetch([
+                                                'itemid' => $gradeitem->id,
+                                                'userid' => $viewingstudent->id
+                                            ]);
+                                            
+                                            // Проверяем finalgrade, который учитывает принудительно проставленные оценки
+                                            if ($usergrade && $usergrade->finalgrade !== null && $usergrade->finalgrade >= 0) {
+                                                $hasgrade = true;
+                                            }
+                                        }
+                                    } catch (\Exception $e) {
+                                        // Игнорируем ошибки
+                                    }
+                                }
+                                
+                                if (!$hasgrade) {
                                     $allassignmentsgraded = false;
                                 }
                             }
