@@ -209,7 +209,8 @@ function local_deanpromoodle_before_footer() {
     // Add JavaScript to insert LK button into header
     $lkurlstring = $lkurl->out(false);
     $teacherurlstring = '';
-    if ($isadmin) {
+    // Кнопка "Преподаватель" показывается для админов и преподавателей
+    if ($isadmin || $isteacher) {
         $teacherurl = new moodle_url('/local/deanpromoodle/pages/teacher.php');
         $teacherurlstring = $teacherurl->out(false);
     }
@@ -259,8 +260,8 @@ function local_deanpromoodle_before_footer() {
             // Add LK button to container
             ssoContainer.appendChild(lkButton);
             
-            " . ($isadmin ? "
-            // Create Teacher button for admins
+            " . (($isadmin || $isteacher) && !empty($teacherurlstring) ? "
+            // Create Teacher button for admins and teachers
             var teacherButton = document.createElement('a');
             teacherButton.id = 'teacher-button-deanpromoodle';
             teacherButton.href = " . $teacherUrlJson . ";
