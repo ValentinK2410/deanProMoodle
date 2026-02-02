@@ -324,11 +324,16 @@ echo html_writer::end_div(); // student-profile-header-main
 
 // Вкладки
 $tabs = [];
+$taburlparams = ['tab' => 'courses'];
+if ($studentid > 0) {
+    $taburlparams['studentid'] = $studentid;
+}
 $tabs[] = new tabobject('courses', 
-    new moodle_url('/local/deanpromoodle/pages/student.php', ['tab' => 'courses']),
+    new moodle_url('/local/deanpromoodle/pages/student.php', $taburlparams),
     'Мои оценки');
+$taburlparams['tab'] = 'programs';
 $tabs[] = new tabobject('programs', 
-    new moodle_url('/local/deanpromoodle/pages/student.php', ['tab' => 'programs']),
+    new moodle_url('/local/deanpromoodle/pages/student.php', $taburlparams),
     'Личная информация и статус');
 
 // Если это просмотр программы, не показываем вкладки
