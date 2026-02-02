@@ -81,64 +81,7 @@ if (!$hasaccess) {
     require_capability('local/deanpromoodle:viewstudent', $context);
 }
 
-// Проверка роли пользователя и редирект при необходимости
-global $USER;
-$isadmin = false;
-$isteacher = false;
-$isstudent = false;
-
-// Проверяем, является ли пользователь админом
-if (has_capability('moodle/site:config', $context) || has_capability('local/deanpromoodle:viewadmin', $context)) {
-    $isadmin = true;
-    // Админ не может заходить на страницу студента - редирект на admin.php
-    redirect(new moodle_url('/local/deanpromoodle/pages/admin.php'));
-}
-
-// Проверяем, является ли пользователь преподавателем
-$teacherroles = ['teacher', 'editingteacher', 'coursecreator'];
-$roles = get_user_roles($context, $USER->id, false);
-foreach ($roles as $role) {
-    if (in_array($role->shortname, $teacherroles)) {
-        $isteacher = true;
-        break;
-    }
-}
-if (!$isteacher) {
-    $systemcontext = context_system::instance();
-    $systemroles = get_user_roles($systemcontext, $USER->id, false);
-    foreach ($systemroles as $role) {
-        if (in_array($role->shortname, $teacherroles)) {
-            $isteacher = true;
-            break;
-        }
-    }
-}
-
-if ($isteacher && !$isadmin) {
-    // Преподаватель не может заходить на страницу студента - редирект на teacher.php
-    redirect(new moodle_url('/local/deanpromoodle/pages/teacher.php'));
-}
-
-// Проверяем, является ли пользователь студентом
-$studentroles = ['student'];
-foreach ($roles as $role) {
-    if (in_array($role->shortname, $studentroles)) {
-        $isstudent = true;
-        break;
-    }
-}
-if (!$isstudent) {
-    $systemcontext = context_system::instance();
-    $systemroles = get_user_roles($systemcontext, $USER->id, false);
-    foreach ($systemroles as $role) {
-        if (in_array($role->shortname, $studentroles)) {
-            $isstudent = true;
-            break;
-        }
-    }
-}
-
-// Получение параметров
+// Получение параметров ДО проверки ролей и редиректов
 $tab = optional_param('tab', 'courses', PARAM_ALPHA); // courses, programs
 $subtab = optional_param('subtab', 'programs', PARAM_ALPHA); // programs, additional для вкладки "Личная информация и статус"
 $action = optional_param('action', '', PARAM_ALPHA); // viewprogram
@@ -146,11 +89,17 @@ $programid = optional_param('programid', 0, PARAM_INT);
 $testmode = optional_param('test', false, PARAM_BOOL); // Параметр для тестирования - показывать цифровую оценку
 $studentid = optional_param('studentid', 0, PARAM_INT); // ID студента для просмотра (для админов и преподавателей)
 
+// Проверка роли пользователя и редирект при необходимости
+global $USER, $DB;
+$isadmin = false;
+$isteacher = false;
+$isstudent = false;
+
 // Определяем, какого студента просматриваем
 $viewingstudent = $USER;
 $isviewingotherstudent = false;
 
-// Если передан studentid, проверяем права доступа
+// Если передан studentid, проверяем права доступа и разрешаем админам/преподавателям просмотр
 if ($studentid > 0) {
     // Проверяем, является ли текущий пользователь администратором или преподавателем
     $isadmin = has_capability('moodle/site:config', $context) || 
@@ -193,12 +142,56 @@ if ($studentid > 0) {
         }
     }
 } else {
-    // Обычная логика редиректа для админа/преподавателя (если не просматривают другого студента)
-    if ($isadmin) {
+    // Если studentid не передан, проверяем роли и делаем редирект при необходимости
+    // Проверяем, является ли пользователь админом
+    if (has_capability('moodle/site:config', $context) || has_capability('local/deanpromoodle:viewadmin', $context)) {
+        $isadmin = true;
+        // Админ не может заходить на страницу студента - редирект на admin.php
         redirect(new moodle_url('/local/deanpromoodle/pages/admin.php'));
     }
+    
+    // Проверяем, является ли пользователь преподавателем
+    $teacherroles = ['teacher', 'editingteacher', 'coursecreator'];
+    $roles = get_user_roles($context, $USER->id, false);
+    foreach ($roles as $role) {
+        if (in_array($role->shortname, $teacherroles)) {
+            $isteacher = true;
+            break;
+        }
+    }
+    if (!$isteacher) {
+        $systemcontext = context_system::instance();
+        $systemroles = get_user_roles($systemcontext, $USER->id, false);
+        foreach ($systemroles as $role) {
+            if (in_array($role->shortname, $teacherroles)) {
+                $isteacher = true;
+                break;
+            }
+        }
+    }
+    
     if ($isteacher && !$isadmin) {
+        // Преподаватель не может заходить на страницу студента - редирект на teacher.php
         redirect(new moodle_url('/local/deanpromoodle/pages/teacher.php'));
+    }
+    
+    // Проверяем, является ли пользователь студентом
+    $studentroles = ['student'];
+    foreach ($roles as $role) {
+        if (in_array($role->shortname, $studentroles)) {
+            $isstudent = true;
+            break;
+        }
+    }
+    if (!$isstudent) {
+        $systemcontext = context_system::instance();
+        $systemroles = get_user_roles($systemcontext, $USER->id, false);
+        foreach ($systemroles as $role) {
+            if (in_array($role->shortname, $studentroles)) {
+                $isstudent = true;
+                break;
+            }
+        }
     }
 }
 
