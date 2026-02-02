@@ -764,7 +764,7 @@ if ($action == 'viewprogram' && $programid > 0) {
                         color: #ffffff;
                     }
                     .grade-badge-failed {
-                        background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+                        background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
                         color: #ffffff;
                     }
                     .grade-badge-satisfactory {
@@ -1483,10 +1483,10 @@ if ($action == 'viewprogram' && $programid > 0) {
                         $gradeIcon = '<i class="fas fa-minus-circle"></i>';
                         $numericGrade = null;
                     } elseif ($percentForDisplay !== null && $percentForDisplay < 70) {
-                        // Если оценка ниже 70% - показываем фактическую оценку из gradebook (только целые числа, без максимума)
+                        // Если оценка ниже 70% - показываем "нет оценки" серым цветом
                         $gradeText = 'нет оценки';
-                        $gradeClass = 'grade-badge-failed';
-                        $gradeIcon = '<i class="fas fa-times-circle"></i>';
+                        $gradeClass = 'grade-badge-no-grade';
+                        $gradeIcon = '<i class="fas fa-minus-circle"></i>';
                         $numericGrade = round($percentForDisplay, 1);
                     } elseif ($percentForDisplay >= 70 && $percentForDisplay < 80) {
                         $gradeText = '3 (удовлетворительно)';
