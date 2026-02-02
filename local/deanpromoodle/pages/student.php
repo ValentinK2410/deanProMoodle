@@ -1067,6 +1067,17 @@ if ($action == 'viewprogram' && $programid > 0) {
                     }
                     
                     foreach ($assignments as $assignment) {
+                        // Получаем cmid для проверки видимости
+                        $cm = get_coursemodule_from_instance('assign', $assignment->id, $course->id);
+                        if (!$cm) {
+                            continue; // Пропускаем, если модуль не найден
+                        }
+                        
+                        // Пропускаем скрытые элементы курса
+                        if (!$cm->visible || !$cm->visibleoncoursepage) {
+                            continue;
+                        }
+                        
                         $assignmentname = mb_strtolower($assignment->name);
                         
                         // Определяем тип задания по названию
@@ -1078,11 +1089,7 @@ if ($action == 'viewprogram' && $programid > 0) {
                         }
                         
                         if ($assignmenttype == 'reading_report') {
-                            // Получаем cmid для ссылки
-                            $cm = get_coursemodule_from_instance('assign', $assignment->id, $course->id);
-                            if (!$cm) {
-                                continue; // Пропускаем, если модуль не найден
-                            }
+                            // Получаем cmid для ссылки (уже получен выше)
                             $assignmenturl = new moodle_url('/mod/assign/view.php', ['id' => $cm->id]);
                             
                             // Проверяем статус задания для студента
@@ -1211,12 +1218,19 @@ if ($action == 'viewprogram' && $programid > 0) {
                     }
                     
                     foreach ($quizzes as $quiz) {
+                        // Получаем cmid для проверки видимости
+                        $cm = get_coursemodule_from_instance('quiz', $quiz->id, $course->id);
+                        if (!$cm) {
+                            continue;
+                        }
+                        
+                        // Пропускаем скрытые элементы курса
+                        if (!$cm->visible || !$cm->visibleoncoursepage) {
+                            continue;
+                        }
+                        
                         $quizname = mb_strtolower($quiz->name);
                         if (strpos($quizname, 'экзамен') !== false) {
-                            $cm = get_coursemodule_from_instance('quiz', $quiz->id, $course->id);
-                            if (!$cm) {
-                                continue;
-                            }
                             $quizurl = new moodle_url('/mod/quiz/view.php', ['id' => $cm->id]);
                             
                             $grade = $DB->get_record('quiz_grades', [
@@ -1290,6 +1304,12 @@ if ($action == 'viewprogram' && $programid > 0) {
                         
                         // Проверяем задания
                         foreach ($assignments as $assignment) {
+                            // Проверяем видимость модуля
+                            $cm = get_coursemodule_from_instance('assign', $assignment->id, $course->id);
+                            if (!$cm || !$cm->visible || !$cm->visibleoncoursepage) {
+                                continue; // Пропускаем скрытые элементы
+                            }
+                            
                             $assignmentname = mb_strtolower($assignment->name);
                             // Проверяем отчеты о чтении
                             if (strpos($assignmentname, 'отчет') !== false && strpos($assignmentname, 'чтени') !== false) {
@@ -1328,6 +1348,12 @@ if ($action == 'viewprogram' && $programid > 0) {
                         
                         // Проверяем тесты (экзамены)
                         foreach ($quizzes as $quiz) {
+                            // Проверяем видимость модуля
+                            $cm = get_coursemodule_from_instance('quiz', $quiz->id, $course->id);
+                            if (!$cm || !$cm->visible || !$cm->visibleoncoursepage) {
+                                continue; // Пропускаем скрытые элементы
+                            }
+                            
                             $quizname = mb_strtolower($quiz->name);
                             if (strpos($quizname, 'экзамен') !== false) {
                                 $hasassignments = true;
