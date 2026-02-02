@@ -1872,24 +1872,31 @@ if ($action == 'viewprogram' && $programid > 0) {
                                                     $firstname = isset($columnindexes['firstname']) && isset($row[$columnindexes['firstname']]) ? trim($row[$columnindexes['firstname']]) : '';
                                                     $middlename = isset($columnindexes['middlename']) && isset($row[$columnindexes['middlename']]) ? trim($row[$columnindexes['middlename']]) : '';
                                                     $email = isset($columnindexes['email']) && isset($row[$columnindexes['email']]) ? trim($row[$columnindexes['email']]) : '';
+                                                    $cohort = isset($columnindexes['cohort']) && isset($row[$columnindexes['cohort']]) ? trim($row[$columnindexes['cohort']]) : '';
                                                     
-                                                    if (empty($lastname) || empty($firstname) || empty($email)) {
+                                                    if (empty($lastname) || empty($firstname)) {
                                                         $skipped++;
-                                                        $errors[] = "Строка " . ($i + 1) . ": отсутствуют обязательные данные (ФИО или Email)";
+                                                        $errors[] = "Строка " . ($i + 1) . ": отсутствуют обязательные данные (Фамилия или Имя)";
                                                         continue;
                                                     }
                                                     
                                                     // Ищем студента в Moodle
                                                     $user = null;
                                                     
-                                                    // ШАГ 1: Сначала ищем по email (точное совпадение)
+                                                    // ШАГ 1: Сначала ищем по email (без учета регистра)
                                                     if (!empty($email)) {
-                                                        $user = $DB->get_record('user', ['email' => trim($email), 'deleted' => 0]);
+                                                        $searchemail = mb_strtolower(trim($email), 'UTF-8');
+                                                        $user = $DB->get_record_sql(
+                                                            "SELECT * FROM {user} 
+                                                             WHERE deleted = 0 
+                                                             AND LOWER(TRIM(email)) = ?",
+                                                            [$searchemail]
+                                                        );
                                                     }
                                                     
                                                     // ШАГ 2: Если по email не найден, ищем по ФИО
                                                     if (!$user) {
-                                                        // Нормализуем данные для поиска
+                                                        // Нормализуем данные для поиска (без учета регистра)
                                                         $searchfirstname = mb_strtolower(trim($firstname), 'UTF-8');
                                                         $searchlastname = mb_strtolower(trim($lastname), 'UTF-8');
                                                         $searchmiddlename = !empty($middlename) ? mb_strtolower(trim($middlename), 'UTF-8') : '';
@@ -1940,6 +1947,43 @@ if ($action == 'viewprogram' && $programid > 0) {
                                                         }
                                                     }
                                                     
+                                                    // ШАГ 3: Если все еще не найден, пробуем поиск по фамилии + группе
+                                                    if (!$user && !empty($lastname) && !empty($cohort)) {
+                                                        $searchlastname = mb_strtolower(trim($lastname), 'UTF-8');
+                                                        $searchcohort = mb_strtolower(trim($cohort), 'UTF-8');
+                                                        
+                                                        // Ищем пользователей по фамилии и группе через cohort_members
+                                                        $sql = "SELECT DISTINCT u.* 
+                                                                FROM {user} u
+                                                                INNER JOIN {cohort_members} cm ON cm.userid = u.id
+                                                                INNER JOIN {cohort} c ON c.id = cm.cohortid
+                                                                WHERE u.deleted = 0
+                                                                AND LOWER(TRIM(u.lastname)) = ?
+                                                                AND LOWER(TRIM(c.name)) = ?";
+                                                        $params = [$searchlastname, $searchcohort];
+                                                        
+                                                        $users = $DB->get_records_sql($sql, $params);
+                                                        
+                                                        if (count($users) == 1) {
+                                                            $user = reset($users);
+                                                        } elseif (count($users) > 1) {
+                                                            // Если несколько совпадений, пробуем уточнить по имени
+                                                            if (!empty($firstname)) {
+                                                                $searchfirstname = mb_strtolower(trim($firstname), 'UTF-8');
+                                                                foreach ($users as $candidate) {
+                                                                    if (mb_strtolower(trim($candidate->firstname), 'UTF-8') == $searchfirstname) {
+                                                                        $user = $candidate;
+                                                                        break;
+                                                                    }
+                                                                }
+                                                            }
+                                                            // Если не нашли по имени, используем первое совпадение
+                                                            if (!$user) {
+                                                                $user = reset($users);
+                                                            }
+                                                        }
+                                                    }
+                                                    
                                                     if (!$user) {
                                                         $skipped++;
                                                         // Формируем детальное сообщение о параметрах поиска
@@ -1947,21 +1991,30 @@ if ($action == 'viewprogram' && $programid > 0) {
                                                         $searchdetails[] = "Строка " . ($i + 1);
                                                         $searchdetails[] = "ФИО из Excel: " . trim("$lastname $firstname $middlename");
                                                         $searchdetails[] = "Email из Excel: " . ($email ?: "не указан");
+                                                        $searchdetails[] = "Группа из Excel: " . ($cohort ?: "не указана");
                                                         
                                                         // Показываем, какие попытки поиска были сделаны
                                                         $attempts = [];
                                                         if (!empty($email)) {
-                                                            $attempts[] = "✓ Поиск по Email: '$email' - не найдено";
+                                                            $attempts[] = "✓ Поиск по Email (без учета регистра): '$email' - не найдено";
                                                         } else {
                                                             $attempts[] = "✗ Поиск по Email: не выполнен (email не указан)";
                                                         }
                                                         
                                                         if (!empty($firstname) && !empty($lastname)) {
                                                             if (!empty($middlename)) {
-                                                                $attempts[] = "✓ Поиск по ФИО (с отчеством): '$lastname $firstname $middlename' - не найдено";
-                                                                $attempts[] = "✓ Поиск по ФИО (без отчества): '$lastname $firstname' - не найдено";
+                                                                $attempts[] = "✓ Поиск по ФИО (с отчеством, без учета регистра): '$lastname $firstname $middlename' - не найдено";
+                                                                $attempts[] = "✓ Поиск по ФИО (без отчества, без учета регистра): '$lastname $firstname' - не найдено";
                                                             } else {
-                                                                $attempts[] = "✓ Поиск по ФИО: '$lastname $firstname' - не найдено";
+                                                                $attempts[] = "✓ Поиск по ФИО (без учета регистра): '$lastname $firstname' - не найдено";
+                                                            }
+                                                        }
+                                                        
+                                                        if (!empty($lastname) && !empty($cohort)) {
+                                                            $attempts[] = "✓ Поиск по Фамилии + Группе (без учета регистра): '$lastname' + '$cohort' - не найдено";
+                                                        } else {
+                                                            if (empty($cohort)) {
+                                                                $attempts[] = "✗ Поиск по Фамилии + Группе: не выполнен (группа не указана)";
                                                             }
                                                         }
                                                         
@@ -2117,7 +2170,7 @@ if ($action == 'viewprogram' && $programid > 0) {
                                                     
                                                     $displayed = 0;
                                                     foreach ($errors as $error) {
-                                                        if ($displayed >= 100) break; // Показываем максимум 100 записей
+                                                        // Показываем все записи без ограничений
                                                         
                                                         // Парсим сообщение об ошибке
                                                         $parts = explode(" | ", $error);
@@ -2158,9 +2211,7 @@ if ($action == 'viewprogram' && $programid > 0) {
                                                     
                                                     $message .= "</tbody></table></div>";
                                                     
-                                                    if (count($errors) > 100) {
-                                                        $message .= "<br><em style='color: #666;'>Показано 100 из " . count($errors) . " записей. Всего не найдено: " . count($errors) . " студентов.</em>";
-                                                    }
+                                                    $message .= "<br><em style='color: #666;'>Всего не найдено: " . count($errors) . " студентов.</em>";
                                                     
                                                     // Добавляем подсказку по улучшению поиска
                                                     $message .= "<br><br><small style='color: #666;'><strong>Как исправить:</strong><br>";
