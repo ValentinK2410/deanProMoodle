@@ -780,21 +780,13 @@ switch ($tab) {
                     $prevurl->param('page', $pagenum - 1);
                     echo html_writer::link($prevurl, '« Previous', ['class' => 'btn btn-sm']);
                 }
-                // Убеждаемся, что все значения являются строками перед конкатенацией
+                // Формируем строку напрямую
                 $pagenumval = (int)$pagenum + 1;
                 $totalpagesnumval = (int)$totalpagesnum;
                 $totalcountval = (int)$totalcount;
                 
-                // Формируем строку напрямую, избегая проблем с типами
-                $pagetext = "Page " . $pagenumval . " of " . $totalpagesnumval . " (" . $totalcountval . " items)";
-                
-                // Финальная проверка - убеждаемся, что это строка
-                if (!is_string($pagetext) || is_array($pagetext)) {
-                    $pagetext = "Page " . (string)$pagenumval . " of " . (string)$totalpagesnumval . " (" . (string)$totalcountval . " items)";
-                }
-                
-                // Используем s() для безопасного вывода строки
-                echo html_writer::span(s($pagetext), ['style' => 'margin: 0 15px;']);
+                // Выводим HTML напрямую, избегая проблем с html_writer::span()
+                echo '<span style="margin: 0 15px;">Page ' . $pagenumval . ' of ' . $totalpagesnumval . ' (' . $totalcountval . ' items)</span>';
                 if ($pagenum < $totalpagesnum - 1) {
                     $nexturl = clone $baseurl;
                     $nexturl->param('page', $pagenum + 1);
@@ -1066,21 +1058,13 @@ switch ($tab) {
                     $prevurl->param('page', $pagenum - 1);
                     echo html_writer::link($prevurl, '« Previous', ['class' => 'btn btn-sm']);
                 }
-                // Убеждаемся, что все значения являются строками перед конкатенацией
+                // Формируем строку напрямую
                 $pagenumval = (int)$pagenum + 1;
                 $totalpagesnumval = (int)$totalpagesnum;
                 $totalcountval = (int)$totalcount;
                 
-                // Формируем строку напрямую, избегая проблем с типами
-                $pagetext = "Page " . $pagenumval . " of " . $totalpagesnumval . " (" . $totalcountval . " items)";
-                
-                // Финальная проверка - убеждаемся, что это строка
-                if (!is_string($pagetext) || is_array($pagetext)) {
-                    $pagetext = "Page " . (string)$pagenumval . " of " . (string)$totalpagesnumval . " (" . (string)$totalcountval . " items)";
-                }
-                
-                // Используем s() для безопасного вывода строки
-                echo html_writer::span(s($pagetext), ['style' => 'margin: 0 15px;']);
+                // Выводим HTML напрямую, избегая проблем с html_writer::span()
+                echo '<span style="margin: 0 15px;">Page ' . $pagenumval . ' of ' . $totalpagesnumval . ' (' . $totalcountval . ' items)</span>';
                 if ($pagenum < $totalpagesnum - 1) {
                     $nexturl = clone $baseurl;
                     $nexturl->param('page', $pagenum + 1);
@@ -1222,21 +1206,13 @@ switch ($tab) {
                     $prevurl->param('page', $pagenum - 1);
                     echo html_writer::link($prevurl, '« Previous', ['class' => 'btn btn-sm']);
                 }
-                // Убеждаемся, что все значения являются строками перед конкатенацией
+                // Формируем строку напрямую
                 $pagenumval = (int)$pagenum + 1;
                 $totalpagesnumval = (int)$totalpagesnum;
                 $totalcountval = (int)$totalcount;
                 
-                // Формируем строку напрямую, избегая проблем с типами
-                $pagetext = "Page " . $pagenumval . " of " . $totalpagesnumval . " (" . $totalcountval . " items)";
-                
-                // Финальная проверка - убеждаемся, что это строка
-                if (!is_string($pagetext) || is_array($pagetext)) {
-                    $pagetext = "Page " . (string)$pagenumval . " of " . (string)$totalpagesnumval . " (" . (string)$totalcountval . " items)";
-                }
-                
-                // Используем s() для безопасного вывода строки
-                echo html_writer::span(s($pagetext), ['style' => 'margin: 0 15px;']);
+                // Выводим HTML напрямую, избегая проблем с html_writer::span()
+                echo '<span style="margin: 0 15px;">Page ' . $pagenumval . ' of ' . $totalpagesnumval . ' (' . $totalcountval . ' items)</span>';
                 if ($pagenum < $totalpagesnum - 1) {
                     $nexturl = clone $baseurl;
                     $nexturl->param('page', $pagenum + 1);
