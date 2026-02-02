@@ -39,8 +39,8 @@ require_login();
 $action = optional_param('action', '', PARAM_ALPHA);
 $programid = optional_param('programid', 0, PARAM_INT);
 
-// Для действия searchstudents разрешаем доступ администраторам и преподавателям
-if ($action == 'searchstudents') {
+// Для действий searchstudents и markforumpostnoreply разрешаем доступ администраторам и преподавателям
+if ($action == 'searchstudents' || $action == 'markforumpostnoreply') {
     $context = context_system::instance();
     $hasaccess = false;
     
@@ -1176,6 +1176,48 @@ if ($action == 'getteachercourses' && $teacherid > 0) {
         'students' => $formattedstudents,
         'count' => count($formattedstudents)
     ]);
+} elseif ($action == 'markforumpostnoreply') {
+    // Пометить сообщение форума как "не требует ответа"
+    global $DB, $USER;
+    
+    $postid = optional_param('postid', 0, PARAM_INT);
+    
+    if ($postid <= 0) {
+        echo json_encode(['success' => false, 'error' => 'Неверный ID сообщения']);
+        exit;
+    }
+    
+    // Проверяем существование сообщения
+    $post = $DB->get_record('forum_posts', ['id' => $postid]);
+    if (!$post) {
+        echo json_encode(['success' => false, 'error' => 'Сообщение не найдено']);
+        exit;
+    }
+    
+    // Проверяем, не помечено ли уже это сообщение этим преподавателем
+    $existing = $DB->get_record('local_deanpromoodle_forum_no_reply', [
+        'postid' => $postid,
+        'userid' => $USER->id
+    ]);
+    
+    if ($existing) {
+        echo json_encode(['success' => true, 'message' => 'Сообщение уже помечено']);
+        exit;
+    }
+    
+    // Сохраняем запись
+    $data = new stdClass();
+    $data->postid = $postid;
+    $data->userid = $USER->id;
+    $data->timecreated = time();
+    
+    $id = $DB->insert_record('local_deanpromoodle_forum_no_reply', $data);
+    
+    if ($id) {
+        echo json_encode(['success' => true, 'id' => $id]);
+    } else {
+        echo json_encode(['success' => false, 'error' => 'Ошибка при сохранении']);
+    }
 } else {
     echo json_encode(['success' => false, 'error' => 'Invalid action or parameters']);
 }

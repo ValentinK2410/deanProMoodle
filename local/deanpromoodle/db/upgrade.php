@@ -151,5 +151,30 @@ function xmldb_local_deanpromoodle_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026013006, 'local', 'deanpromoodle');
     }
     
+    // Создание таблицы local_deanpromoodle_forum_no_reply
+    if ($oldversion < 2026013007) {
+        $table = new xmldb_table('local_deanpromoodle_forum_no_reply');
+        
+        // Добавляем таблицу, если её нет
+        if (!$dbman->table_exists($table)) {
+            $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+            $table->add_field('postid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+            $table->add_field('userid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+            $table->add_field('timecreated', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            
+            $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+            $table->add_key('postid_fk', XMLDB_KEY_FOREIGN, ['postid'], 'forum_posts', ['id']);
+            $table->add_key('userid_fk', XMLDB_KEY_FOREIGN, ['userid'], 'user', ['id']);
+            
+            $table->add_index('postid', XMLDB_INDEX_NOTUNIQUE, ['postid']);
+            $table->add_index('userid', XMLDB_INDEX_NOTUNIQUE, ['userid']);
+            $table->add_index('postuser', XMLDB_INDEX_UNIQUE, ['postid', 'userid']);
+            
+            $dbman->create_table($table);
+        }
+        
+        upgrade_plugin_savepoint(true, 2026013007, 'local', 'deanpromoodle');
+    }
+    
     return true;
 }

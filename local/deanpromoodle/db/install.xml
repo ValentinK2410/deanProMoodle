@@ -177,5 +177,25 @@
         <KEY NAME="userid_unique" TYPE="unique" FIELDS="userid"/>
       </KEYS>
     </TABLE>
+
+    <!-- Таблица сообщений форумов, которые не требуют ответа -->
+    <TABLE NAME="local_deanpromoodle_forum_no_reply" COMMENT="Таблица сообщений форумов, которые не требуют ответа">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="postid" TYPE="int" LENGTH="10" NOTNULL="true"/>
+        <FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="true"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="postid_fk" TYPE="foreign" FIELDS="postid" REFTABLE="forum_posts" REFFIELDS="id"/>
+        <KEY NAME="userid_fk" TYPE="foreign" FIELDS="userid" REFTABLE="user" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="postid" UNIQUE="false" FIELDS="postid"/>
+        <INDEX NAME="userid" UNIQUE="false" FIELDS="userid"/>
+        <INDEX NAME="postuser" UNIQUE="true" FIELDS="postid, userid"/>
+      </INDEXES>
+    </TABLE>
   </TABLES>
 </XMLDB>

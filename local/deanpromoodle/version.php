@@ -26,7 +26,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_deanpromoodle';
-$plugin->version = 2026013006; // YYYYMMDDXX format - создана таблица личной информации студентов
+$plugin->version = 2026013007; // YYYYMMDDXX format - создана таблица для форумов "не требует ответа"
 $plugin->requires = 2022041900; // Moodle 4.0+
 $plugin->maturity = MATURITY_ALPHA;
 $plugin->release = 'v1.0.0-alpha';

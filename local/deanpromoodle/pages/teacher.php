@@ -220,29 +220,6 @@ foreach ($teachercourses as $course) {
     }
 }
 
-// Подсчет несданных экзаменов
-$quizzescount = 0;
-foreach ($teachercourses as $course) {
-    $quizzes = get_all_instances_in_course('quiz', $course, false);
-    foreach ($quizzes as $quiz) {
-        $quizname = mb_strtolower($quiz->name);
-        if (strpos($quizname, 'экзамен') === false) {
-            continue;
-        }
-        $attemptscount = $DB->count_records_sql(
-            "SELECT COUNT(DISTINCT qa.id)
-             FROM {quiz_attempts} qa
-             LEFT JOIN {quiz_grades} qg ON qg.quiz = qa.quiz AND qg.userid = qa.userid
-             WHERE qa.quiz = ? 
-             AND qa.state = 'finished'
-             AND NOT (qa.sumgrades > 0 AND qa.timemodified > 0)
-             AND qg.grade IS NULL",
-            [$quiz->id]
-        );
-        $quizzescount += $attemptscount;
-    }
-}
-
 // Подсчет сообщений форумов без ответов преподавателя
 $forumscount = 0;
 $teacherroleids = $DB->get_fieldset_select('role', 'id', "shortname IN ('teacher', 'editingteacher', 'manager')");
@@ -352,38 +329,6 @@ if (!empty($teachercourses)) {
     }
 }
 
-// Подсчет проверенных тестов за текущий месяц
-$gradedquizzescount = 0;
-if (!empty($teachercourses)) {
-    $allquizzes = [];
-    foreach ($teachercourses as $course) {
-        try {
-            $quizzes = get_all_instances_in_course('quiz', $course, false);
-            foreach ($quizzes as $quiz) {
-                $allquizzes[] = $quiz->id;
-            }
-        } catch (\Exception $e) {
-            // Пропускаем курс, если не удалось получить тесты
-        }
-    }
-    
-    if (!empty($allquizzes)) {
-        $quizids_placeholders = implode(',', array_fill(0, count($allquizzes), '?'));
-        // Подсчитываем оценки тестов, где timemodified в текущем месяце
-        // Для quiz_grades нет поля grader, но можно проверить через попытки и оценки
-        // Проверяем, что есть попытка и оценка в текущем месяце
-        $gradedquizzescount = $DB->count_records_sql(
-            "SELECT COUNT(DISTINCT qg.id)
-             FROM {quiz_grades} qg
-             JOIN {quiz_attempts} qa ON qa.quiz = qg.quiz AND qa.userid = qg.userid
-             WHERE qg.quiz IN ($quizids_placeholders)
-             AND qg.timemodified >= ? AND qg.timemodified <= ?
-             AND qa.state = 'finished'",
-            array_merge($allquizzes, [$selectedmonthstart, $selectedmonthend])
-        );
-    }
-}
-
 // Подсчет ответов на форумы за текущий месяц
 $forumrepliescount = 0;
 if (!empty($teachercourses)) {
@@ -425,10 +370,6 @@ $assignmentsstr = get_string('assignments', 'local_deanpromoodle');
 if (strpos($assignmentsstr, '[[') !== false) {
     $assignmentsstr = 'Задания'; // Резервное значение
 }
-$quizzesstr = get_string('quizzes', 'local_deanpromoodle');
-if (strpos($quizzesstr, '[[') !== false) {
-    $quizzesstr = 'Тесты'; // Резервное значение
-}
 $forumsstr = get_string('forums', 'local_deanpromoodle');
 if (strpos($forumsstr, '[[') !== false) {
     $forumsstr = 'Форумы'; // Резервное значение
@@ -436,12 +377,12 @@ if (strpos($forumsstr, '[[') !== false) {
 $tabs[] = new tabobject('assignments', 
     new moodle_url('/local/deanpromoodle/pages/teacher.php', ['tab' => 'assignments', 'courseid' => $courseid]),
     $assignmentsstr . ' (' . $assignmentscount . ')');
-$tabs[] = new tabobject('quizzes', 
-    new moodle_url('/local/deanpromoodle/pages/teacher.php', ['tab' => 'quizzes', 'courseid' => $courseid]),
-    $quizzesstr . ' (' . $quizzescount . ')');
 $tabs[] = new tabobject('forums', 
     new moodle_url('/local/deanpromoodle/pages/teacher.php', ['tab' => 'forums', 'courseid' => $courseid]),
     $forumsstr . ' (' . $forumscount . ')');
+$tabs[] = new tabobject('history', 
+    new moodle_url('/local/deanpromoodle/pages/teacher.php', ['tab' => 'history', 'courseid' => $courseid]),
+    'История (' . $gradedassignmentshistorycount . ')');
 $tabs[] = new tabobject('searchstudent', 
     new moodle_url('/local/deanpromoodle/pages/teacher.php', ['tab' => 'searchstudent']),
     'Поиск студента');
@@ -515,11 +456,95 @@ echo html_writer::select($yearoptions, 'statyear', $selectedyear, false, ['class
 echo html_writer::empty_tag('input', ['type' => 'submit', 'value' => 'Показать', 'class' => 'btn btn-primary', 'style' => 'margin-left: 10px;']);
 echo html_writer::end_tag('form');
 
-// Отображение статистики
+// Подсчет не проверенных заданий
+$ungradedassignmentscount = $assignmentscount;
+
+// Подсчет не отвеченных сообщений (с учетом таблицы local_deanpromoodle_forum_no_reply)
+$unrepliedforumscount = 0;
+if (!empty($teachercourses) && !empty($teacherroleids) && $studentroleid) {
+    $forumids = [];
+    $courseforums = [];
+    foreach ($teachercourses as $course) {
+        $forums = get_all_instances_in_course('forum', $course, false);
+        foreach ($forums as $forum) {
+            $forumids[] = $forum->id;
+            $courseforums[$forum->id] = $course;
+        }
+    }
+    if (!empty($forumids)) {
+        $coursecontexts = [];
+        $allcourseids = array_unique(array_column($courseforums, 'id'));
+        foreach ($allcourseids as $cid) {
+            $coursecontexts[$cid] = context_course::instance($cid);
+        }
+        $systemcontext = context_system::instance();
+        $placeholders = implode(',', array_fill(0, count($teacherroleids), '?'));
+        $coursecontextids = array_map(function($ctx) { return $ctx->id; }, $coursecontexts);
+        $coursecontextplaceholders = implode(',', array_fill(0, count($coursecontextids), '?'));
+        
+        $allteacheruserids = $DB->get_fieldset_sql(
+            "SELECT DISTINCT ra.userid
+             FROM {role_assignments} ra
+             WHERE (ra.contextid IN ($coursecontextplaceholders) OR ra.contextid = ?)
+             AND ra.roleid IN ($placeholders)",
+            array_merge($coursecontextids, [$systemcontext->id], $teacherroleids)
+        );
+        
+        $allstudentuserids = $DB->get_fieldset_sql(
+            "SELECT DISTINCT ra.userid
+             FROM {role_assignments} ra
+             WHERE ra.contextid IN ($coursecontextplaceholders)
+             AND ra.roleid = ?",
+            array_merge($coursecontextids, [$studentroleid])
+        );
+        
+        if (!empty($allteacheruserids) && !empty($allstudentuserids)) {
+            $forumplaceholders = implode(',', array_fill(0, count($forumids), '?'));
+            $teacherplaceholders = implode(',', array_fill(0, count($allteacheruserids), '?'));
+            $studentplaceholders = implode(',', array_fill(0, count($allstudentuserids), '?'));
+            
+            $unrepliedforumscount = $DB->count_records_sql(
+                "SELECT COUNT(DISTINCT p.id)
+                 FROM {forum_posts} p
+                 JOIN {user} u ON u.id = p.userid
+                 JOIN {forum_discussions} d ON d.id = p.discussion
+                 JOIN {forum} f ON f.id = d.forum
+                 LEFT JOIN {forum_posts} p2 ON p2.discussion = p.discussion 
+                     AND p2.created > p.created 
+                     AND p2.userid IN ($teacherplaceholders)
+                 LEFT JOIN {local_deanpromoodle_forum_no_reply} fnr ON fnr.postid = p.id
+                 WHERE d.forum IN ($forumplaceholders)
+                 AND p.userid IN ($studentplaceholders)
+                 AND p2.id IS NULL
+                 AND fnr.id IS NULL",
+                array_merge($forumids, $allteacheruserids, $allstudentuserids)
+            );
+        }
+    }
+}
+
+// Отображение статистики в новом формате
 echo html_writer::start_div('', ['style' => 'margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(0,0,0,0.1);']);
-echo html_writer::tag('span', 'Проверено заданий: ' . $gradedassignmentscount, ['style' => 'margin-right: 20px; color: #28a745; font-weight: 500;']);
-echo html_writer::tag('span', 'Проверено тестов: ' . $gradedquizzescount, ['style' => 'margin-right: 20px; color: #007bff; font-weight: 500;']);
-echo html_writer::tag('span', 'Ответов на форумах: ' . $forumrepliescount, ['style' => 'color: #17a2b8; font-weight: 500;']);
+echo html_writer::start_tag('table', ['class' => 'teacher-statistics-table', 'style' => 'width: 100%; border-collapse: collapse;']);
+echo html_writer::start_tag('thead');
+echo html_writer::start_tag('tr');
+echo html_writer::tag('th', 'СДЕЛАНО', ['style' => 'background-color: #d4edda; padding: 10px; text-align: center; border: 1px solid #c3e6cb;']);
+echo html_writer::tag('th', 'НЕ СДЕЛАНО', ['style' => 'background-color: #f8d7da; padding: 10px; text-align: center; border: 1px solid #f5c6cb;']);
+echo html_writer::end_tag('tr');
+echo html_writer::end_tag('thead');
+echo html_writer::start_tag('tbody');
+echo html_writer::start_tag('tr');
+echo html_writer::start_tag('td', ['style' => 'background-color: #d4edda; padding: 10px; border: 1px solid #c3e6cb;']);
+echo html_writer::tag('div', 'Проверено заданий: ' . $gradedassignmentscount, ['style' => 'margin-bottom: 5px;']);
+echo html_writer::tag('div', 'Ответов на сообщения: ' . $forumrepliescount, ['style' => '']);
+echo html_writer::end_tag('td');
+echo html_writer::start_tag('td', ['style' => 'background-color: #f8d7da; padding: 10px; border: 1px solid #f5c6cb;']);
+echo html_writer::tag('div', 'Не проверено заданий: ' . $ungradedassignmentscount, ['style' => 'margin-bottom: 5px;']);
+echo html_writer::tag('div', 'Не отвечено сообщений: ' . $unrepliedforumscount, ['style' => '']);
+echo html_writer::end_tag('td');
+echo html_writer::end_tag('tr');
+echo html_writer::end_tag('tbody');
+echo html_writer::end_tag('table');
 echo html_writer::end_div();
 echo html_writer::end_div();
 
@@ -588,6 +613,7 @@ switch ($tab) {
                                     'assignmentname' => $assignment->name,
                                     'courseid' => $course->id,
                                     'coursename' => $course->fullname,
+                                    'courseshortname' => $course->shortname,
                                     'userid' => $participant->id,
                                     'studentname' => fullname($participant),
                                     'email' => $participant->email,
@@ -627,6 +653,7 @@ switch ($tab) {
                                 'assignmentname' => $assignment->name,
                                 'courseid' => $course->id,
                                 'coursename' => $course->fullname,
+                                'courseshortname' => $course->shortname,
                                 'userid' => $submission->userid,
                                 'studentname' => fullname($submission),
                                 'email' => $submission->email,
@@ -665,31 +692,34 @@ switch ($tab) {
             if (strpos($assignmentstr, '[[') !== false) {
                 $assignmentstr = 'Задание';
             }
-            $fullnamestr = get_string('fullname', 'local_deanpromoodle');
-            if (strpos($fullnamestr, '[[') !== false) {
-                $fullnamestr = 'Студент';
-            }
             $actionsstr = get_string('actions', 'local_deanpromoodle');
             if (strpos($actionsstr, '[[') !== false) {
-                $actionsstr = 'Действия';
+                $actionsstr = 'Действие';
             }
             echo html_writer::tag('th', $coursestr); // Курс
             echo html_writer::tag('th', $assignmentstr); // Задание
-            echo html_writer::tag('th', $fullnamestr); // Студент
-            $submittedstr = 'Отправлено';
+            echo html_writer::tag('th', 'ФИО студента');
+            $submittedstr = 'Опубликовано';
             echo html_writer::tag('th', $submittedstr);
-            echo html_writer::tag('th', $actionsstr); // Действия
+            echo html_writer::tag('th', $actionsstr); // Действие
             echo html_writer::end_tag('tr');
             echo html_writer::end_tag('thead');
             echo html_writer::start_tag('tbody');
             foreach ($paginated as $item) {
                 echo html_writer::start_tag('tr');
-                echo html_writer::tag('td', htmlspecialchars($item->coursename));
+                // Используем краткое название курса
+                $coursedisplayname = !empty($item->courseshortname) ? htmlspecialchars($item->courseshortname) : htmlspecialchars($item->coursename);
+                echo html_writer::tag('td', $coursedisplayname);
                 echo html_writer::tag('td', htmlspecialchars($item->assignmentname));
                 echo html_writer::tag('td', htmlspecialchars($item->studentname));
                 echo html_writer::tag('td', $item->submitted);
-                // Используем cmid (ID модуля курса) вместо assignmentid
-                $gradeurl = new moodle_url('/mod/assign/view.php', ['id' => $item->cmid, 'action' => 'grading', 'userid' => $item->userid]);
+                // Используем прямой переход к странице оценки конкретного студента
+                $gradeurl = new moodle_url('/mod/assign/view.php', [
+                    'id' => $item->cmid, 
+                    'action' => 'grade', 
+                    'userid' => $item->userid,
+                    'rownum' => 0
+                ]);
                 $gradestr = 'Оценить';
                 $actions = html_writer::link($gradeurl, $gradestr, ['class' => 'btn btn-sm btn-primary', 'target' => '_blank']);
                 echo html_writer::tag('td', $actions);
@@ -712,146 +742,6 @@ switch ($tab) {
                     $nexturl = clone $baseurl;
                     $nexturl->param('page', $page + 1);
                     echo html_writer::link($nexturl, 'Next »', ['class' => 'btn btn-sm']);
-                }
-                echo html_writer::end_div();
-            }
-        }
-        break;
-        
-    case 'quizzes':
-        // Получение только несданных экзаменов
-        // Показываем только тесты с названием "Экзамен" и только если они не сданы
-        // Условие: если есть оценка И дата оценки - не показывать такой тест
-        $failedquizzes = [];
-        foreach ($teachercourses as $course) {
-            $quizzes = get_all_instances_in_course('quiz', $course, false);
-            
-            foreach ($quizzes as $quiz) {
-                // Фильтруем только экзамены по названию (содержит "Экзамен" или "экзамен")
-                $quizname = mb_strtolower($quiz->name);
-                if (strpos($quizname, 'экзамен') === false) {
-                    continue; // Пропускаем тесты, которые не являются экзаменами
-                }
-                
-                // Получаем попытки экзаменов
-                // Исключаем тесты, у которых есть оценка И дата завершения
-                // Условие: НЕ показывать если (sumgrades > 0 AND timemodified > 0)
-                $attempts = $DB->get_records_sql(
-                    "SELECT qa.*, u.firstname, u.lastname, u.email, u.id as userid, q.name as quizname, q.sumgrades as maxgrade
-                     FROM {quiz_attempts} qa
-                     JOIN {user} u ON u.id = qa.userid
-                     JOIN {quiz} q ON q.id = qa.quiz
-                     LEFT JOIN {quiz_grades} qg ON qg.quiz = qa.quiz AND qg.userid = qa.userid
-                     WHERE qa.quiz = ? 
-                     AND qa.state = 'finished'
-                     AND NOT (qa.sumgrades > 0 AND qa.timemodified > 0)
-                     AND qg.grade IS NULL
-                     ORDER BY qa.timemodified DESC",
-                    [$quiz->id]
-                );
-                
-                foreach ($attempts as $attempt) {
-                    // Дополнительная проверка: если есть оценка И дата - пропускаем (на всякий случай)
-                    if ($attempt->sumgrades > 0 && $attempt->timemodified > 0) {
-                        continue;
-                    }
-                    
-                    $failedquizzes[] = (object)[
-                        'id' => $attempt->id,
-                        'quizid' => $quiz->id,
-                        'quizname' => $quiz->name,
-                        'courseid' => $course->id,
-                        'coursename' => $course->fullname,
-                        'userid' => $attempt->userid,
-                        'studentname' => fullname($attempt),
-                        'email' => $attempt->email,
-                        'grade' => ($attempt->sumgrades ?? 0) . ' / ' . $quiz->sumgrades,
-                        'attempted' => $attempt->timemodified > 0 ? userdate($attempt->timemodified) : 'Не завершено',
-                        'timemodified' => $attempt->timemodified
-                    ];
-                }
-            }
-        }
-        
-        // Пагинация
-        $total = count($failedquizzes);
-        $totalpages = $total > 0 ? ceil($total / $perpage) : 0;
-        $offset = $page * $perpage;
-        $paginated = array_slice($failedquizzes, $offset, $perpage);
-        
-        // Отображение таблицы
-        if (empty($paginated)) {
-            $noquizzesfoundstr = get_string('noquizzesfound', 'local_deanpromoodle');
-            if (strpos($noquizzesfoundstr, '[[') !== false) {
-                $noquizzesfoundstr = 'Несданные экзамены не найдены'; // Fallback на русский
-            }
-            echo html_writer::div($noquizzesfoundstr, 'alert alert-info');
-        } else {
-            echo html_writer::start_tag('table', ['class' => 'table table-striped table-hover', 'style' => 'width: 100%;']);
-            echo html_writer::start_tag('thead');
-            echo html_writer::start_tag('tr');
-            $coursestr = get_string('courses', 'local_deanpromoodle');
-            if (strpos($coursestr, '[[') !== false) {
-                $coursestr = 'Курс';
-            }
-            $quizzesstr = get_string('quizzes', 'local_deanpromoodle');
-            if (strpos($quizzesstr, '[[') !== false) {
-                $quizzesstr = 'Тест';
-            }
-            $fullnamestr = get_string('fullname', 'local_deanpromoodle');
-            if (strpos($fullnamestr, '[[') !== false) {
-                $fullnamestr = 'Студент';
-            }
-            $actionsstr = get_string('actions', 'local_deanpromoodle');
-            if (strpos($actionsstr, '[[') !== false) {
-                $actionsstr = 'Действия';
-            }
-            echo html_writer::tag('th', $coursestr); // Курс
-            echo html_writer::tag('th', $quizzesstr); // Тест
-            echo html_writer::tag('th', $fullnamestr); // Студент
-            $gradestr = 'Оценка';
-            echo html_writer::tag('th', $gradestr);
-            $attemptedstr = 'Попытка';
-            echo html_writer::tag('th', $attemptedstr);
-            echo html_writer::tag('th', $actionsstr); // Действия
-            echo html_writer::end_tag('tr');
-            echo html_writer::end_tag('thead');
-            echo html_writer::start_tag('tbody');
-            foreach ($paginated as $item) {
-                // Все записи в этой таблице - несданные экзамены, выделяем красным
-                echo html_writer::start_tag('tr', ['style' => 'background-color: #ffebee; color: #c62828;']);
-                echo html_writer::tag('td', htmlspecialchars($item->coursename));
-                echo html_writer::tag('td', htmlspecialchars($item->quizname));
-                echo html_writer::tag('td', htmlspecialchars($item->studentname));
-                echo html_writer::tag('td', html_writer::tag('strong', $item->grade));
-                echo html_writer::tag('td', $item->attempted);
-                $reviewurl = new moodle_url('/mod/quiz/review.php', ['attempt' => $item->id]);
-                $reviewstr = 'Просмотр';
-                $actions = html_writer::link($reviewurl, $reviewstr, ['class' => 'btn btn-sm btn-danger', 'target' => '_blank']);
-                echo html_writer::tag('td', $actions);
-                echo html_writer::end_tag('tr');
-            }
-            echo html_writer::end_tag('tbody');
-            echo html_writer::end_tag('table');
-            
-            // Пагинация
-            if ($totalpages > 1) {
-                echo html_writer::start_div('pagination-wrapper', ['style' => 'margin-top: 20px; text-align: center;']);
-                $baseurl = new moodle_url('/local/deanpromoodle/pages/teacher.php', ['tab' => $tab, 'courseid' => $courseid, 'perpage' => $perpage]);
-                $prevstr = get_string('previous', 'local_deanpromoodle');
-                $nextstr = get_string('next', 'local_deanpromoodle');
-                $pagestr = get_string('page', 'local_deanpromoodle');
-                $ofstr = get_string('of', 'local_deanpromoodle');
-                if ($page > 0) {
-                    $prevurl = clone $baseurl;
-                    $prevurl->param('page', $page - 1);
-                    echo html_writer::link($prevurl, '« ' . $prevstr, ['class' => 'btn btn-sm']);
-                }
-                echo html_writer::span($pagestr . " " . ($page + 1) . " " . $ofstr . " " . $totalpages . " ($total)", ['style' => 'margin: 0 15px;']);
-                if ($page < $totalpages - 1) {
-                    $nexturl = clone $baseurl;
-                    $nexturl->param('page', $page + 1);
-                    echo html_writer::link($nexturl, $nextstr . ' »', ['class' => 'btn btn-sm']);
                 }
                 echo html_writer::end_div();
             }
@@ -933,6 +823,7 @@ switch ($tab) {
         $studentplaceholders = implode(',', array_fill(0, count($allstudentuserids), '?'));
         
         // Используем LEFT JOIN вместо NOT EXISTS для лучшей производительности
+        // Исключаем сообщения, которые помечены как "не требует ответа"
         $posts = $DB->get_records_sql(
             "SELECT p.id, p.discussion, p.userid, p.subject, p.message, p.created,
                     u.firstname, u.lastname, u.email,
@@ -945,9 +836,11 @@ switch ($tab) {
              LEFT JOIN {forum_posts} p2 ON p2.discussion = p.discussion 
                  AND p2.created > p.created 
                  AND p2.userid IN ($teacherplaceholders)
+             LEFT JOIN {local_deanpromoodle_forum_no_reply} fnr ON fnr.postid = p.id
              WHERE d.forum IN ($forumplaceholders)
              AND p.userid IN ($studentplaceholders)
              AND p2.id IS NULL
+             AND fnr.id IS NULL
              ORDER BY p.created DESC
              LIMIT 1000",
             array_merge($forumids, $allteacheruserids, $allstudentuserids)
@@ -976,6 +869,7 @@ switch ($tab) {
                 'discussionname' => $post->discussionname,
                 'courseid' => $post->courseid,
                 'coursename' => $course->fullname,
+                'courseshortname' => $course->shortname,
                 'userid' => $post->userid,
                 'studentname' => fullname($post),
                 'email' => $post->email,
@@ -1019,9 +913,7 @@ switch ($tab) {
             }
             echo html_writer::tag('th', $coursestr); // Курс
             echo html_writer::tag('th', $forumsstr); // Форум
-            $discussionstr = 'Обсуждение';
-            echo html_writer::tag('th', $discussionstr);
-            echo html_writer::tag('th', $fullnamestr); // Студент
+            echo html_writer::tag('th', 'ФИО студента');
             $subjectstr = 'Тема';
             echo html_writer::tag('th', $subjectstr);
             $messagestr = 'Сообщение студента';
@@ -1033,10 +925,11 @@ switch ($tab) {
             echo html_writer::end_tag('thead');
             echo html_writer::start_tag('tbody');
             foreach ($paginated as $item) {
-                echo html_writer::start_tag('tr');
-                echo html_writer::tag('td', htmlspecialchars($item->coursename));
+                echo html_writer::start_tag('tr', ['id' => 'forum-post-' . $item->id]);
+                // Используем краткое название курса
+                $coursedisplayname = !empty($item->courseshortname) ? htmlspecialchars($item->courseshortname) : htmlspecialchars($item->coursename);
+                echo html_writer::tag('td', $coursedisplayname);
                 echo html_writer::tag('td', htmlspecialchars($item->forumname));
-                echo html_writer::tag('td', htmlspecialchars($item->discussionname));
                 echo html_writer::tag('td', htmlspecialchars($item->studentname));
                 echo html_writer::tag('td', htmlspecialchars($item->subject));
                 echo html_writer::tag('td', htmlspecialchars($item->message), ['style' => 'max-width: 300px; word-wrap: break-word;']);
@@ -1049,7 +942,145 @@ switch ($tab) {
                 ]);
                 $posturl->set_anchor('p' . $item->id); // Якорь для прокрутки к сообщению
                 $replystr = 'Ответить';
-                $actions = html_writer::link($posturl, $replystr, ['class' => 'btn btn-sm btn-primary', 'target' => '_blank']);
+                $noreplystr = 'Не требует ответа';
+                $actions = html_writer::link($posturl, $replystr, ['class' => 'btn btn-sm btn-primary', 'target' => '_blank', 'style' => 'margin-right: 5px;']);
+                $actions .= html_writer::link('#', $noreplystr, [
+                    'class' => 'btn btn-sm btn-secondary forum-no-reply-btn',
+                    'data-postid' => $item->id,
+                    'onclick' => 'return false;'
+                ]);
+                echo html_writer::tag('td', $actions);
+                echo html_writer::end_tag('tr');
+            }
+            echo html_writer::end_tag('tbody');
+            echo html_writer::end_tag('table');
+            
+            // Pagination
+            if ($totalpages > 1) {
+                echo html_writer::start_div('pagination-wrapper', ['style' => 'margin-top: 20px; text-align: center;']);
+                $baseurl = new moodle_url('/local/deanpromoodle/pages/teacher.php', ['tab' => $tab, 'courseid' => $courseid, 'perpage' => $perpage]);
+                if ($page > 0) {
+                    $prevurl = clone $baseurl;
+                    $prevurl->param('page', $page - 1);
+                    echo html_writer::link($prevurl, '« Previous', ['class' => 'btn btn-sm']);
+                }
+                echo html_writer::span("Page " . ($page + 1) . " of " . $totalpages . " ($total items)", ['style' => 'margin: 0 15px;']);
+                if ($page < $totalpages - 1) {
+                    $nexturl = clone $baseurl;
+                    $nexturl->param('page', $page + 1);
+                    echo html_writer::link($nexturl, 'Next »', ['class' => 'btn btn-sm']);
+                }
+                echo html_writer::end_div();
+            }
+        }
+        break;
+    
+    case 'history':
+        // Получение проверенных заданий (за все время)
+        require_once($CFG->dirroot . '/mod/assign/locallib.php');
+        $gradedassignments = [];
+        
+        if (!empty($teachercourses)) {
+            $allassignments = [];
+            foreach ($teachercourses as $course) {
+                try {
+                    $assignments = get_all_instances_in_course('assign', $course, false);
+                    foreach ($assignments as $assignment) {
+                        $allassignments[] = ['assignment' => $assignment, 'course' => $course];
+                    }
+                } catch (\Exception $e) {
+                    // Пропускаем курс, если не удалось получить задания
+                }
+            }
+            
+            if (!empty($allassignments)) {
+                foreach ($allassignments as $item) {
+                    $assignment = $item['assignment'];
+                    $course = $item['course'];
+                    
+                    // Получаем все проверенные задания текущим преподавателем
+                    $grades = $DB->get_records_sql(
+                        "SELECT ag.*, u.firstname, u.lastname, u.email, u.id as userid, a.name as assignmentname
+                         FROM {assign_grades} ag
+                         JOIN {assign} a ON a.id = ag.assignment
+                         JOIN {user} u ON u.id = ag.userid
+                         WHERE ag.assignment = ?
+                         AND ag.grader = ?
+                         AND ag.grade IS NOT NULL
+                         AND ag.grade >= 0
+                         ORDER BY ag.timemodified DESC",
+                        [$assignment->id, $USER->id]
+                    );
+                    
+                    foreach ($grades as $grade) {
+                        $cm = get_coursemodule_from_instance('assign', $assignment->id, $course->id);
+                        if ($cm) {
+                            $gradedassignments[] = (object)[
+                                'id' => $grade->id,
+                                'assignmentid' => $assignment->id,
+                                'cmid' => $cm->id,
+                                'assignmentname' => $grade->assignmentname,
+                                'courseid' => $course->id,
+                                'coursename' => $course->fullname,
+                                'courseshortname' => $course->shortname,
+                                'userid' => $grade->userid,
+                                'studentname' => fullname($grade),
+                                'email' => $grade->email,
+                                'grade' => $grade->grade,
+                                'graded' => userdate($grade->timemodified),
+                                'timemodified' => $grade->timemodified
+                            ];
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Сортируем по дате проверки (новые первыми)
+        usort($gradedassignments, function($a, $b) {
+            return $b->timemodified - $a->timemodified;
+        });
+        
+        // Pagination
+        $total = count($gradedassignments);
+        $totalpages = $total > 0 ? ceil($total / $perpage) : 0;
+        $offset = $page * $perpage;
+        $paginated = array_slice($gradedassignments, $offset, $perpage);
+        
+        // Display table
+        if (empty($paginated)) {
+            echo html_writer::div('Проверенные задания не найдены', 'alert alert-info');
+        } else {
+            echo html_writer::start_tag('table', ['class' => 'table table-striped table-hover', 'style' => 'width: 100%;']);
+            echo html_writer::start_tag('thead');
+            echo html_writer::start_tag('tr');
+            echo html_writer::tag('th', 'Курс');
+            echo html_writer::tag('th', 'Задание');
+            echo html_writer::tag('th', 'ФИО студента');
+            echo html_writer::tag('th', 'Дата проверки');
+            echo html_writer::tag('th', 'Оценка');
+            echo html_writer::tag('th', 'Действие');
+            echo html_writer::end_tag('tr');
+            echo html_writer::end_tag('thead');
+            echo html_writer::start_tag('tbody');
+            foreach ($paginated as $item) {
+                echo html_writer::start_tag('tr');
+                // Используем краткое название курса
+                $coursedisplayname = !empty($item->courseshortname) ? htmlspecialchars($item->courseshortname) : htmlspecialchars($item->coursename);
+                echo html_writer::tag('td', $coursedisplayname);
+                echo html_writer::tag('td', htmlspecialchars($item->assignmentname));
+                echo html_writer::tag('td', htmlspecialchars($item->studentname));
+                echo html_writer::tag('td', $item->graded);
+                echo html_writer::tag('td', htmlspecialchars($item->grade));
+                // Ссылка на задание для просмотра
+                $viewurl = new moodle_url('/mod/assign/view.php', [
+                    'id' => $item->cmid, 
+                    'action' => 'grade', 
+                    'userid' => $item->userid,
+                    'rownum' => 0
+                ]);
+                $viewstr = 'Просмотр';
+                $actions = html_writer::link($viewurl, $viewstr, ['class' => 'btn btn-sm btn-primary', 'target' => '_blank']);
                 echo html_writer::tag('td', $actions);
                 echo html_writer::end_tag('tr');
             }
@@ -1285,6 +1316,52 @@ switch ($tab) {
         ");
         
         echo html_writer::end_div();
+        
+        // JavaScript для обработки кнопки "Не требует ответа"
+        global $CFG;
+        $ajaxurl = $CFG->wwwroot . '/local/deanpromoodle/pages/admin_ajax.php';
+        $PAGE->requires->js_init_code("
+            (function() {
+                document.addEventListener('click', function(e) {
+                    if (e.target && e.target.classList.contains('forum-no-reply-btn')) {
+                        e.preventDefault();
+                        var postid = e.target.getAttribute('data-postid');
+                        var row = e.target.closest('tr');
+                        
+                        if (!postid) {
+                            alert('Ошибка: не указан ID сообщения');
+                            return;
+                        }
+                        
+                        // Отправляем AJAX-запрос
+                        var xhr = new XMLHttpRequest();
+                        xhr.open('GET', '" . $ajaxurl . "?action=markforumpostnoreply&postid=' + postid, true);
+                        xhr.onreadystatechange = function() {
+                            if (xhr.readyState === 4) {
+                                if (xhr.status === 200) {
+                                    try {
+                                        var response = JSON.parse(xhr.responseText);
+                                        if (response.success) {
+                                            // Скрываем строку таблицы
+                                            if (row) {
+                                                row.style.display = 'none';
+                                            }
+                                        } else {
+                                            alert('Ошибка: ' + (response.error || 'Неизвестная ошибка'));
+                                        }
+                                    } catch (e) {
+                                        alert('Ошибка при обработке ответа сервера');
+                                    }
+                                } else {
+                                    alert('Ошибка сети: ' + xhr.status);
+                                }
+                            }
+                        };
+                        xhr.send();
+                    }
+                });
+            })();
+        ");
         break;
 }
 
