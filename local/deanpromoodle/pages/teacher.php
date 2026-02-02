@@ -503,6 +503,17 @@ if (!empty($teachercourses) && !empty($teacherroleids) && $studentroleid) {
             $teacherplaceholders = implode(',', array_fill(0, count($allteacheruserids), '?'));
             $studentplaceholders = implode(',', array_fill(0, count($allstudentuserids), '?'));
             
+            // Проверяем существование таблицы local_deanpromoodle_forum_no_reply
+            $dbman = $DB->get_manager();
+            $tableexists = $dbman->table_exists('local_deanpromoodle_forum_no_reply');
+            
+            $noreplyjoin = '';
+            $noreplywhere = '';
+            if ($tableexists) {
+                $noreplyjoin = "LEFT JOIN {local_deanpromoodle_forum_no_reply} fnr ON fnr.postid = p.id";
+                $noreplywhere = "AND fnr.id IS NULL";
+            }
+            
             $unrepliedforumscount = $DB->count_records_sql(
                 "SELECT COUNT(DISTINCT p.id)
                  FROM {forum_posts} p
@@ -512,11 +523,11 @@ if (!empty($teachercourses) && !empty($teacherroleids) && $studentroleid) {
                  LEFT JOIN {forum_posts} p2 ON p2.discussion = p.discussion 
                      AND p2.created > p.created 
                      AND p2.userid IN ($teacherplaceholders)
-                 LEFT JOIN {local_deanpromoodle_forum_no_reply} fnr ON fnr.postid = p.id
+                 $noreplyjoin
                  WHERE d.forum IN ($forumplaceholders)
                  AND p.userid IN ($studentplaceholders)
                  AND p2.id IS NULL
-                 AND fnr.id IS NULL",
+                 $noreplywhere",
                 array_merge($forumids, $allteacheruserids, $allstudentuserids)
             );
         }
@@ -822,8 +833,19 @@ switch ($tab) {
         $teacherplaceholders = implode(',', array_fill(0, count($allteacheruserids), '?'));
         $studentplaceholders = implode(',', array_fill(0, count($allstudentuserids), '?'));
         
+        // Проверяем существование таблицы local_deanpromoodle_forum_no_reply
+        $dbman = $DB->get_manager();
+        $tableexists = $dbman->table_exists('local_deanpromoodle_forum_no_reply');
+        
         // Используем LEFT JOIN вместо NOT EXISTS для лучшей производительности
         // Исключаем сообщения, которые помечены как "не требует ответа"
+        $noreplyjoin = '';
+        $noreplywhere = '';
+        if ($tableexists) {
+            $noreplyjoin = "LEFT JOIN {local_deanpromoodle_forum_no_reply} fnr ON fnr.postid = p.id";
+            $noreplywhere = "AND fnr.id IS NULL";
+        }
+        
         $posts = $DB->get_records_sql(
             "SELECT p.id, p.discussion, p.userid, p.subject, p.message, p.created,
                     u.firstname, u.lastname, u.email,
@@ -836,11 +858,11 @@ switch ($tab) {
              LEFT JOIN {forum_posts} p2 ON p2.discussion = p.discussion 
                  AND p2.created > p.created 
                  AND p2.userid IN ($teacherplaceholders)
-             LEFT JOIN {local_deanpromoodle_forum_no_reply} fnr ON fnr.postid = p.id
+             $noreplyjoin
              WHERE d.forum IN ($forumplaceholders)
              AND p.userid IN ($studentplaceholders)
              AND p2.id IS NULL
-             AND fnr.id IS NULL
+             $noreplywhere
              ORDER BY p.created DESC
              LIMIT 1000",
             array_merge($forumids, $allteacheruserids, $allstudentuserids)

@@ -1187,6 +1187,13 @@ if ($action == 'getteachercourses' && $teacherid > 0) {
         exit;
     }
     
+    // Проверяем существование таблицы
+    $dbman = $DB->get_manager();
+    if (!$dbman->table_exists('local_deanpromoodle_forum_no_reply')) {
+        echo json_encode(['success' => false, 'error' => 'Таблица не существует. Необходимо обновить базу данных через админ-панель Moodle.']);
+        exit;
+    }
+    
     // Проверяем существование сообщения
     $post = $DB->get_record('forum_posts', ['id' => $postid]);
     if (!$post) {
