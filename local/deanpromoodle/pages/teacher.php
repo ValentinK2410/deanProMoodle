@@ -762,22 +762,23 @@ switch ($tab) {
             echo html_writer::end_tag('table');
             
             // Pagination
-            if ($totalpages > 1) {
+            // Убеждаемся, что все переменные определены и являются числами
+            $totalcount = isset($total) ? (is_array($total) ? count($total) : (int)$total) : 0;
+            $pagenum = isset($page) ? (is_array($page) ? 0 : (int)$page) : 0;
+            $totalpagesnum = isset($totalpages) ? (is_array($totalpages) ? 0 : (int)$totalpages) : 0;
+            
+            if ($totalpagesnum > 1) {
                 echo html_writer::start_div('pagination-wrapper', ['style' => 'margin-top: 20px; text-align: center;']);
                 $baseurl = new moodle_url('/local/deanpromoodle/pages/teacher.php', ['tab' => $tab, 'courseid' => $courseid, 'perpage' => $perpage]);
-                if ($page > 0) {
+                if ($pagenum > 0) {
                     $prevurl = clone $baseurl;
-                    $prevurl->param('page', $page - 1);
+                    $prevurl->param('page', $pagenum - 1);
                     echo html_writer::link($prevurl, '« Previous', ['class' => 'btn btn-sm']);
                 }
-                // Убеждаемся, что все переменные являются числами
-                $totalcount = isset($total) ? (is_array($total) ? count($total) : (int)$total) : 0;
-                $pagenum = (int)$page + 1;
-                $totalpagesnum = (int)$totalpages;
-                echo html_writer::span("Page " . $pagenum . " of " . $totalpagesnum . " ($totalcount items)", ['style' => 'margin: 0 15px;']);
-                if ($page < $totalpages - 1) {
+                echo html_writer::span("Page " . ($pagenum + 1) . " of " . $totalpagesnum . " ($totalcount items)", ['style' => 'margin: 0 15px;']);
+                if ($pagenum < $totalpagesnum - 1) {
                     $nexturl = clone $baseurl;
-                    $nexturl->param('page', $page + 1);
+                    $nexturl->param('page', $pagenum + 1);
                     echo html_writer::link($nexturl, 'Next »', ['class' => 'btn btn-sm']);
                 }
                 echo html_writer::end_div();
@@ -1004,22 +1005,23 @@ switch ($tab) {
             echo html_writer::end_tag('table');
             
             // Pagination
-            if ($totalpages > 1) {
+            // Убеждаемся, что все переменные определены и являются числами
+            $totalcount = isset($total) ? (is_array($total) ? count($total) : (int)$total) : 0;
+            $pagenum = isset($page) ? (is_array($page) ? 0 : (int)$page) : 0;
+            $totalpagesnum = isset($totalpages) ? (is_array($totalpages) ? 0 : (int)$totalpages) : 0;
+            
+            if ($totalpagesnum > 1) {
                 echo html_writer::start_div('pagination-wrapper', ['style' => 'margin-top: 20px; text-align: center;']);
                 $baseurl = new moodle_url('/local/deanpromoodle/pages/teacher.php', ['tab' => $tab, 'courseid' => $courseid, 'perpage' => $perpage]);
-                if ($page > 0) {
+                if ($pagenum > 0) {
                     $prevurl = clone $baseurl;
-                    $prevurl->param('page', $page - 1);
+                    $prevurl->param('page', $pagenum - 1);
                     echo html_writer::link($prevurl, '« Previous', ['class' => 'btn btn-sm']);
                 }
-                // Убеждаемся, что все переменные являются числами
-                $totalcount = isset($total) ? (is_array($total) ? count($total) : (int)$total) : 0;
-                $pagenum = (int)$page + 1;
-                $totalpagesnum = (int)$totalpages;
-                echo html_writer::span("Page " . $pagenum . " of " . $totalpagesnum . " ($totalcount items)", ['style' => 'margin: 0 15px;']);
-                if ($page < $totalpages - 1) {
+                echo html_writer::span("Page " . ($pagenum + 1) . " of " . $totalpagesnum . " ($totalcount items)", ['style' => 'margin: 0 15px;']);
+                if ($pagenum < $totalpagesnum - 1) {
                     $nexturl = clone $baseurl;
-                    $nexturl->param('page', $page + 1);
+                    $nexturl->param('page', $pagenum + 1);
                     echo html_writer::link($nexturl, 'Next »', ['class' => 'btn btn-sm']);
                 }
                 echo html_writer::end_div();
@@ -1140,22 +1142,23 @@ switch ($tab) {
             echo html_writer::end_tag('table');
             
             // Pagination
-            if ($totalpages > 1) {
+            // Убеждаемся, что все переменные определены и являются числами
+            $totalcount = isset($total) ? (is_array($total) ? count($total) : (int)$total) : 0;
+            $pagenum = isset($page) ? (is_array($page) ? 0 : (int)$page) : 0;
+            $totalpagesnum = isset($totalpages) ? (is_array($totalpages) ? 0 : (int)$totalpages) : 0;
+            
+            if ($totalpagesnum > 1) {
                 echo html_writer::start_div('pagination-wrapper', ['style' => 'margin-top: 20px; text-align: center;']);
                 $baseurl = new moodle_url('/local/deanpromoodle/pages/teacher.php', ['tab' => $tab, 'courseid' => $courseid, 'perpage' => $perpage]);
-                if ($page > 0) {
+                if ($pagenum > 0) {
                     $prevurl = clone $baseurl;
-                    $prevurl->param('page', $page - 1);
+                    $prevurl->param('page', $pagenum - 1);
                     echo html_writer::link($prevurl, '« Previous', ['class' => 'btn btn-sm']);
                 }
-                // Убеждаемся, что все переменные являются числами
-                $totalcount = isset($total) ? (is_array($total) ? count($total) : (int)$total) : 0;
-                $pagenum = (int)$page + 1;
-                $totalpagesnum = (int)$totalpages;
-                echo html_writer::span("Page " . $pagenum . " of " . $totalpagesnum . " ($totalcount items)", ['style' => 'margin: 0 15px;']);
-                if ($page < $totalpages - 1) {
+                echo html_writer::span("Page " . ($pagenum + 1) . " of " . $totalpagesnum . " ($totalcount items)", ['style' => 'margin: 0 15px;']);
+                if ($pagenum < $totalpagesnum - 1) {
                     $nexturl = clone $baseurl;
-                    $nexturl->param('page', $page + 1);
+                    $nexturl->param('page', $pagenum + 1);
                     echo html_writer::link($nexturl, 'Next »', ['class' => 'btn btn-sm']);
                 }
                 echo html_writer::end_div();
