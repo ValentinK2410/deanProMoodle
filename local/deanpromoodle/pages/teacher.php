@@ -1040,7 +1040,7 @@ switch ($tab) {
                 $posturl->set_anchor('p' . $postid); // Якорь для прокрутки к сообщению
                 $replystr = 'Ответить';
                 $noreplystr = 'Не требует ответа';
-                $actions = html_writer::link($posturl, $replystr, ['class' => 'btn btn-sm btn-primary', 'target' => '_blank', 'style' => 'margin-right: 5px;']);
+                $actions = html_writer::link($posturl, $replystr, ['class' => 'btn btn-sm btn-primary', 'target' => '_blank', 'style' => 'margin-right: 8px;']);
                 $actions .= html_writer::link('#', $noreplystr, [
                     'class' => 'btn btn-sm btn-secondary forum-no-reply-btn',
                     'data-postid' => $postid,
