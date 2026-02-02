@@ -1492,6 +1492,7 @@ switch ($tab) {
                         echo html_writer::tag('th', 'Название');
                         echo html_writer::tag('th', 'Код', ['style' => 'width: 150px;']);
                         echo html_writer::tag('th', 'Краткое описание', ['style' => 'width: 200px;']);
+                        echo html_writer::tag('th', 'Курсы', ['style' => 'width: 300px;']);
                         echo html_writer::end_tag('tr');
                         echo html_writer::end_tag('thead');
                         echo html_writer::start_tag('tbody', ['id' => 'subjects-tbody']);
@@ -1502,6 +1503,16 @@ switch ($tab) {
                             $subjectshortdesc = is_string($subject->shortdescription) ? $subject->shortdescription : '';
                             $sortorder = (int)$subject->sortorder;
                             $relationid = (int)$subject->relation_id;
+                            
+                            // Получаем курсы предмета
+                            $subjectcourses = $DB->get_records_sql(
+                                "SELECT sc.*, c.fullname, c.shortname
+                                 FROM {local_deanpromoodle_subject_courses} sc
+                                 JOIN {course} c ON c.id = sc.courseid
+                                 WHERE sc.subjectid = ?
+                                 ORDER BY sc.sortorder ASC, c.fullname ASC",
+                                [$subject->id]
+                            );
                             
                             echo html_writer::start_tag('tr', [
                                 'data-subject-id' => $subject->id,
@@ -1529,6 +1540,34 @@ switch ($tab) {
                             echo $subjectshortdesc ? htmlspecialchars(mb_substr($subjectshortdesc, 0, 50), ENT_QUOTES, 'UTF-8') . (mb_strlen($subjectshortdesc) > 50 ? '...' : '') : '-';
                             echo html_writer::end_tag('td');
                             
+                            // Курсы
+                            echo html_writer::start_tag('td');
+                            if (!empty($subjectcourses)) {
+                                echo html_writer::start_div('', ['style' => 'display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 5px;']);
+                                foreach ($subjectcourses as $sc) {
+                                    $coursename = htmlspecialchars($sc->shortname ?: $sc->fullname, ENT_QUOTES, 'UTF-8');
+                                    echo html_writer::start_span('badge badge-secondary', [
+                                        'style' => 'display: inline-flex; align-items: center; gap: 5px; padding: 4px 8px; margin: 2px;'
+                                    ]);
+                                    echo htmlspecialchars($coursename, ENT_QUOTES, 'UTF-8');
+                                    echo html_writer::link('#', '<i class="fas fa-times"></i>', [
+                                        'class' => 'detach-course-from-subject-btn',
+                                        'data-subject-id' => $subject->id,
+                                        'data-course-id' => $sc->courseid,
+                                        'style' => 'color: white; text-decoration: none; margin-left: 5px;',
+                                        'title' => 'Открепить курс'
+                                    ]);
+                                    echo html_writer::end_span();
+                                }
+                                echo html_writer::end_div();
+                            }
+                            echo html_writer::link('#', '<i class="fas fa-plus"></i> Добавить курс', [
+                                'class' => 'btn btn-sm btn-primary add-course-to-subject-btn',
+                                'data-subject-id' => $subject->id,
+                                'style' => 'font-size: 12px; padding: 4px 8px;'
+                            ]);
+                            echo html_writer::end_tag('td');
+                            
                             echo html_writer::end_tag('tr');
                         }
                         
@@ -1536,6 +1575,167 @@ switch ($tab) {
                         echo html_writer::end_tag('table');
                         echo html_writer::end_div();
                     }
+                    
+                    // Модальное окно для добавления курса к предмету
+                    echo html_writer::start_div('modal fade', [
+                        'id' => 'addCourseToSubjectModal',
+                        'tabindex' => '-1',
+                        'role' => 'dialog'
+                    ]);
+                    echo html_writer::start_div('modal-dialog modal-lg', ['role' => 'document']);
+                    echo html_writer::start_div('modal-content');
+                    echo html_writer::start_div('modal-header');
+                    echo html_writer::tag('h5', 'Добавить курс к предмету', ['class' => 'modal-title']);
+                    echo html_writer::start_tag('button', [
+                        'type' => 'button',
+                        'class' => 'close',
+                        'data-dismiss' => 'modal',
+                        'onclick' => 'jQuery(\'#addCourseToSubjectModal\').modal(\'hide\');'
+                    ]);
+                    echo html_writer::tag('span', '×', ['aria-hidden' => 'true']);
+                    echo html_writer::end_tag('button');
+                    echo html_writer::end_div();
+                    echo html_writer::start_div('modal-body');
+                    echo html_writer::start_div('form-group');
+                    echo html_writer::label('Поиск курса', 'course-search-subject');
+                    echo html_writer::empty_tag('input', [
+                        'type' => 'text',
+                        'id' => 'course-search-subject',
+                        'class' => 'form-control',
+                        'placeholder' => 'Введите название или код курса...'
+                    ]);
+                    echo html_writer::end_div();
+                    echo html_writer::start_div('', ['id' => 'courses-list-subject', 'style' => 'max-height: 400px; overflow-y: auto;']);
+                    echo html_writer::div('Введите текст для поиска курсов...', 'text-muted');
+                    echo html_writer::end_div();
+                    echo html_writer::end_div();
+                    echo html_writer::start_div('modal-footer');
+                    echo html_writer::start_tag('button', [
+                        'type' => 'button',
+                        'class' => 'btn btn-secondary',
+                        'data-dismiss' => 'modal',
+                        'onclick' => 'jQuery(\'#addCourseToSubjectModal\').modal(\'hide\');'
+                    ]);
+                    echo 'Закрыть';
+                    echo html_writer::end_tag('button');
+                    echo html_writer::end_div();
+                    echo html_writer::end_div();
+                    echo html_writer::end_div();
+                    echo html_writer::end_div();
+                    
+                    // JavaScript для работы с курсами предметов
+                    $PAGE->requires->js_init_code("
+                        (function() {
+                            var currentSubjectId = null;
+                            var searchInput = document.getElementById('course-search-subject');
+                            var coursesList = document.getElementById('courses-list-subject');
+                            var searchTimeout;
+                            
+                            // Обработчик открытия модального окна
+                            document.querySelectorAll('.add-course-to-subject-btn').forEach(function(btn) {
+                                btn.addEventListener('click', function(e) {
+                                    e.preventDefault();
+                                    currentSubjectId = this.getAttribute('data-subject-id');
+                                    if (!currentSubjectId) return;
+                                    
+                                    searchInput.value = '';
+                                    coursesList.innerHTML = '<div class=\"text-muted\">Введите текст для поиска курсов...</div>';
+                                    
+                                    if (typeof jQuery !== 'undefined' && jQuery.fn.modal) {
+                                        jQuery('#addCourseToSubjectModal').modal('show');
+                                    } else if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                                        var modal = new bootstrap.Modal(document.getElementById('addCourseToSubjectModal'));
+                                        modal.show();
+                                    }
+                                });
+                            });
+                            
+                            // Поиск курсов
+                            searchInput.addEventListener('input', function() {
+                                clearTimeout(searchTimeout);
+                                var query = this.value.trim();
+                                
+                                if (!currentSubjectId) return;
+                                
+                                if (query.length < 2) {
+                                    coursesList.innerHTML = '<div class=\"text-muted\">Введите минимум 2 символа для поиска...</div>';
+                                    return;
+                                }
+                                
+                                searchTimeout = setTimeout(function() {
+                                    var xhr = new XMLHttpRequest();
+                                    xhr.open('GET', '/local/deanpromoodle/pages/admin_ajax.php?action=getcourses&search=' + encodeURIComponent(query) + '&subjectid=' + currentSubjectId, true);
+                                    xhr.onreadystatechange = function() {
+                                        if (xhr.readyState === 4 && xhr.status === 200) {
+                                            try {
+                                                var response = JSON.parse(xhr.responseText);
+                                                if (response.success && response.courses) {
+                                                    var html = '<table class=\"table table-striped\"><thead><tr><th>ID</th><th>Название</th><th>Код</th><th>Действие</th></tr></thead><tbody>';
+                                                    response.courses.forEach(function(course) {
+                                                        html += '<tr><td>' + course.id + '</td><td>' + course.fullname + '</td><td>' + (course.shortname || '-') + '</td><td><button class=\"btn btn-sm btn-primary attach-course-to-subject-btn\" data-course-id=\"' + course.id + '\">Прикрепить</button></td></tr>';
+                                                    });
+                                                    html += '</tbody></table>';
+                                                    coursesList.innerHTML = html;
+                                                    
+                                                    // Обработчики кнопок прикрепления
+                                                    document.querySelectorAll('.attach-course-to-subject-btn').forEach(function(btn) {
+                                                        btn.addEventListener('click', function() {
+                                                            var courseId = this.getAttribute('data-course-id');
+                                                            var xhr2 = new XMLHttpRequest();
+                                                            xhr2.open('POST', '/local/deanpromoodle/pages/admin_ajax.php', true);
+                                                            xhr2.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                                                            xhr2.onreadystatechange = function() {
+                                                                if (xhr2.readyState === 4 && xhr2.status === 200) {
+                                                                    var response2 = JSON.parse(xhr2.responseText);
+                                                                    if (response2.success) {
+                                                                        location.reload();
+                                                                    } else {
+                                                                        alert('Ошибка: ' + (response2.error || 'Неизвестная ошибка'));
+                                                                    }
+                                                                }
+                                                            };
+                                                            xhr2.send('action=attachcoursetosubject&subjectid=' + currentSubjectId + '&courseid=' + courseId);
+                                                        });
+                                                    });
+                                                } else {
+                                                    coursesList.innerHTML = '<div class=\"alert alert-info\">Курсы не найдены</div>';
+                                                }
+                                            } catch (e) {
+                                                coursesList.innerHTML = '<div class=\"alert alert-danger\">Ошибка при обработке ответа</div>';
+                                            }
+                                        }
+                                    };
+                                    xhr.send();
+                                }, 500);
+                            });
+                            
+                            // Обработчик открепления курса
+                            document.querySelectorAll('.detach-course-from-subject-btn').forEach(function(btn) {
+                                btn.addEventListener('click', function(e) {
+                                    e.preventDefault();
+                                    if (!confirm('Вы уверены, что хотите открепить этот курс от предмета?')) {
+                                        return;
+                                    }
+                                    var subjectId = this.getAttribute('data-subject-id');
+                                    var courseId = this.getAttribute('data-course-id');
+                                    var xhr = new XMLHttpRequest();
+                                    xhr.open('POST', '/local/deanpromoodle/pages/admin_ajax.php', true);
+                                    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                                    xhr.onreadystatechange = function() {
+                                        if (xhr.readyState === 4 && xhr.status === 200) {
+                                            var response = JSON.parse(xhr.responseText);
+                                            if (response.success) {
+                                                location.reload();
+                                            } else {
+                                                alert('Ошибка: ' + (response.error || 'Неизвестная ошибка'));
+                                            }
+                                        }
+                                    };
+                                    xhr.send('action=detachcoursefromsubject&subjectid=' + subjectId + '&courseid=' + courseId);
+                                });
+                            });
+                        })();
+                    ");
                     
                     echo html_writer::end_div();
                 }
