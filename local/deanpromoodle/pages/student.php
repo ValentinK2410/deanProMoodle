@@ -1917,6 +1917,9 @@ if ($action == 'viewprogram' && $programid > 0) {
                                         } else {
                                             $transaction = $DB->start_delegated_transaction();
                                             try {
+                                                // Инициализируем массив для не найденных студентов
+                                                $notfoundstudents = [];
+                                                
                                                 // Обрабатываем каждую строку данных
                                                 for ($i = 1; $i < count($rows); $i++) {
                                                     $row = $rows[$i];
@@ -2081,9 +2084,6 @@ if ($action == 'viewprogram' && $programid > 0) {
                                                         $errors[] = $errormsg;
                                                         
                                                         // Сохраняем данные для скачивания
-                                                        if (!isset($notfoundstudents)) {
-                                                            $notfoundstudents = [];
-                                                        }
                                                         $notfoundstudents[] = [
                                                             'row' => $i + 1,
                                                             'lastname' => $lastname,
