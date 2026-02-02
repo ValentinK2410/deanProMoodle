@@ -1942,7 +1942,31 @@ if ($action == 'viewprogram' && $programid > 0) {
                                                     
                                                     if (!$user) {
                                                         $skipped++;
-                                                        $errors[] = "Строка " . ($i + 1) . ": студент не найден в Moodle (ФИО: $lastname $firstname $middlename, Email: $email)";
+                                                        // Формируем детальное сообщение о параметрах поиска
+                                                        $searchdetails = [];
+                                                        $searchdetails[] = "Строка " . ($i + 1);
+                                                        $searchdetails[] = "ФИО из Excel: " . trim("$lastname $firstname $middlename");
+                                                        $searchdetails[] = "Email из Excel: " . ($email ?: "не указан");
+                                                        
+                                                        // Показываем, какие попытки поиска были сделаны
+                                                        $attempts = [];
+                                                        if (!empty($email)) {
+                                                            $attempts[] = "✓ Поиск по Email: '$email' - не найдено";
+                                                        } else {
+                                                            $attempts[] = "✗ Поиск по Email: не выполнен (email не указан)";
+                                                        }
+                                                        
+                                                        if (!empty($firstname) && !empty($lastname)) {
+                                                            if (!empty($middlename)) {
+                                                                $attempts[] = "✓ Поиск по ФИО (с отчеством): '$lastname $firstname $middlename' - не найдено";
+                                                                $attempts[] = "✓ Поиск по ФИО (без отчества): '$lastname $firstname' - не найдено";
+                                                            } else {
+                                                                $attempts[] = "✓ Поиск по ФИО: '$lastname $firstname' - не найдено";
+                                                            }
+                                                        }
+                                                        
+                                                        $errormsg = implode(" | ", $searchdetails) . "\n" . implode(" | ", $attempts);
+                                                        $errors[] = $errormsg;
                                                         continue;
                                                     }
                                                     
@@ -2081,19 +2105,69 @@ if ($action == 'viewprogram' && $programid > 0) {
                                                 
                                                 // Показываем детальную информацию о пропущенных записях
                                                 if (!empty($errors)) {
-                                                    $message .= "<br><br><strong>Детали пропущенных записей:</strong><br>";
-                                                    $message .= "<div style='max-height: 400px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; margin-top: 10px;'>";
-                                                    $message .= "<ul style='margin: 0; padding-left: 20px;'>";
-                                                    foreach (array_slice($errors, 0, 50) as $error) {
-                                                        $message .= "<li>" . htmlspecialchars($error, ENT_QUOTES, 'UTF-8') . "</li>";
+                                                    $message .= "<br><br><strong>Список студентов, не найденных в Moodle:</strong><br>";
+                                                    $message .= "<div style='max-height: 500px; overflow-y: auto; border: 1px solid #ddd; padding: 15px; margin-top: 10px; background: #f9f9f9;'>";
+                                                    $message .= "<table style='width: 100%; border-collapse: collapse; font-size: 12px;'>";
+                                                    $message .= "<thead><tr style='background: #e9ecef; border-bottom: 2px solid #ddd;'>";
+                                                    $message .= "<th style='padding: 8px; text-align: left; border: 1px solid #ddd;'>№ строки</th>";
+                                                    $message .= "<th style='padding: 8px; text-align: left; border: 1px solid #ddd;'>ФИО из Excel</th>";
+                                                    $message .= "<th style='padding: 8px; text-align: left; border: 1px solid #ddd;'>Email из Excel</th>";
+                                                    $message .= "<th style='padding: 8px; text-align: left; border: 1px solid #ddd;'>Попытки поиска</th>";
+                                                    $message .= "</tr></thead><tbody>";
+                                                    
+                                                    $displayed = 0;
+                                                    foreach ($errors as $error) {
+                                                        if ($displayed >= 100) break; // Показываем максимум 100 записей
+                                                        
+                                                        // Парсим сообщение об ошибке
+                                                        $parts = explode(" | ", $error);
+                                                        $rowNum = "";
+                                                        $fio = "";
+                                                        $email = "";
+                                                        $attempts = "";
+                                                        
+                                                        foreach ($parts as $part) {
+                                                            if (strpos($part, "Строка") !== false) {
+                                                                $rowNum = trim(str_replace("Строка", "", $part));
+                                                            } elseif (strpos($part, "ФИО из Excel:") !== false) {
+                                                                $fio = trim(str_replace("ФИО из Excel:", "", $part));
+                                                            } elseif (strpos($part, "Email из Excel:") !== false) {
+                                                                $email = trim(str_replace("Email из Excel:", "", $part));
+                                                            } elseif (strpos($part, "Поиск") !== false) {
+                                                                $attempts .= ($attempts ? "<br>" : "") . htmlspecialchars($part, ENT_QUOTES, 'UTF-8');
+                                                            }
+                                                        }
+                                                        
+                                                        // Если формат не распознан, показываем как есть
+                                                        if (empty($rowNum)) {
+                                                            $rowNum = "?";
+                                                            $fio = htmlspecialchars($error, ENT_QUOTES, 'UTF-8');
+                                                            $email = "-";
+                                                            $attempts = "-";
+                                                        }
+                                                        
+                                                        $message .= "<tr style='border-bottom: 1px solid #ddd;'>";
+                                                        $message .= "<td style='padding: 8px; border: 1px solid #ddd;'>" . htmlspecialchars($rowNum, ENT_QUOTES, 'UTF-8') . "</td>";
+                                                        $message .= "<td style='padding: 8px; border: 1px solid #ddd;'>" . htmlspecialchars($fio, ENT_QUOTES, 'UTF-8') . "</td>";
+                                                        $message .= "<td style='padding: 8px; border: 1px solid #ddd;'>" . htmlspecialchars($email, ENT_QUOTES, 'UTF-8') . "</td>";
+                                                        $message .= "<td style='padding: 8px; border: 1px solid #ddd; font-size: 11px;'>" . $attempts . "</td>";
+                                                        $message .= "</tr>";
+                                                        
+                                                        $displayed++;
                                                     }
-                                                    if (count($errors) > 50) {
-                                                        $message .= "<li><em>... и еще " . (count($errors) - 50) . " записей</em></li>";
+                                                    
+                                                    $message .= "</tbody></table></div>";
+                                                    
+                                                    if (count($errors) > 100) {
+                                                        $message .= "<br><em style='color: #666;'>Показано 100 из " . count($errors) . " записей. Всего не найдено: " . count($errors) . " студентов.</em>";
                                                     }
-                                                    $message .= "</ul></div>";
                                                     
                                                     // Добавляем подсказку по улучшению поиска
-                                                    $message .= "<br><small style='color: #666;'>Подсказка: Если студенты не найдены, проверьте совпадение ФИО и Email в Moodle. Поиск выполняется сначала по Email (точное совпадение), затем по ФИО (с учетом регистра и пробелов).</small>";
+                                                    $message .= "<br><br><small style='color: #666;'><strong>Как исправить:</strong><br>";
+                                                    $message .= "1. Проверьте, что Email в Excel точно совпадает с Email в Moodle (регистр не важен, но пробелы важны)<br>";
+                                                    $message .= "2. Проверьте, что ФИО в Excel точно совпадает с ФИО в Moodle (регистр не важен, но пробелы и дефисы важны)<br>";
+                                                    $message .= "3. Если в Excel указано отчество, а в Moodle нет (или наоборот), поиск может не сработать<br>";
+                                                    $message .= "4. Убедитесь, что студенты не удалены в Moodle (deleted = 0)</small>";
                                                 }
                                                 
                                                 if ($imported > 0) {
