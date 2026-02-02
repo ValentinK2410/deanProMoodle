@@ -1135,19 +1135,22 @@ switch ($tab) {
                             if (xhr.status === 200) {
                                 try {
                                     var response = JSON.parse(xhr.responseText);
-                                    if (response.success && response.students && response.students.length > 0) {
-                                        var html = '<table class=\"table table-striped table-hover\"><thead><tr><th>ID</th><th>ФИО</th><th>Email</th><th>Группы</th><th>Действие</th></tr></thead><tbody>';
-                                        response.students.forEach(function(student) {
-                                            var fullname = (student.firstname || '') + ' ' + (student.lastname || '');
-                                            var cohorts = student.cohorts && student.cohorts.length > 0 ? student.cohorts.join(', ') : '-';
-                                            html += '<tr>';
-                                            html += '<td>' + student.id + '</td>';
-                                            html += '<td>' + (fullname.trim() || '-') + '</td>';
-                                            html += '<td>' + (student.email || '-') + '</td>';
-                                            html += '<td>' + cohorts + '</td>';
-                                            html += '<td><a href=\"' + studentUrl + '?studentid=' + student.id + '&tab=courses\" class=\"btn btn-sm btn-primary\" target=\"_blank\"><i class=\"fas fa-user\"></i> Перейти в личный кабинет</a></td>';
-                                            html += '</tr>';
-                                        });
+                                if (response.success && response.students && response.students.length > 0) {
+                                    var html = '<table class=\"table table-striped table-hover\"><thead><tr><th>ID</th><th>ФИО</th><th>Email</th><th>Группы</th><th>Действие</th></tr></thead><tbody>';
+                                    response.students.forEach(function(student) {
+                                        var fullname = (student.firstname || '') + ' ' + (student.lastname || '');
+                                        var cohorts = student.cohorts && student.cohorts.length > 0 ? student.cohorts.join(', ') : '-';
+                                        html += '<tr>';
+                                        html += '<td>' + student.id + '</td>';
+                                        html += '<td>' + (fullname.trim() || '-') + '</td>';
+                                        html += '<td>' + (student.email || '-') + '</td>';
+                                        html += '<td>' + cohorts + '</td>';
+                                        html += '<td>';
+                                        html += '<a href=\"' + studentUrl + '?studentid=' + student.id + '&tab=courses\" class=\"btn btn-sm btn-primary\" target=\"_blank\" style=\"margin-right: 5px;\"><i class=\"fas fa-graduation-cap\"></i> Мои оценки</a>';
+                                        html += '<a href=\"' + studentUrl + '?studentid=' + student.id + '&tab=programs\" class=\"btn btn-sm btn-info\" target=\"_blank\"><i class=\"fas fa-user\"></i> Личная информация</a>';
+                                        html += '</td>';
+                                        html += '</tr>';
+                                    });
                                         html += '</tbody></table>';
                                         html += '<div class=\"text-muted\" style=\"margin-top: 10px;\">Найдено студентов: ' + response.count + '</div>';
                                         resultsDiv.innerHTML = html;

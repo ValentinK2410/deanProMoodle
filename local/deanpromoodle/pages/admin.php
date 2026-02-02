@@ -6286,7 +6286,10 @@ switch ($tab) {
                                             html += '<td>' + (fullname.trim() || '-') + '</td>';
                                             html += '<td>' + (student.email || '-') + '</td>';
                                             html += '<td>' + cohorts + '</td>';
-                                            html += '<td><a href=\"' + studentUrl + '?studentid=' + student.id + '&tab=courses\" class=\"btn btn-sm btn-primary\" target=\"_blank\"><i class=\"fas fa-user\"></i> Перейти в личный кабинет</a></td>';
+                                            html += '<td>';
+                                            html += '<a href=\"' + studentUrl + '?studentid=' + student.id + '&tab=courses\" class=\"btn btn-sm btn-primary\" target=\"_blank\" style=\"margin-right: 5px;\"><i class=\"fas fa-graduation-cap\"></i> Мои оценки</a>';
+                                            html += '<a href=\"' + studentUrl + '?studentid=' + student.id + '&tab=programs\" class=\"btn btn-sm btn-info\" target=\"_blank\"><i class=\"fas fa-user\"></i> Личная информация</a>';
+                                            html += '</td>';
                                             html += '</tr>';
                                         });
                                         html += '</tbody></table>';
