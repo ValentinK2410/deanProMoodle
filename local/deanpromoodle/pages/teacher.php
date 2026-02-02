@@ -980,28 +980,44 @@ switch ($tab) {
             echo html_writer::end_tag('thead');
             echo html_writer::start_tag('tbody');
             foreach ($paginated as $item) {
-                echo html_writer::start_tag('tr', ['id' => 'forum-post-' . $item->id]);
-                // Используем краткое название курса
-                $coursedisplayname = !empty($item->courseshortname) ? htmlspecialchars($item->courseshortname) : htmlspecialchars($item->coursename);
+                // Проверяем и приводим ID к правильному типу
+                $postid = isset($item->id) && !is_array($item->id) ? (int)$item->id : 0;
+                $discussionid = isset($item->discussionid) && !is_array($item->discussionid) ? (int)$item->discussionid : 0;
+                
+                echo html_writer::start_tag('tr', ['id' => 'forum-post-' . $postid]);
+                // Используем краткое название курса с проверкой типов
+                $courseshortname = isset($item->courseshortname) && !is_array($item->courseshortname) ? (string)$item->courseshortname : '';
+                $coursename = isset($item->coursename) && !is_array($item->coursename) ? (string)$item->coursename : '';
+                $coursedisplayname = !empty($courseshortname) ? htmlspecialchars($courseshortname) : htmlspecialchars($coursename);
                 echo html_writer::tag('td', $coursedisplayname);
-                echo html_writer::tag('td', htmlspecialchars($item->forumname));
-                echo html_writer::tag('td', htmlspecialchars($item->studentname));
-                echo html_writer::tag('td', htmlspecialchars($item->subject));
-                echo html_writer::tag('td', htmlspecialchars($item->message), ['style' => 'max-width: 300px; word-wrap: break-word;']);
-                echo html_writer::tag('td', $item->posted);
+                
+                $forumname = isset($item->forumname) && !is_array($item->forumname) ? (string)$item->forumname : '';
+                echo html_writer::tag('td', htmlspecialchars($forumname));
+                
+                $studentname = isset($item->studentname) && !is_array($item->studentname) ? (string)$item->studentname : '';
+                echo html_writer::tag('td', htmlspecialchars($studentname));
+                
+                $subject = isset($item->subject) && !is_array($item->subject) ? (string)$item->subject : '';
+                echo html_writer::tag('td', htmlspecialchars($subject));
+                
+                $message = isset($item->message) && !is_array($item->message) ? (string)$item->message : '';
+                echo html_writer::tag('td', htmlspecialchars($message), ['style' => 'max-width: 300px; word-wrap: break-word;']);
+                
+                $posted = isset($item->posted) && !is_array($item->posted) ? (string)$item->posted : '';
+                echo html_writer::tag('td', $posted);
                 // Создаем URL с якорем для перехода к конкретному сообщению
                 // Используем discuss.php с параметром reply для открытия формы ответа и якорем для прокрутки
                 $posturl = new moodle_url('/mod/forum/discuss.php', [
-                    'd' => $item->discussionid,
-                    'reply' => $item->id // ID сообщения, на которое отвечаем
+                    'd' => $discussionid,
+                    'reply' => $postid // ID сообщения, на которое отвечаем
                 ]);
-                $posturl->set_anchor('p' . $item->id); // Якорь для прокрутки к сообщению
+                $posturl->set_anchor('p' . $postid); // Якорь для прокрутки к сообщению
                 $replystr = 'Ответить';
                 $noreplystr = 'Не требует ответа';
                 $actions = html_writer::link($posturl, $replystr, ['class' => 'btn btn-sm btn-primary', 'target' => '_blank', 'style' => 'margin-right: 5px;']);
                 $actions .= html_writer::link('#', $noreplystr, [
                     'class' => 'btn btn-sm btn-secondary forum-no-reply-btn',
-                    'data-postid' => $item->id,
+                    'data-postid' => $postid,
                     'onclick' => 'return false;'
                 ]);
                 echo html_writer::tag('td', $actions);
