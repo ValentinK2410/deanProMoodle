@@ -1656,8 +1656,74 @@ if ($action == 'viewprogram' && $programid > 0) {
         case 'additional':
             // Подвкладка "Дополнительные данные"
             try {
+                // Проверяем права на редактирование
+                $canedit = false;
+                if ($isadmin || $isteacher) {
+                    // Админ и преподаватель могут редактировать любые данные
+                    $canedit = true;
+                } elseif ($isstudent && $viewingstudent->id == $USER->id) {
+                    // Студент может редактировать только свои данные
+                    $canedit = true;
+                }
+                
+                // Обработка сохранения формы
+                if ($action == 'save' && $canedit) {
+                    require_sesskey();
+                    
+                    // Получаем данные из формы
+                    $data = new stdClass();
+                    $data->userid = $viewingstudent->id;
+                    $data->lastname = optional_param('lastname', '', PARAM_TEXT);
+                    $data->firstname = optional_param('firstname', '', PARAM_TEXT);
+                    $data->middlename = optional_param('middlename', '', PARAM_TEXT);
+                    $data->status = optional_param('status', '', PARAM_TEXT);
+                    $data->enrollment_year = optional_param('enrollment_year', 0, PARAM_INT);
+                    $data->gender = optional_param('gender', '', PARAM_TEXT);
+                    $birthdate = optional_param('birthdate', '', PARAM_TEXT);
+                    $data->birthdate = !empty($birthdate) ? strtotime($birthdate) : 0;
+                    $data->snils = optional_param('snils', '', PARAM_TEXT);
+                    $data->mobile = optional_param('mobile', '', PARAM_TEXT);
+                    $data->email = optional_param('email', '', PARAM_TEXT);
+                    $data->citizenship = optional_param('citizenship', '', PARAM_TEXT);
+                    $data->birthplace = optional_param('birthplace', '', PARAM_TEXT);
+                    $data->id_type = optional_param('id_type', '', PARAM_TEXT);
+                    $data->passport_number = optional_param('passport_number', '', PARAM_TEXT);
+                    $data->passport_issued_by = optional_param('passport_issued_by', '', PARAM_TEXT);
+                    $passport_issue_date = optional_param('passport_issue_date', '', PARAM_TEXT);
+                    $data->passport_issue_date = !empty($passport_issue_date) ? strtotime($passport_issue_date) : 0;
+                    $data->passport_division_code = optional_param('passport_division_code', '', PARAM_TEXT);
+                    $data->postal_index = optional_param('postal_index', '', PARAM_TEXT);
+                    $data->country = optional_param('country', '', PARAM_TEXT);
+                    $data->region = optional_param('region', '', PARAM_TEXT);
+                    $data->city = optional_param('city', '', PARAM_TEXT);
+                    $data->street = optional_param('street', '', PARAM_TEXT);
+                    $data->house_apartment = optional_param('house_apartment', '', PARAM_TEXT);
+                    $data->previous_institution = optional_param('previous_institution', '', PARAM_TEXT);
+                    $data->previous_institution_year = optional_param('previous_institution_year', 0, PARAM_INT);
+                    $data->cohort = optional_param('cohort', '', PARAM_TEXT);
+                    $data->timemodified = time();
+                    
+                    // Проверяем, существует ли запись
+                    $existing = $DB->get_record('local_deanpromoodle_student_info', ['userid' => $viewingstudent->id]);
+                    
+                    if ($existing) {
+                        // Обновляем существующую запись
+                        $data->id = $existing->id;
+                        $DB->update_record('local_deanpromoodle_student_info', $data);
+                        echo html_writer::div('Данные успешно сохранены', 'alert alert-success');
+                    } else {
+                        // Создаем новую запись
+                        $data->timecreated = time();
+                        $DB->insert_record('local_deanpromoodle_student_info', $data);
+                        echo html_writer::div('Данные успешно сохранены', 'alert alert-success');
+                    }
+                }
+                
                 // Получаем данные из таблицы local_deanpromoodle_student_info
                 $studentinfo = $DB->get_record('local_deanpromoodle_student_info', ['userid' => $viewingstudent->id]);
+                
+                // Определяем режим отображения
+                $editmode = ($action == 'edit' && $canedit);
                 
                 // Группа (cohort) - сначала из таблицы, если нет - из cohort_members
                 $cohortdisplay = '';
@@ -1753,71 +1819,620 @@ if ($action == 'viewprogram' && $programid > 0) {
                     }
                 }
                 
-                // Стили для таблицы дополнительных данных
-                echo html_writer::start_tag('style');
-                echo "
-                    .additional-data-table {
-                        background: white;
-                        border-radius: 8px;
-                        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-                        overflow: hidden;
-                    }
-                    .additional-data-table table {
-                        margin: 0;
-                        width: 100%;
-                    }
-                    .additional-data-table tbody tr {
-                        border-bottom: 1px solid #f0f0f0;
-                    }
-                    .additional-data-table tbody tr:last-child {
-                        border-bottom: none;
-                    }
-                    .additional-data-table tbody td {
-                        padding: 16px;
-                        vertical-align: middle;
-                    }
-                    .additional-data-table tbody td:first-child {
-                        font-weight: 600;
-                        width: 250px;
-                        color: #495057;
-                    }
-                    .additional-data-table tbody td:last-child {
-                        color: #212529;
-                    }
-                ";
-                echo html_writer::end_tag('style');
+                // Кнопка редактирования
+                if ($canedit && !$editmode) {
+                    $editurl = new moodle_url('/local/deanpromoodle/pages/student.php', [
+                        'tab' => 'programs',
+                        'subtab' => 'additional',
+                        'action' => 'edit',
+                        'studentid' => $viewingstudent->id
+                    ]);
+                    echo html_writer::start_div('', ['style' => 'margin-bottom: 20px;']);
+                    echo html_writer::link($editurl, 'Редактировать', ['class' => 'btn btn-primary']);
+                    echo html_writer::end_div();
+                }
                 
-                echo html_writer::start_div('additional-data-table');
-                echo html_writer::start_tag('table', ['class' => 'table']);
-                echo html_writer::start_tag('tbody');
-                
-                // Группа
-                echo html_writer::start_tag('tr');
-                echo html_writer::tag('td', 'Группа');
-                echo html_writer::tag('td', $cohortdisplay ?: '-');
-                echo html_writer::end_tag('tr');
-                
-                // Дата зачисления
-                echo html_writer::start_tag('tr');
-                echo html_writer::tag('td', 'Дата зачисления');
-                echo html_writer::tag('td', $enrollmentdisplay);
-                echo html_writer::end_tag('tr');
-                
-                // Адрес
-                echo html_writer::start_tag('tr');
-                echo html_writer::tag('td', 'Адрес');
-                echo html_writer::tag('td', $addressdisplay);
-                echo html_writer::end_tag('tr');
-                
-                // СНИЛС
-                echo html_writer::start_tag('tr');
-                echo html_writer::tag('td', 'СНИЛС');
-                echo html_writer::tag('td', $snilsdisplay);
-                echo html_writer::end_tag('tr');
-                
-                echo html_writer::end_tag('tbody');
-                echo html_writer::end_tag('table');
-                echo html_writer::end_div();
+                if ($editmode) {
+                    // Форма редактирования - код формы будет добавлен ниже
+                    $saveurl = new moodle_url('/local/deanpromoodle/pages/student.php', [
+                        'tab' => 'programs',
+                        'subtab' => 'additional',
+                        'action' => 'save',
+                        'studentid' => $viewingstudent->id
+                    ]);
+                    $cancelurl = new moodle_url('/local/deanpromoodle/pages/student.php', [
+                        'tab' => 'programs',
+                        'subtab' => 'additional',
+                        'studentid' => $viewingstudent->id
+                    ]);
+                    
+                    echo html_writer::start_tag('form', [
+                        'method' => 'post',
+                        'action' => $saveurl,
+                        'class' => 'student-info-form'
+                    ]);
+                    echo html_writer::input_hidden_params($saveurl);
+                    echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'sesskey', 'value' => sesskey()]);
+                    
+                    // Стили для формы
+                    echo html_writer::start_tag('style');
+                    echo "
+                        .student-info-form {
+                            background: white;
+                            border-radius: 8px;
+                            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                            padding: 30px;
+                        }
+                        .student-info-form .form-group {
+                            margin-bottom: 20px;
+                        }
+                        .student-info-form label {
+                            display: block;
+                            font-weight: 600;
+                            margin-bottom: 8px;
+                            color: #495057;
+                        }
+                        .student-info-form input[type='text'],
+                        .student-info-form input[type='email'],
+                        .student-info-form input[type='tel'],
+                        .student-info-form input[type='date'],
+                        .student-info-form input[type='number'],
+                        .student-info-form select,
+                        .student-info-form textarea {
+                            width: 100%;
+                            padding: 10px 12px;
+                            border: 1px solid #ced4da;
+                            border-radius: 6px;
+                            font-size: 14px;
+                            transition: border-color 0.2s;
+                        }
+                        .student-info-form input:focus,
+                        .student-info-form select:focus,
+                        .student-info-form textarea:focus {
+                            outline: none;
+                            border-color: #007bff;
+                            box-shadow: 0 0 0 0.2rem rgba(0,123,255,0.25);
+                        }
+                        .student-info-form .form-row {
+                            display: grid;
+                            grid-template-columns: 1fr 1fr;
+                            gap: 20px;
+                        }
+                        .student-info-form .form-actions {
+                            margin-top: 30px;
+                            display: flex;
+                            gap: 10px;
+                        }
+                    ";
+                    echo html_writer::end_tag('style');
+                    
+                    // ФИО
+                    echo html_writer::start_div('form-row');
+                    echo html_writer::start_div('form-group');
+                    echo html_writer::tag('label', 'Фамилия');
+                    echo html_writer::empty_tag('input', [
+                        'type' => 'text',
+                        'name' => 'lastname',
+                        'value' => $studentinfo ? htmlspecialchars($studentinfo->lastname, ENT_QUOTES, 'UTF-8') : '',
+                        'class' => 'form-control'
+                    ]);
+                    echo html_writer::end_div();
+                    
+                    echo html_writer::start_div('form-group');
+                    echo html_writer::tag('label', 'Имя');
+                    echo html_writer::empty_tag('input', [
+                        'type' => 'text',
+                        'name' => 'firstname',
+                        'value' => $studentinfo ? htmlspecialchars($studentinfo->firstname, ENT_QUOTES, 'UTF-8') : '',
+                        'class' => 'form-control'
+                    ]);
+                    echo html_writer::end_div();
+                    
+                    echo html_writer::start_div('form-group');
+                    echo html_writer::tag('label', 'Отчество');
+                    echo html_writer::empty_tag('input', [
+                        'type' => 'text',
+                        'name' => 'middlename',
+                        'value' => $studentinfo ? htmlspecialchars($studentinfo->middlename, ENT_QUOTES, 'UTF-8') : '',
+                        'class' => 'form-control'
+                    ]);
+                    echo html_writer::end_div();
+                    echo html_writer::end_div();
+                    
+                    // Статус, год поступления, пол
+                    echo html_writer::start_div('form-row');
+                    echo html_writer::start_div('form-group');
+                    echo html_writer::tag('label', 'Статус');
+                    echo html_writer::empty_tag('input', [
+                        'type' => 'text',
+                        'name' => 'status',
+                        'value' => $studentinfo ? htmlspecialchars($studentinfo->status, ENT_QUOTES, 'UTF-8') : '',
+                        'class' => 'form-control'
+                    ]);
+                    echo html_writer::end_div();
+                    
+                    echo html_writer::start_div('form-group');
+                    echo html_writer::tag('label', 'Год поступления');
+                    echo html_writer::empty_tag('input', [
+                        'type' => 'number',
+                        'name' => 'enrollment_year',
+                        'value' => $studentinfo && $studentinfo->enrollment_year ? $studentinfo->enrollment_year : '',
+                        'class' => 'form-control',
+                        'min' => '1900',
+                        'max' => '2100'
+                    ]);
+                    echo html_writer::end_div();
+                    
+                    echo html_writer::start_div('form-group');
+                    echo html_writer::tag('label', 'Пол');
+                    $genderoptions = [
+                        '' => 'Не указан',
+                        'М' => 'Мужской',
+                        'Ж' => 'Женский'
+                    ];
+                    $genderselect = html_writer::start_tag('select', ['name' => 'gender', 'class' => 'form-control']);
+                    foreach ($genderoptions as $value => $label) {
+                        $selected = ($studentinfo && $studentinfo->gender == $value) ? 'selected' : '';
+                        $genderselect .= html_writer::tag('option', $label, ['value' => $value, 'selected' => $selected]);
+                    }
+                    $genderselect .= html_writer::end_tag('select');
+                    echo $genderselect;
+                    echo html_writer::end_div();
+                    echo html_writer::end_div();
+                    
+                    // Дата рождения, СНИЛС, мобильный, email
+                    echo html_writer::start_div('form-row');
+                    echo html_writer::start_div('form-group');
+                    echo html_writer::tag('label', 'Дата рождения');
+                    $birthdatevalue = '';
+                    if ($studentinfo && $studentinfo->birthdate > 0) {
+                        $birthdatevalue = date('Y-m-d', $studentinfo->birthdate);
+                    }
+                    echo html_writer::empty_tag('input', [
+                        'type' => 'date',
+                        'name' => 'birthdate',
+                        'value' => $birthdatevalue,
+                        'class' => 'form-control'
+                    ]);
+                    echo html_writer::end_div();
+                    
+                    echo html_writer::start_div('form-group');
+                    echo html_writer::tag('label', 'СНИЛС');
+                    echo html_writer::empty_tag('input', [
+                        'type' => 'text',
+                        'name' => 'snils',
+                        'value' => $studentinfo ? htmlspecialchars($studentinfo->snils, ENT_QUOTES, 'UTF-8') : '',
+                        'class' => 'form-control'
+                    ]);
+                    echo html_writer::end_div();
+                    
+                    echo html_writer::start_div('form-group');
+                    echo html_writer::tag('label', 'Мобильный телефон');
+                    echo html_writer::empty_tag('input', [
+                        'type' => 'tel',
+                        'name' => 'mobile',
+                        'value' => $studentinfo ? htmlspecialchars($studentinfo->mobile, ENT_QUOTES, 'UTF-8') : '',
+                        'class' => 'form-control'
+                    ]);
+                    echo html_writer::end_div();
+                    
+                    echo html_writer::start_div('form-group');
+                    echo html_writer::tag('label', 'Email');
+                    echo html_writer::empty_tag('input', [
+                        'type' => 'email',
+                        'name' => 'email',
+                        'value' => $studentinfo ? htmlspecialchars($studentinfo->email, ENT_QUOTES, 'UTF-8') : '',
+                        'class' => 'form-control'
+                    ]);
+                    echo html_writer::end_div();
+                    echo html_writer::end_div();
+                    
+                    // Гражданство, место рождения
+                    echo html_writer::start_div('form-row');
+                    echo html_writer::start_div('form-group');
+                    echo html_writer::tag('label', 'Гражданство');
+                    echo html_writer::empty_tag('input', [
+                        'type' => 'text',
+                        'name' => 'citizenship',
+                        'value' => $studentinfo ? htmlspecialchars($studentinfo->citizenship, ENT_QUOTES, 'UTF-8') : '',
+                        'class' => 'form-control'
+                    ]);
+                    echo html_writer::end_div();
+                    
+                    echo html_writer::start_div('form-group');
+                    echo html_writer::tag('label', 'Место рождения');
+                    echo html_writer::empty_tag('input', [
+                        'type' => 'text',
+                        'name' => 'birthplace',
+                        'value' => $studentinfo ? htmlspecialchars($studentinfo->birthplace, ENT_QUOTES, 'UTF-8') : '',
+                        'class' => 'form-control'
+                    ]);
+                    echo html_writer::end_div();
+                    echo html_writer::end_div();
+                    
+                    // Паспортные данные
+                    echo html_writer::start_tag('h3', ['style' => 'margin-top: 30px; margin-bottom: 20px; color: #495057;']);
+                    echo 'Паспортные данные';
+                    echo html_writer::end_tag('h3');
+                    
+                    echo html_writer::start_div('form-row');
+                    echo html_writer::start_div('form-group');
+                    echo html_writer::tag('label', 'Тип удостоверения');
+                    echo html_writer::empty_tag('input', [
+                        'type' => 'text',
+                        'name' => 'id_type',
+                        'value' => $studentinfo ? htmlspecialchars($studentinfo->id_type, ENT_QUOTES, 'UTF-8') : '',
+                        'class' => 'form-control',
+                        'placeholder' => 'Например: Паспорт РФ'
+                    ]);
+                    echo html_writer::end_div();
+                    
+                    echo html_writer::start_div('form-group');
+                    echo html_writer::tag('label', 'Номер паспорта');
+                    echo html_writer::empty_tag('input', [
+                        'type' => 'text',
+                        'name' => 'passport_number',
+                        'value' => $studentinfo ? htmlspecialchars($studentinfo->passport_number, ENT_QUOTES, 'UTF-8') : '',
+                        'class' => 'form-control'
+                    ]);
+                    echo html_writer::end_div();
+                    echo html_writer::end_div();
+                    
+                    echo html_writer::start_div('form-group');
+                    echo html_writer::tag('label', 'Кем выдан паспорт');
+                    echo html_writer::empty_tag('input', [
+                        'type' => 'text',
+                        'name' => 'passport_issued_by',
+                        'value' => $studentinfo ? htmlspecialchars($studentinfo->passport_issued_by, ENT_QUOTES, 'UTF-8') : '',
+                        'class' => 'form-control'
+                    ]);
+                    echo html_writer::end_div();
+                    
+                    echo html_writer::start_div('form-row');
+                    echo html_writer::start_div('form-group');
+                    echo html_writer::tag('label', 'Дата выдачи паспорта');
+                    $passportissuedatevalue = '';
+                    if ($studentinfo && $studentinfo->passport_issue_date > 0) {
+                        $passportissuedatevalue = date('Y-m-d', $studentinfo->passport_issue_date);
+                    }
+                    echo html_writer::empty_tag('input', [
+                        'type' => 'date',
+                        'name' => 'passport_issue_date',
+                        'value' => $passportissuedatevalue,
+                        'class' => 'form-control'
+                    ]);
+                    echo html_writer::end_div();
+                    
+                    echo html_writer::start_div('form-group');
+                    echo html_writer::tag('label', 'Код подразделения');
+                    echo html_writer::empty_tag('input', [
+                        'type' => 'text',
+                        'name' => 'passport_division_code',
+                        'value' => $studentinfo ? htmlspecialchars($studentinfo->passport_division_code, ENT_QUOTES, 'UTF-8') : '',
+                        'class' => 'form-control'
+                    ]);
+                    echo html_writer::end_div();
+                    echo html_writer::end_div();
+                    
+                    // Адрес
+                    echo html_writer::start_tag('h3', ['style' => 'margin-top: 30px; margin-bottom: 20px; color: #495057;']);
+                    echo 'Адрес';
+                    echo html_writer::end_tag('h3');
+                    
+                    echo html_writer::start_div('form-row');
+                    echo html_writer::start_div('form-group');
+                    echo html_writer::tag('label', 'Индекс');
+                    echo html_writer::empty_tag('input', [
+                        'type' => 'text',
+                        'name' => 'postal_index',
+                        'value' => $studentinfo ? htmlspecialchars($studentinfo->postal_index, ENT_QUOTES, 'UTF-8') : '',
+                        'class' => 'form-control'
+                    ]);
+                    echo html_writer::end_div();
+                    
+                    echo html_writer::start_div('form-group');
+                    echo html_writer::tag('label', 'Страна');
+                    echo html_writer::empty_tag('input', [
+                        'type' => 'text',
+                        'name' => 'country',
+                        'value' => $studentinfo ? htmlspecialchars($studentinfo->country, ENT_QUOTES, 'UTF-8') : '',
+                        'class' => 'form-control'
+                    ]);
+                    echo html_writer::end_div();
+                    echo html_writer::end_div();
+                    
+                    echo html_writer::start_div('form-row');
+                    echo html_writer::start_div('form-group');
+                    echo html_writer::tag('label', 'Регион/Область');
+                    echo html_writer::empty_tag('input', [
+                        'type' => 'text',
+                        'name' => 'region',
+                        'value' => $studentinfo ? htmlspecialchars($studentinfo->region, ENT_QUOTES, 'UTF-8') : '',
+                        'class' => 'form-control'
+                    ]);
+                    echo html_writer::end_div();
+                    
+                    echo html_writer::start_div('form-group');
+                    echo html_writer::tag('label', 'Город');
+                    echo html_writer::empty_tag('input', [
+                        'type' => 'text',
+                        'name' => 'city',
+                        'value' => $studentinfo ? htmlspecialchars($studentinfo->city, ENT_QUOTES, 'UTF-8') : '',
+                        'class' => 'form-control'
+                    ]);
+                    echo html_writer::end_div();
+                    echo html_writer::end_div();
+                    
+                    echo html_writer::start_div('form-row');
+                    echo html_writer::start_div('form-group');
+                    echo html_writer::tag('label', 'Улица');
+                    echo html_writer::empty_tag('input', [
+                        'type' => 'text',
+                        'name' => 'street',
+                        'value' => $studentinfo ? htmlspecialchars($studentinfo->street, ENT_QUOTES, 'UTF-8') : '',
+                        'class' => 'form-control'
+                    ]);
+                    echo html_writer::end_div();
+                    
+                    echo html_writer::start_div('form-group');
+                    echo html_writer::tag('label', 'Дом/Квартира');
+                    echo html_writer::empty_tag('input', [
+                        'type' => 'text',
+                        'name' => 'house_apartment',
+                        'value' => $studentinfo ? htmlspecialchars($studentinfo->house_apartment, ENT_QUOTES, 'UTF-8') : '',
+                        'class' => 'form-control'
+                    ]);
+                    echo html_writer::end_div();
+                    echo html_writer::end_div();
+                    
+                    // Предыдущее учебное заведение
+                    echo html_writer::start_tag('h3', ['style' => 'margin-top: 30px; margin-bottom: 20px; color: #495057;']);
+                    echo 'Предыдущее учебное заведение';
+                    echo html_writer::end_tag('h3');
+                    
+                    echo html_writer::start_div('form-row');
+                    echo html_writer::start_div('form-group');
+                    echo html_writer::tag('label', 'Название учебного заведения');
+                    echo html_writer::empty_tag('input', [
+                        'type' => 'text',
+                        'name' => 'previous_institution',
+                        'value' => $studentinfo ? htmlspecialchars($studentinfo->previous_institution, ENT_QUOTES, 'UTF-8') : '',
+                        'class' => 'form-control'
+                    ]);
+                    echo html_writer::end_div();
+                    
+                    echo html_writer::start_div('form-group');
+                    echo html_writer::tag('label', 'Год окончания');
+                    echo html_writer::empty_tag('input', [
+                        'type' => 'number',
+                        'name' => 'previous_institution_year',
+                        'value' => $studentinfo && $studentinfo->previous_institution_year ? $studentinfo->previous_institution_year : '',
+                        'class' => 'form-control',
+                        'min' => '1900',
+                        'max' => '2100'
+                    ]);
+                    echo html_writer::end_div();
+                    echo html_writer::end_div();
+                    
+                    // Группа
+                    echo html_writer::start_div('form-group');
+                    echo html_writer::tag('label', 'Группа');
+                    echo html_writer::empty_tag('input', [
+                        'type' => 'text',
+                        'name' => 'cohort',
+                        'value' => $studentinfo ? htmlspecialchars($studentinfo->cohort, ENT_QUOTES, 'UTF-8') : '',
+                        'class' => 'form-control'
+                    ]);
+                    echo html_writer::end_div();
+                    
+                    // Кнопки действий
+                    echo html_writer::start_div('form-actions');
+                    echo html_writer::empty_tag('input', [
+                        'type' => 'submit',
+                        'value' => 'Сохранить',
+                        'class' => 'btn btn-primary'
+                    ]);
+                    echo html_writer::link($cancelurl, 'Отмена', ['class' => 'btn btn-secondary']);
+                    echo html_writer::end_div();
+                    
+                    echo html_writer::end_tag('form');
+                } else {
+                    // Режим просмотра
+                    // Стили для таблицы дополнительных данных
+                    echo html_writer::start_tag('style');
+                    echo "
+                        .additional-data-table {
+                            background: white;
+                            border-radius: 8px;
+                            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                            overflow: hidden;
+                        }
+                        .additional-data-table table {
+                            margin: 0;
+                            width: 100%;
+                        }
+                        .additional-data-table tbody tr {
+                            border-bottom: 1px solid #f0f0f0;
+                        }
+                        .additional-data-table tbody tr:last-child {
+                            border-bottom: none;
+                        }
+                        .additional-data-table tbody td {
+                            padding: 16px;
+                            vertical-align: middle;
+                        }
+                        .additional-data-table tbody td:first-child {
+                            font-weight: 600;
+                            width: 250px;
+                            color: #495057;
+                        }
+                        .additional-data-table tbody td:last-child {
+                            color: #212529;
+                        }
+                    ";
+                    echo html_writer::end_tag('style');
+                    
+                    echo html_writer::start_div('additional-data-table');
+                    echo html_writer::start_tag('table', ['class' => 'table']);
+                    echo html_writer::start_tag('tbody');
+                    
+                    // ФИО
+                    if ($studentinfo) {
+                        $fullname = trim(($studentinfo->lastname ?? '') . ' ' . ($studentinfo->firstname ?? '') . ' ' . ($studentinfo->middlename ?? ''));
+                        if (!empty($fullname)) {
+                            echo html_writer::start_tag('tr');
+                            echo html_writer::tag('td', 'ФИО');
+                            echo html_writer::tag('td', htmlspecialchars($fullname, ENT_QUOTES, 'UTF-8'));
+                            echo html_writer::end_tag('tr');
+                        }
+                    }
+                    
+                    // Статус
+                    if ($studentinfo && !empty($studentinfo->status)) {
+                        echo html_writer::start_tag('tr');
+                        echo html_writer::tag('td', 'Статус');
+                        echo html_writer::tag('td', htmlspecialchars($studentinfo->status, ENT_QUOTES, 'UTF-8'));
+                        echo html_writer::end_tag('tr');
+                    }
+                    
+                    // Год поступления
+                    if ($studentinfo && !empty($studentinfo->enrollment_year)) {
+                        echo html_writer::start_tag('tr');
+                        echo html_writer::tag('td', 'Год поступления');
+                        echo html_writer::tag('td', htmlspecialchars($studentinfo->enrollment_year, ENT_QUOTES, 'UTF-8'));
+                        echo html_writer::end_tag('tr');
+                    }
+                    
+                    // Пол
+                    if ($studentinfo && !empty($studentinfo->gender)) {
+                        echo html_writer::start_tag('tr');
+                        echo html_writer::tag('td', 'Пол');
+                        echo html_writer::tag('td', htmlspecialchars($studentinfo->gender, ENT_QUOTES, 'UTF-8'));
+                        echo html_writer::end_tag('tr');
+                    }
+                    
+                    // Дата рождения
+                    if ($studentinfo && $studentinfo->birthdate > 0) {
+                        echo html_writer::start_tag('tr');
+                        echo html_writer::tag('td', 'Дата рождения');
+                        echo html_writer::tag('td', userdate($studentinfo->birthdate, get_string('strftimedatefullshort')));
+                        echo html_writer::end_tag('tr');
+                    }
+                    
+                    // СНИЛС
+                    if ($studentinfo && !empty($studentinfo->snils)) {
+                        echo html_writer::start_tag('tr');
+                        echo html_writer::tag('td', 'СНИЛС');
+                        echo html_writer::tag('td', htmlspecialchars($studentinfo->snils, ENT_QUOTES, 'UTF-8'));
+                        echo html_writer::end_tag('tr');
+                    }
+                    
+                    // Мобильный
+                    if ($studentinfo && !empty($studentinfo->mobile)) {
+                        echo html_writer::start_tag('tr');
+                        echo html_writer::tag('td', 'Мобильный телефон');
+                        echo html_writer::tag('td', htmlspecialchars($studentinfo->mobile, ENT_QUOTES, 'UTF-8'));
+                        echo html_writer::end_tag('tr');
+                    }
+                    
+                    // Email
+                    if ($studentinfo && !empty($studentinfo->email)) {
+                        echo html_writer::start_tag('tr');
+                        echo html_writer::tag('td', 'Email');
+                        echo html_writer::tag('td', htmlspecialchars($studentinfo->email, ENT_QUOTES, 'UTF-8'));
+                        echo html_writer::end_tag('tr');
+                    }
+                    
+                    // Гражданство
+                    if ($studentinfo && !empty($studentinfo->citizenship)) {
+                        echo html_writer::start_tag('tr');
+                        echo html_writer::tag('td', 'Гражданство');
+                        echo html_writer::tag('td', htmlspecialchars($studentinfo->citizenship, ENT_QUOTES, 'UTF-8'));
+                        echo html_writer::end_tag('tr');
+                    }
+                    
+                    // Место рождения
+                    if ($studentinfo && !empty($studentinfo->birthplace)) {
+                        echo html_writer::start_tag('tr');
+                        echo html_writer::tag('td', 'Место рождения');
+                        echo html_writer::tag('td', htmlspecialchars($studentinfo->birthplace, ENT_QUOTES, 'UTF-8'));
+                        echo html_writer::end_tag('tr');
+                    }
+                    
+                    // Паспортные данные
+                    if ($studentinfo && (!empty($studentinfo->id_type) || !empty($studentinfo->passport_number))) {
+                        echo html_writer::start_tag('tr');
+                        echo html_writer::tag('td', 'Тип удостоверения');
+                        echo html_writer::tag('td', htmlspecialchars($studentinfo->id_type ?? '', ENT_QUOTES, 'UTF-8'));
+                        echo html_writer::end_tag('tr');
+                        
+                        echo html_writer::start_tag('tr');
+                        echo html_writer::tag('td', 'Номер паспорта');
+                        echo html_writer::tag('td', htmlspecialchars($studentinfo->passport_number ?? '', ENT_QUOTES, 'UTF-8'));
+                        echo html_writer::end_tag('tr');
+                        
+                        if (!empty($studentinfo->passport_issued_by)) {
+                            echo html_writer::start_tag('tr');
+                            echo html_writer::tag('td', 'Кем выдан паспорт');
+                            echo html_writer::tag('td', htmlspecialchars($studentinfo->passport_issued_by, ENT_QUOTES, 'UTF-8'));
+                            echo html_writer::end_tag('tr');
+                        }
+                        
+                        if ($studentinfo->passport_issue_date > 0) {
+                            echo html_writer::start_tag('tr');
+                            echo html_writer::tag('td', 'Дата выдачи паспорта');
+                            echo html_writer::tag('td', userdate($studentinfo->passport_issue_date, get_string('strftimedatefullshort')));
+                            echo html_writer::end_tag('tr');
+                        }
+                        
+                        if (!empty($studentinfo->passport_division_code)) {
+                            echo html_writer::start_tag('tr');
+                            echo html_writer::tag('td', 'Код подразделения');
+                            echo html_writer::tag('td', htmlspecialchars($studentinfo->passport_division_code, ENT_QUOTES, 'UTF-8'));
+                            echo html_writer::end_tag('tr');
+                        }
+                    }
+                    
+                    // Адрес
+                    if ($studentinfo) {
+                        $addressparts = [];
+                        if (!empty($studentinfo->postal_index)) $addressparts[] = htmlspecialchars($studentinfo->postal_index, ENT_QUOTES, 'UTF-8');
+                        if (!empty($studentinfo->country)) $addressparts[] = htmlspecialchars($studentinfo->country, ENT_QUOTES, 'UTF-8');
+                        if (!empty($studentinfo->region)) $addressparts[] = htmlspecialchars($studentinfo->region, ENT_QUOTES, 'UTF-8');
+                        if (!empty($studentinfo->city)) $addressparts[] = htmlspecialchars($studentinfo->city, ENT_QUOTES, 'UTF-8');
+                        if (!empty($studentinfo->street)) $addressparts[] = htmlspecialchars($studentinfo->street, ENT_QUOTES, 'UTF-8');
+                        if (!empty($studentinfo->house_apartment)) $addressparts[] = htmlspecialchars($studentinfo->house_apartment, ENT_QUOTES, 'UTF-8');
+                        
+                        if (!empty($addressparts)) {
+                            echo html_writer::start_tag('tr');
+                            echo html_writer::tag('td', 'Адрес');
+                            echo html_writer::tag('td', implode(', ', $addressparts));
+                            echo html_writer::end_tag('tr');
+                        }
+                    }
+                    
+                    // Предыдущее учебное заведение
+                    if ($studentinfo && !empty($studentinfo->previous_institution)) {
+                        echo html_writer::start_tag('tr');
+                        echo html_writer::tag('td', 'Предыдущее учебное заведение');
+                        $previnst = htmlspecialchars($studentinfo->previous_institution, ENT_QUOTES, 'UTF-8');
+                        if ($studentinfo->previous_institution_year > 0) {
+                            $previnst .= ' (' . $studentinfo->previous_institution_year . ')';
+                        }
+                        echo html_writer::tag('td', $previnst);
+                        echo html_writer::end_tag('tr');
+                    }
+                    
+                    // Группа
+                    echo html_writer::start_tag('tr');
+                    echo html_writer::tag('td', 'Группа');
+                    echo html_writer::tag('td', $cohortdisplay ?: '-');
+                    echo html_writer::end_tag('tr');
+                    
+                    echo html_writer::end_tag('tbody');
+                    echo html_writer::end_tag('table');
+                    echo html_writer::end_div();
+                }
             } catch (\Exception $e) {
                 echo html_writer::div('Ошибка: ' . $e->getMessage(), 'alert alert-danger');
             }
