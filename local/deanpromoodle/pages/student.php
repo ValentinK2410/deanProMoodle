@@ -1484,7 +1484,7 @@ if ($action == 'viewprogram' && $programid > 0) {
                         $numericGrade = null;
                     } elseif ($percentForDisplay !== null && $percentForDisplay < 70) {
                         // Если оценка ниже 70% - показываем фактическую оценку из gradebook (только целые числа, без максимума)
-                        $gradeText = 'курс не пройден';
+                        $gradeText = 'нет оценки';
                         $gradeClass = 'grade-badge-failed';
                         $gradeIcon = '<i class="fas fa-times-circle"></i>';
                         $numericGrade = round($percentForDisplay, 1);
