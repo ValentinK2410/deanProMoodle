@@ -167,7 +167,7 @@ if (strpos($pagetitle, '[[') !== false || $pagetitle == 'Teacher Dashboard') {
     $pagetitle = 'Панель преподавателя'; // Fallback на русский
 }
 $PAGE->set_title($pagetitle);
-$PAGE->set_heading($pagetitle);
+$PAGE->set_heading(''); // Убираем стандартный заголовок, используем кастомный
 $PAGE->set_pagelayout('standard');
 
 // Подключение CSS
@@ -445,6 +445,32 @@ $tabs[] = new tabobject('forums',
 $tabs[] = new tabobject('searchstudent', 
     new moodle_url('/local/deanpromoodle/pages/teacher.php', ['tab' => 'searchstudent']),
     'Поиск студента');
+
+// Заголовок с информацией о преподавателе
+echo html_writer::start_div('teacher-profile-header-main');
+// Фото преподавателя
+$userpicture = $OUTPUT->user_picture($USER, ['size' => 120, 'class' => 'userpicture']);
+echo html_writer::div($userpicture, 'teacher-profile-photo-main');
+// ФИО и email преподавателя
+echo html_writer::start_div('teacher-profile-info-main');
+$profileurl = new moodle_url('/user/profile.php', ['id' => $USER->id]);
+echo html_writer::tag('h1', 
+    html_writer::link($profileurl, fullname($USER), [
+        'class' => 'teacher-profile-name-link',
+        'target' => '_blank'
+    ]),
+    ['class' => 'teacher-profile-name-main']
+);
+if (!empty($USER->email)) {
+    echo html_writer::div(
+        html_writer::link('mailto:' . htmlspecialchars($USER->email, ENT_QUOTES, 'UTF-8'), htmlspecialchars($USER->email, ENT_QUOTES, 'UTF-8')),
+        'teacher-profile-email-main'
+    );
+}
+// Бейдж "Преподаватель"
+echo html_writer::div('Преподаватель', 'teacher-profile-role-main');
+echo html_writer::end_div(); // teacher-profile-info-main
+echo html_writer::end_div(); // teacher-profile-header-main
 
 echo $OUTPUT->tabtree($tabs, $tab);
 
