@@ -1631,83 +1631,141 @@ switch ($tab) {
                             var coursesList = document.getElementById('courses-list-subject');
                             var searchTimeout;
                             
+                            // Функция для загрузки курсов
+                            function loadCourses(query) {
+                                if (!currentSubjectId) return;
+                                
+                                var searchQuery = query || '';
+                                if (searchQuery.length > 0 && searchQuery.length < 2) {
+                                    coursesList.innerHTML = '<div class=\"text-muted\">Введите минимум 2 символа для поиска...</div>';
+                                    return;
+                                }
+                                
+                                var xhr = new XMLHttpRequest();
+                                var url = '/local/deanpromoodle/pages/admin_ajax.php?action=getcourses&subjectid=' + currentSubjectId;
+                                if (searchQuery.length >= 2) {
+                                    url += '&search=' + encodeURIComponent(searchQuery);
+                                }
+                                // Если запрос пустой, не добавляем параметр search - сервер вернет все доступные курсы
+                                
+                                xhr.open('GET', url, true);
+                                xhr.onreadystatechange = function() {
+                                    if (xhr.readyState === 4 && xhr.status === 200) {
+                                        try {
+                                            var response = JSON.parse(xhr.responseText);
+                                            if (response.success && response.courses && response.courses.length > 0) {
+                                                var html = '<table class=\"table table-striped\"><thead><tr><th>ID</th><th>Название</th><th>Код</th><th>Действие</th></tr></thead><tbody>';
+                                                response.courses.forEach(function(course) {
+                                                    html += '<tr><td>' + course.id + '</td><td>' + course.fullname + '</td><td>' + (course.shortname || '-') + '</td><td><button class=\"btn btn-sm btn-primary attach-course-to-subject-btn\" data-course-id=\"' + course.id + '\">Прикрепить</button></td></tr>';
+                                                });
+                                                html += '</tbody></table>';
+                                                coursesList.innerHTML = html;
+                                                
+                                                // Обработчики кнопок прикрепления
+                                                document.querySelectorAll('.attach-course-to-subject-btn').forEach(function(btn) {
+                                                    btn.addEventListener('click', function() {
+                                                        var courseId = this.getAttribute('data-course-id');
+                                                        var xhr2 = new XMLHttpRequest();
+                                                        xhr2.open('POST', '/local/deanpromoodle/pages/admin_ajax.php', true);
+                                                        xhr2.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                                                        xhr2.onreadystatechange = function() {
+                                                            if (xhr2.readyState === 4 && xhr2.status === 200) {
+                                                                var response2 = JSON.parse(xhr2.responseText);
+                                                                if (response2.success) {
+                                                                    location.reload();
+                                                                } else {
+                                                                    alert('Ошибка: ' + (response2.error || 'Неизвестная ошибка'));
+                                                                }
+                                                            }
+                                                        };
+                                                        xhr2.send('action=attachcoursetosubject&subjectid=' + currentSubjectId + '&courseid=' + courseId);
+                                                    });
+                                                });
+                                            } else {
+                                                coursesList.innerHTML = '<div class=\"alert alert-info\">' + (searchQuery.length >= 2 ? 'Курсы не найдены' : 'Введите текст для поиска курсов (минимум 2 символа)') + '</div>';
+                                            }
+                                        } catch (e) {
+                                            coursesList.innerHTML = '<div class=\"alert alert-danger\">Ошибка при обработке ответа: ' + e.message + '</div>';
+                                        }
+                                    }
+                                };
+                                xhr.send();
+                            }
+                            
                             // Обработчик открытия модального окна
                             document.querySelectorAll('.add-course-to-subject-btn').forEach(function(btn) {
                                 btn.addEventListener('click', function(e) {
                                     e.preventDefault();
                                     currentSubjectId = this.getAttribute('data-subject-id');
-                                    if (!currentSubjectId) return;
+                                    if (!currentSubjectId) {
+                                        alert('Ошибка: не указан ID предмета');
+                                        return;
+                                    }
+                                    
+                                    if (!searchInput || !coursesList) {
+                                        alert('Ошибка: элементы модального окна не найдены');
+                                        return;
+                                    }
                                     
                                     searchInput.value = '';
-                                    coursesList.innerHTML = '<div class=\"text-muted\">Введите текст для поиска курсов...</div>';
+                                    coursesList.innerHTML = '<div class=\"text-muted\">Загрузка курсов...</div>';
+                                    
+                                    var modalElement = document.getElementById('addCourseToSubjectModal');
+                                    if (!modalElement) {
+                                        alert('Ошибка: модальное окно не найдено');
+                                        return;
+                                    }
+                                    
+                                    // Функция для загрузки курсов после открытия модального окна
+                                    var loadCoursesAfterOpen = function() {
+                                        setTimeout(function() {
+                                            loadCourses('');
+                                        }, 300);
+                                    };
                                     
                                     if (typeof jQuery !== 'undefined' && jQuery.fn.modal) {
-                                        jQuery('#addCourseToSubjectModal').modal('show');
+                                        jQuery(modalElement).off('shown.bs.modal'); // Удаляем предыдущие обработчики
+                                        jQuery(modalElement).on('shown.bs.modal', loadCoursesAfterOpen);
+                                        jQuery(modalElement).modal('show');
                                     } else if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
-                                        var modal = new bootstrap.Modal(document.getElementById('addCourseToSubjectModal'));
+                                        var modal = new bootstrap.Modal(modalElement);
+                                        modalElement.addEventListener('shown.bs.modal', function handler() {
+                                            modalElement.removeEventListener('shown.bs.modal', handler);
+                                            loadCoursesAfterOpen();
+                                        }, { once: true });
                                         modal.show();
+                                    } else {
+                                        // Fallback
+                                        modalElement.style.display = 'block';
+                                        modalElement.classList.add('show');
+                                        document.body.classList.add('modal-open');
+                                        loadCoursesAfterOpen();
                                     }
                                 });
                             });
                             
                             // Поиск курсов
-                            searchInput.addEventListener('input', function() {
-                                clearTimeout(searchTimeout);
-                                var query = this.value.trim();
-                                
-                                if (!currentSubjectId) return;
-                                
-                                if (query.length < 2) {
-                                    coursesList.innerHTML = '<div class=\"text-muted\">Введите минимум 2 символа для поиска...</div>';
-                                    return;
-                                }
-                                
-                                searchTimeout = setTimeout(function() {
-                                    var xhr = new XMLHttpRequest();
-                                    xhr.open('GET', '/local/deanpromoodle/pages/admin_ajax.php?action=getcourses&search=' + encodeURIComponent(query) + '&subjectid=' + currentSubjectId, true);
-                                    xhr.onreadystatechange = function() {
-                                        if (xhr.readyState === 4 && xhr.status === 200) {
-                                            try {
-                                                var response = JSON.parse(xhr.responseText);
-                                                if (response.success && response.courses) {
-                                                    var html = '<table class=\"table table-striped\"><thead><tr><th>ID</th><th>Название</th><th>Код</th><th>Действие</th></tr></thead><tbody>';
-                                                    response.courses.forEach(function(course) {
-                                                        html += '<tr><td>' + course.id + '</td><td>' + course.fullname + '</td><td>' + (course.shortname || '-') + '</td><td><button class=\"btn btn-sm btn-primary attach-course-to-subject-btn\" data-course-id=\"' + course.id + '\">Прикрепить</button></td></tr>';
-                                                    });
-                                                    html += '</tbody></table>';
-                                                    coursesList.innerHTML = html;
-                                                    
-                                                    // Обработчики кнопок прикрепления
-                                                    document.querySelectorAll('.attach-course-to-subject-btn').forEach(function(btn) {
-                                                        btn.addEventListener('click', function() {
-                                                            var courseId = this.getAttribute('data-course-id');
-                                                            var xhr2 = new XMLHttpRequest();
-                                                            xhr2.open('POST', '/local/deanpromoodle/pages/admin_ajax.php', true);
-                                                            xhr2.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-                                                            xhr2.onreadystatechange = function() {
-                                                                if (xhr2.readyState === 4 && xhr2.status === 200) {
-                                                                    var response2 = JSON.parse(xhr2.responseText);
-                                                                    if (response2.success) {
-                                                                        location.reload();
-                                                                    } else {
-                                                                        alert('Ошибка: ' + (response2.error || 'Неизвестная ошибка'));
-                                                                    }
-                                                                }
-                                                            };
-                                                            xhr2.send('action=attachcoursetosubject&subjectid=' + currentSubjectId + '&courseid=' + courseId);
-                                                        });
-                                                    });
-                                                } else {
-                                                    coursesList.innerHTML = '<div class=\"alert alert-info\">Курсы не найдены</div>';
-                                                }
-                                            } catch (e) {
-                                                coursesList.innerHTML = '<div class=\"alert alert-danger\">Ошибка при обработке ответа</div>';
-                                            }
-                                        }
-                                    };
-                                    xhr.send();
-                                }, 500);
-                            });
+                            if (searchInput) {
+                                searchInput.addEventListener('input', function() {
+                                    clearTimeout(searchTimeout);
+                                    var query = this.value.trim();
+                                    
+                                    if (!currentSubjectId) {
+                                        coursesList.innerHTML = '<div class=\"alert alert-warning\">Ошибка: не выбран предмет</div>';
+                                        return;
+                                    }
+                                    
+                                    searchTimeout = setTimeout(function() {
+                                        loadCourses(query);
+                                    }, 500);
+                                });
+                            } else {
+                                console.error('Элемент поиска курсов не найден');
+                            }
+                            
+                            if (!coursesList) {
+                                console.error('Элемент списка курсов не найден');
+                            }
                             
                             // Обработчик открепления курса
                             document.querySelectorAll('.detach-course-from-subject-btn').forEach(function(btn) {

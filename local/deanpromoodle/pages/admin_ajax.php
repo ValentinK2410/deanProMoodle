@@ -417,32 +417,52 @@ if ($action == 'getteachercourses' && $teacherid > 0) {
     global $DB;
     
     $courses = [];
-    if (!empty($search) && strlen($search) >= 2) {
-        $searchpattern = '%' . $DB->sql_like_escape($search) . '%';
-        $courses = $DB->get_records_sql(
-            "SELECT c.id, c.fullname, c.shortname
-             FROM {course} c
-             WHERE c.id > 1
-             AND (c.fullname LIKE ? OR c.shortname LIKE ?)
-             ORDER BY c.fullname ASC
-             LIMIT 50",
-            [$searchpattern, $searchpattern]
-        );
-    }
     
-    // Исключаем курсы, уже прикрепленные к предмету, если указан subjectid
-    if ($subjectid > 0 && !empty($courses)) {
+    // Получаем список уже прикрепленных курсов к предмету, если указан subjectid
+    $attachedcourseids = [];
+    if ($subjectid > 0) {
         $attachedcourseids = $DB->get_fieldset_select(
             'local_deanpromoodle_subject_courses',
             'courseid',
             'subjectid = ?',
             [$subjectid]
         );
+    }
+    
+    // Если поиск пустой или равен '*', загружаем все курсы (первые 50)
+    if (empty($search) || $search == '*') {
+        $sql = "SELECT c.id, c.fullname, c.shortname
+                FROM {course} c
+                WHERE c.id > 1";
+        $params = [];
+        
+        // Исключаем уже прикрепленные курсы
         if (!empty($attachedcourseids)) {
-            $courses = array_filter($courses, function($course) use ($attachedcourseids) {
-                return !in_array($course->id, $attachedcourseids);
-            });
+            list($insql, $inparams) = $DB->get_in_or_equal($attachedcourseids, SQL_PARAMS_NAMED, 'param', false);
+            $sql .= " AND c.id " . $insql;
+            $params = array_merge($params, $inparams);
         }
+        
+        $sql .= " ORDER BY c.fullname ASC LIMIT 50";
+        $courses = $DB->get_records_sql($sql, $params);
+    } elseif (!empty($search) && strlen($search) >= 2) {
+        // Поиск по названию или коду курса
+        $searchpattern = '%' . $DB->sql_like_escape($search) . '%';
+        $sql = "SELECT c.id, c.fullname, c.shortname
+                FROM {course} c
+                WHERE c.id > 1
+                AND (c.fullname LIKE :search1 OR c.shortname LIKE :search2)";
+        $params = ['search1' => $searchpattern, 'search2' => $searchpattern];
+        
+        // Исключаем уже прикрепленные курсы
+        if (!empty($attachedcourseids)) {
+            list($insql, $inparams) = $DB->get_in_or_equal($attachedcourseids, SQL_PARAMS_NAMED, 'param', false);
+            $sql .= " AND c.id " . $insql;
+            $params = array_merge($params, $inparams);
+        }
+        
+        $sql .= " ORDER BY c.fullname ASC LIMIT 50";
+        $courses = $DB->get_records_sql($sql, $params);
     }
     
     $formattedcourses = [];
