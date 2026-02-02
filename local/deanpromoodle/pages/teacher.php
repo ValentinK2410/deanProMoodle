@@ -535,15 +535,21 @@ switch ($tab) {
                 $assigncontext = context_module::instance($cm->id);
                 
                 // Get submissions that need grading
+                // Ищем отправленные задания без оценки или с оценкой NULL
+                // Учитываем принудительно проставленные оценки (overridden)
                 $submissions = $DB->get_records_sql(
-                    "SELECT s.*, u.firstname, u.lastname, u.email, u.id as userid
+                    "SELECT DISTINCT s.*, u.firstname, u.lastname, u.email, u.id as userid
                      FROM {assign_submission} s
                      JOIN {user} u ON u.id = s.userid
-                     WHERE s.assignment = ? AND s.status = 'submitted' 
-                     AND (s.timemodified > 0)
+                     WHERE s.assignment = ? 
+                     AND s.status = 'submitted' 
+                     AND s.timemodified > 0
                      AND NOT EXISTS (
                          SELECT 1 FROM {assign_grades} g 
-                         WHERE g.assignment = s.assignment AND g.userid = s.userid
+                         WHERE g.assignment = s.assignment 
+                         AND g.userid = s.userid
+                         AND g.grade IS NOT NULL
+                         AND g.grade >= 0
                      )
                      ORDER BY s.timemodified DESC",
                     [$assignment->id]
