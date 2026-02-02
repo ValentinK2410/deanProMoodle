@@ -767,15 +767,21 @@ switch ($tab) {
             $pagenum = isset($page) ? (is_array($page) ? 0 : (int)$page) : 0;
             $totalpagesnum = isset($totalpages) ? (is_array($totalpages) ? 0 : (int)$totalpages) : 0;
             
+            // Убеждаемся, что параметры для URL являются правильных типов
+            $tabparam = is_array($tab) ? 'forums' : (string)$tab;
+            $courseidparam = is_array($courseid) ? 0 : (int)$courseid;
+            $perpageparam = is_array($perpage) ? 25 : (int)$perpage;
+            
             if ($totalpagesnum > 1) {
                 echo html_writer::start_div('pagination-wrapper', ['style' => 'margin-top: 20px; text-align: center;']);
-                $baseurl = new moodle_url('/local/deanpromoodle/pages/teacher.php', ['tab' => $tab, 'courseid' => $courseid, 'perpage' => $perpage]);
+                $baseurl = new moodle_url('/local/deanpromoodle/pages/teacher.php', ['tab' => $tabparam, 'courseid' => $courseidparam, 'perpage' => $perpageparam]);
                 if ($pagenum > 0) {
                     $prevurl = clone $baseurl;
                     $prevurl->param('page', $pagenum - 1);
                     echo html_writer::link($prevurl, '« Previous', ['class' => 'btn btn-sm']);
                 }
-                echo html_writer::span("Page " . ($pagenum + 1) . " of " . $totalpagesnum . " ($totalcount items)", ['style' => 'margin: 0 15px;']);
+                $pagetext = "Page " . (string)($pagenum + 1) . " of " . (string)$totalpagesnum . " (" . (string)$totalcount . " items)";
+                echo html_writer::span($pagetext, ['style' => 'margin: 0 15px;']);
                 if ($pagenum < $totalpagesnum - 1) {
                     $nexturl = clone $baseurl;
                     $nexturl->param('page', $pagenum + 1);
@@ -1010,15 +1016,21 @@ switch ($tab) {
             $pagenum = isset($page) ? (is_array($page) ? 0 : (int)$page) : 0;
             $totalpagesnum = isset($totalpages) ? (is_array($totalpages) ? 0 : (int)$totalpages) : 0;
             
+            // Убеждаемся, что параметры для URL являются правильных типов
+            $tabparam = is_array($tab) ? 'forums' : (string)$tab;
+            $courseidparam = is_array($courseid) ? 0 : (int)$courseid;
+            $perpageparam = is_array($perpage) ? 25 : (int)$perpage;
+            
             if ($totalpagesnum > 1) {
                 echo html_writer::start_div('pagination-wrapper', ['style' => 'margin-top: 20px; text-align: center;']);
-                $baseurl = new moodle_url('/local/deanpromoodle/pages/teacher.php', ['tab' => $tab, 'courseid' => $courseid, 'perpage' => $perpage]);
+                $baseurl = new moodle_url('/local/deanpromoodle/pages/teacher.php', ['tab' => $tabparam, 'courseid' => $courseidparam, 'perpage' => $perpageparam]);
                 if ($pagenum > 0) {
                     $prevurl = clone $baseurl;
                     $prevurl->param('page', $pagenum - 1);
                     echo html_writer::link($prevurl, '« Previous', ['class' => 'btn btn-sm']);
                 }
-                echo html_writer::span("Page " . ($pagenum + 1) . " of " . $totalpagesnum . " ($totalcount items)", ['style' => 'margin: 0 15px;']);
+                $pagetext = "Page " . (string)($pagenum + 1) . " of " . (string)$totalpagesnum . " (" . (string)$totalcount . " items)";
+                echo html_writer::span($pagetext, ['style' => 'margin: 0 15px;']);
                 if ($pagenum < $totalpagesnum - 1) {
                     $nexturl = clone $baseurl;
                     $nexturl->param('page', $pagenum + 1);
@@ -1147,15 +1159,21 @@ switch ($tab) {
             $pagenum = isset($page) ? (is_array($page) ? 0 : (int)$page) : 0;
             $totalpagesnum = isset($totalpages) ? (is_array($totalpages) ? 0 : (int)$totalpages) : 0;
             
+            // Убеждаемся, что параметры для URL являются правильных типов
+            $tabparam = is_array($tab) ? 'forums' : (string)$tab;
+            $courseidparam = is_array($courseid) ? 0 : (int)$courseid;
+            $perpageparam = is_array($perpage) ? 25 : (int)$perpage;
+            
             if ($totalpagesnum > 1) {
                 echo html_writer::start_div('pagination-wrapper', ['style' => 'margin-top: 20px; text-align: center;']);
-                $baseurl = new moodle_url('/local/deanpromoodle/pages/teacher.php', ['tab' => $tab, 'courseid' => $courseid, 'perpage' => $perpage]);
+                $baseurl = new moodle_url('/local/deanpromoodle/pages/teacher.php', ['tab' => $tabparam, 'courseid' => $courseidparam, 'perpage' => $perpageparam]);
                 if ($pagenum > 0) {
                     $prevurl = clone $baseurl;
                     $prevurl->param('page', $pagenum - 1);
                     echo html_writer::link($prevurl, '« Previous', ['class' => 'btn btn-sm']);
                 }
-                echo html_writer::span("Page " . ($pagenum + 1) . " of " . $totalpagesnum . " ($totalcount items)", ['style' => 'margin: 0 15px;']);
+                $pagetext = "Page " . (string)($pagenum + 1) . " of " . (string)$totalpagesnum . " (" . (string)$totalcount . " items)";
+                echo html_writer::span($pagetext, ['style' => 'margin: 0 15px;']);
                 if ($pagenum < $totalpagesnum - 1) {
                     $nexturl = clone $baseurl;
                     $nexturl->param('page', $pagenum + 1);
