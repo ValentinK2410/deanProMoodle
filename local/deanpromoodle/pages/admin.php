@@ -6235,8 +6235,9 @@ switch ($tab) {
         echo html_writer::end_div();
         
         // JavaScript для поиска студентов
-        $ajaxurl = (new moodle_url('/local/deanpromoodle/pages/admin_ajax.php'))->out(true);
-        $studenturl = (new moodle_url('/local/deanpromoodle/pages/student.php'))->out(true);
+        // Используем тот же подход, что и в других AJAX-запросах
+        $ajaxurl = $CFG->wwwroot . '/local/deanpromoodle/pages/admin_ajax.php';
+        $studenturl = $CFG->wwwroot . '/local/deanpromoodle/pages/student.php';
         $PAGE->requires->js_init_code("
             (function() {
                 var searchTimeout;
