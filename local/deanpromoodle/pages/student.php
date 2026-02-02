@@ -1887,14 +1887,14 @@ if ($action == 'viewprogram' && $programid > 0) {
                                                         $user = $DB->get_record('user', ['email' => trim($email), 'deleted' => 0]);
                                                     }
                                                     
-                                                    // Если не найден по email, ищем по ФИО
+                                                    // Если не найден по email, ищем по ФИО (более гибкий поиск)
                                                     if (!$user) {
                                                         // Нормализуем данные для поиска
                                                         $searchfirstname = mb_strtolower(trim($firstname), 'UTF-8');
                                                         $searchlastname = mb_strtolower(trim($lastname), 'UTF-8');
                                                         $searchmiddlename = !empty($middlename) ? mb_strtolower(trim($middlename), 'UTF-8') : '';
                                                         
-                                                        // Поиск по ФИО с учетом отчества
+                                                        // Поиск по ФИО с учетом отчества (точное совпадение)
                                                         if (!empty($searchmiddlename)) {
                                                             $sql = "SELECT * FROM {user} 
                                                                     WHERE deleted = 0 
@@ -1913,12 +1913,47 @@ if ($action == 'viewprogram' && $programid > 0) {
                                                         }
                                                         
                                                         $users = $DB->get_records_sql($sql, $params);
+                                                        
                                                         if (count($users) == 1) {
                                                             $user = reset($users);
                                                         } elseif (count($users) > 1) {
                                                             // Если несколько совпадений, пробуем найти по email из Excel
-                                                            // или используем первое совпадение
-                                                            $user = reset($users);
+                                                            foreach ($users as $candidate) {
+                                                                if (!empty($email) && mb_strtolower(trim($candidate->email)) == mb_strtolower(trim($email))) {
+                                                                    $user = $candidate;
+                                                                    break;
+                                                                }
+                                                            }
+                                                            // Если не нашли по email, используем первое совпадение
+                                                            if (!$user) {
+                                                                $user = reset($users);
+                                                            }
+                                                        }
+                                                        
+                                                        // Если все еще не найден, пробуем более мягкий поиск (только имя и фамилия, без отчества)
+                                                        if (!$user && !empty($searchmiddlename)) {
+                                                            $sql = "SELECT * FROM {user} 
+                                                                    WHERE deleted = 0 
+                                                                    AND LOWER(TRIM(firstname)) = ?
+                                                                    AND LOWER(TRIM(lastname)) = ?";
+                                                            $params = [$searchfirstname, $searchlastname];
+                                                            $users = $DB->get_records_sql($sql, $params);
+                                                            
+                                                            if (count($users) == 1) {
+                                                                $user = reset($users);
+                                                            } elseif (count($users) > 1) {
+                                                                // Если несколько совпадений, пробуем найти по email
+                                                                foreach ($users as $candidate) {
+                                                                    if (!empty($email) && mb_strtolower(trim($candidate->email)) == mb_strtolower(trim($email))) {
+                                                                        $user = $candidate;
+                                                                        break;
+                                                                    }
+                                                                }
+                                                                // Если не нашли по email, используем первое совпадение
+                                                                if (!$user) {
+                                                                    $user = reset($users);
+                                                                }
+                                                            }
                                                         }
                                                     }
                                                     
@@ -2060,13 +2095,29 @@ if ($action == 'viewprogram' && $programid > 0) {
                                                 if ($skipped > 0) {
                                                     $message .= ", пропущено: $skipped";
                                                 }
-                                                if (!empty($errors) && count($errors) <= 10) {
-                                                    $message .= ". Ошибки: " . implode('; ', array_slice($errors, 0, 10));
-                                                    if (count($errors) > 10) {
-                                                        $message .= ' и еще ' . (count($errors) - 10) . ' ошибок';
+                                                
+                                                // Показываем детальную информацию о пропущенных записях
+                                                if (!empty($errors)) {
+                                                    $message .= "<br><br><strong>Детали пропущенных записей:</strong><br>";
+                                                    $message .= "<div style='max-height: 400px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; margin-top: 10px;'>";
+                                                    $message .= "<ul style='margin: 0; padding-left: 20px;'>";
+                                                    foreach (array_slice($errors, 0, 50) as $error) {
+                                                        $message .= "<li>" . htmlspecialchars($error, ENT_QUOTES, 'UTF-8') . "</li>";
                                                     }
+                                                    if (count($errors) > 50) {
+                                                        $message .= "<li><em>... и еще " . (count($errors) - 50) . " записей</em></li>";
+                                                    }
+                                                    $message .= "</ul></div>";
+                                                    
+                                                    // Добавляем подсказку по улучшению поиска
+                                                    $message .= "<br><small style='color: #666;'>Подсказка: Если студенты не найдены, проверьте совпадение ФИО и Email в Moodle. Поиск выполняется сначала по Email (точное совпадение), затем по ФИО (с учетом регистра и пробелов).</small>";
                                                 }
-                                                echo html_writer::div($message, 'alert alert-success');
+                                                
+                                                if ($imported > 0) {
+                                                    echo html_writer::div($message, 'alert alert-success');
+                                                } else {
+                                                    echo html_writer::div($message, 'alert alert-warning');
+                                                }
                                                 
                                             } catch (\Exception $e) {
                                                 $transaction->rollback($e);
