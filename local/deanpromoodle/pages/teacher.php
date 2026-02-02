@@ -773,26 +773,39 @@ switch ($tab) {
             $perpageparam = is_array($perpage) ? 25 : (int)$perpage;
             
             if ($totalpagesnum > 1) {
-                echo html_writer::start_div('pagination-wrapper', ['style' => 'margin-top: 20px; text-align: center;']);
+                echo '<div class="pagination-wrapper">';
                 $baseurl = new moodle_url('/local/deanpromoodle/pages/teacher.php', ['tab' => $tabparam, 'courseid' => $courseidparam, 'perpage' => $perpageparam]);
+                
+                // Кнопка "Назад"
                 if ($pagenum > 0) {
                     $prevurl = clone $baseurl;
                     $prevurl->param('page', $pagenum - 1);
-                    echo html_writer::link($prevurl, '« Previous', ['class' => 'btn btn-sm']);
+                    echo '<a href="' . $prevurl . '" class="pagination-btn prev-btn"><span class="arrow-icon">◀</span> Назад</a>';
+                } else {
+                    echo '<span class="pagination-btn prev-btn disabled"><span class="arrow-icon">◀</span> Назад</span>';
                 }
-                // Формируем строку напрямую
+                
+                // Информация о страницах
                 $pagenumval = (int)$pagenum + 1;
                 $totalpagesnumval = (int)$totalpagesnum;
                 $totalcountval = (int)$totalcount;
                 
-                // Выводим HTML напрямую, избегая проблем с html_writer::span()
-                echo '<span style="margin: 0 15px;">Page ' . $pagenumval . ' of ' . $totalpagesnumval . ' (' . $totalcountval . ' items)</span>';
+                echo '<div class="pagination-info">';
+                echo 'Страница <span class="current-page">' . $pagenumval . '</span>';
+                echo '<span class="total-pages">из ' . $totalpagesnumval . '</span>';
+                echo '<span class="items-count">' . $totalcountval . ' записей</span>';
+                echo '</div>';
+                
+                // Кнопка "Вперед"
                 if ($pagenum < $totalpagesnum - 1) {
                     $nexturl = clone $baseurl;
                     $nexturl->param('page', $pagenum + 1);
-                    echo html_writer::link($nexturl, 'Next »', ['class' => 'btn btn-sm']);
+                    echo '<a href="' . $nexturl . '" class="pagination-btn next-btn">Вперёд <span class="arrow-icon">▶</span></a>';
+                } else {
+                    echo '<span class="pagination-btn next-btn disabled">Вперёд <span class="arrow-icon">▶</span></span>';
                 }
-                echo html_writer::end_div();
+                
+                echo '</div>';
             }
         }
         break;
@@ -1051,26 +1064,39 @@ switch ($tab) {
             $perpageparam = is_array($perpage) ? 25 : (int)$perpage;
             
             if ($totalpagesnum > 1) {
-                echo html_writer::start_div('pagination-wrapper', ['style' => 'margin-top: 20px; text-align: center;']);
+                echo '<div class="pagination-wrapper">';
                 $baseurl = new moodle_url('/local/deanpromoodle/pages/teacher.php', ['tab' => $tabparam, 'courseid' => $courseidparam, 'perpage' => $perpageparam]);
+                
+                // Кнопка "Назад"
                 if ($pagenum > 0) {
                     $prevurl = clone $baseurl;
                     $prevurl->param('page', $pagenum - 1);
-                    echo html_writer::link($prevurl, '« Previous', ['class' => 'btn btn-sm']);
+                    echo '<a href="' . $prevurl . '" class="pagination-btn prev-btn"><span class="arrow-icon">◀</span> Назад</a>';
+                } else {
+                    echo '<span class="pagination-btn prev-btn disabled"><span class="arrow-icon">◀</span> Назад</span>';
                 }
-                // Формируем строку напрямую
+                
+                // Информация о страницах
                 $pagenumval = (int)$pagenum + 1;
                 $totalpagesnumval = (int)$totalpagesnum;
                 $totalcountval = (int)$totalcount;
                 
-                // Выводим HTML напрямую, избегая проблем с html_writer::span()
-                echo '<span style="margin: 0 15px;">Page ' . $pagenumval . ' of ' . $totalpagesnumval . ' (' . $totalcountval . ' items)</span>';
+                echo '<div class="pagination-info">';
+                echo 'Страница <span class="current-page">' . $pagenumval . '</span>';
+                echo '<span class="total-pages">из ' . $totalpagesnumval . '</span>';
+                echo '<span class="items-count">' . $totalcountval . ' записей</span>';
+                echo '</div>';
+                
+                // Кнопка "Вперед"
                 if ($pagenum < $totalpagesnum - 1) {
                     $nexturl = clone $baseurl;
                     $nexturl->param('page', $pagenum + 1);
-                    echo html_writer::link($nexturl, 'Next »', ['class' => 'btn btn-sm']);
+                    echo '<a href="' . $nexturl . '" class="pagination-btn next-btn">Вперёд <span class="arrow-icon">▶</span></a>';
+                } else {
+                    echo '<span class="pagination-btn next-btn disabled">Вперёд <span class="arrow-icon">▶</span></span>';
                 }
-                echo html_writer::end_div();
+                
+                echo '</div>';
             }
         }
         break;
@@ -1199,26 +1225,39 @@ switch ($tab) {
             $perpageparam = is_array($perpage) ? 25 : (int)$perpage;
             
             if ($totalpagesnum > 1) {
-                echo html_writer::start_div('pagination-wrapper', ['style' => 'margin-top: 20px; text-align: center;']);
+                echo '<div class="pagination-wrapper">';
                 $baseurl = new moodle_url('/local/deanpromoodle/pages/teacher.php', ['tab' => $tabparam, 'courseid' => $courseidparam, 'perpage' => $perpageparam]);
+                
+                // Кнопка "Назад"
                 if ($pagenum > 0) {
                     $prevurl = clone $baseurl;
                     $prevurl->param('page', $pagenum - 1);
-                    echo html_writer::link($prevurl, '« Previous', ['class' => 'btn btn-sm']);
+                    echo '<a href="' . $prevurl . '" class="pagination-btn prev-btn"><span class="arrow-icon">◀</span> Назад</a>';
+                } else {
+                    echo '<span class="pagination-btn prev-btn disabled"><span class="arrow-icon">◀</span> Назад</span>';
                 }
-                // Формируем строку напрямую
+                
+                // Информация о страницах
                 $pagenumval = (int)$pagenum + 1;
                 $totalpagesnumval = (int)$totalpagesnum;
                 $totalcountval = (int)$totalcount;
                 
-                // Выводим HTML напрямую, избегая проблем с html_writer::span()
-                echo '<span style="margin: 0 15px;">Page ' . $pagenumval . ' of ' . $totalpagesnumval . ' (' . $totalcountval . ' items)</span>';
+                echo '<div class="pagination-info">';
+                echo 'Страница <span class="current-page">' . $pagenumval . '</span>';
+                echo '<span class="total-pages">из ' . $totalpagesnumval . '</span>';
+                echo '<span class="items-count">' . $totalcountval . ' записей</span>';
+                echo '</div>';
+                
+                // Кнопка "Вперед"
                 if ($pagenum < $totalpagesnum - 1) {
                     $nexturl = clone $baseurl;
                     $nexturl->param('page', $pagenum + 1);
-                    echo html_writer::link($nexturl, 'Next »', ['class' => 'btn btn-sm']);
+                    echo '<a href="' . $nexturl . '" class="pagination-btn next-btn">Вперёд <span class="arrow-icon">▶</span></a>';
+                } else {
+                    echo '<span class="pagination-btn next-btn disabled">Вперёд <span class="arrow-icon">▶</span></span>';
                 }
-                echo html_writer::end_div();
+                
+                echo '</div>';
             }
         }
         break;
