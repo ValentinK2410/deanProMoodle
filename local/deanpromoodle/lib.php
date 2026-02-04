@@ -128,13 +128,237 @@ function local_deanpromoodle_has_access($pagename) {
 function local_deanpromoodle_before_footer() {
     global $PAGE, $USER, $OUTPUT;
     
-    // Check if user is logged in - early return for non-logged-in users
-    if (!isloggedin() || isguestuser()) {
+    // Additional safety check: ensure $PAGE is available
+    if (!isset($PAGE) || !is_object($PAGE)) {
         return;
     }
     
-    // Additional safety check: ensure $PAGE is available
-    if (!isset($PAGE) || !is_object($PAGE)) {
+    // Add footer links (User Agreement and Privacy Policy) for ALL users (logged in and not logged in)
+    $footerLinksJs = "
+    (function() {
+        try {
+            // Check if footer links already added
+            if (document.getElementById('deanpromoodle-footer-links')) {
+                return;
+            }
+            
+            function addFooterLinks() {
+                try {
+                    // Check again before adding
+                    if (document.getElementById('deanpromoodle-footer-links')) {
+                        return;
+                    }
+            
+            // Find footer element
+            var footer = document.querySelector('footer, .footer, #page-footer, .site-footer');
+            if (!footer) {
+                // Try to find footer by common Moodle classes
+                footer = document.querySelector('[role=\"contentinfo\"], .footer-content, .footer-container');
+            }
+            
+            // If footer not found, create one or append to body
+            if (!footer) {
+                footer = document.body;
+            }
+            
+            // Create footer links container
+            var footerLinks = document.createElement('div');
+            footerLinks.id = 'deanpromoodle-footer-links';
+            footerLinks.style.cssText = 'text-align: center; padding: 15px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; margin-top: 20px; font-size: 13px; color: #6c757d;';
+            
+            // Create links wrapper
+            var linksWrapper = document.createElement('div');
+            linksWrapper.style.cssText = 'display: inline-flex; align-items: center; gap: 15px; flex-wrap: wrap; justify-content: center;';
+            
+            // Function to close modal (defined first)
+            function closeModal() {
+                var overlay = document.getElementById('deanpromoodle-modal-overlay');
+                var iframe = document.getElementById('deanpromoodle-modal-iframe');
+                
+                if (overlay) {
+                    overlay.style.display = 'none';
+                    if (document.body) {
+                        document.body.style.overflow = ''; // Restore body scroll
+                    }
+                }
+                if (iframe) {
+                    iframe.src = ''; // Clear iframe content
+                }
+            }
+            
+            // Function to open modal
+            function openModal(url, title) {
+                var overlay = document.getElementById('deanpromoodle-modal-overlay');
+                var iframe = document.getElementById('deanpromoodle-modal-iframe');
+                var modalTitle = document.getElementById('deanpromoodle-modal-title');
+                
+                if (overlay && iframe && modalTitle) {
+                    modalTitle.textContent = title;
+                    iframe.src = url;
+                    overlay.style.display = 'flex';
+                    if (document.body) {
+                        document.body.style.overflow = 'hidden'; // Prevent body scroll
+                    }
+                }
+            }
+            
+            // Create modal overlay and container (if not exists)
+            // Wait for body to be available
+            if (!document.getElementById('deanpromoodle-modal-overlay')) {
+                if (!document.body) {
+                    // Body not ready, skip modal creation for now
+                    return;
+                }
+                var modalOverlay = document.createElement('div');
+                modalOverlay.id = 'deanpromoodle-modal-overlay';
+                modalOverlay.style.cssText = 'display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.7); z-index: 10001; align-items: center; justify-content: center;';
+                modalOverlay.onclick = function(e) {
+                    if (e.target === modalOverlay) {
+                        closeModal();
+                    }
+                };
+                
+                var modalContainer = document.createElement('div');
+                modalContainer.id = 'deanpromoodle-modal-container';
+                modalContainer.style.cssText = 'position: relative; background-color: white; border-radius: 8px; width: 90%; max-width: 900px; max-height: 90vh; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3); display: flex; flex-direction: column;';
+                
+                var modalHeader = document.createElement('div');
+                modalHeader.style.cssText = 'padding: 15px 20px; border-bottom: 1px solid #dee2e6; display: flex; justify-content: space-between; align-items: center; background-color: #f8f9fa;';
+                
+                var modalTitle = document.createElement('h3');
+                modalTitle.id = 'deanpromoodle-modal-title';
+                modalTitle.style.cssText = 'margin: 0; font-size: 18px; font-weight: 600; color: #333;';
+                
+                var closeButton = document.createElement('button');
+                closeButton.innerHTML = '&times;';
+                closeButton.style.cssText = 'background: none; border: none; font-size: 28px; color: #666; cursor: pointer; padding: 0; width: 30px; height: 30px; line-height: 1; transition: color 0.3s;';
+                closeButton.onmouseover = function() { this.style.color = '#000'; };
+                closeButton.onmouseout = function() { this.style.color = '#666'; };
+                closeButton.onclick = closeModal;
+                
+                modalHeader.appendChild(modalTitle);
+                modalHeader.appendChild(closeButton);
+                
+                var modalContent = document.createElement('div');
+                modalContent.id = 'deanpromoodle-modal-content';
+                modalContent.style.cssText = 'flex: 1; overflow: auto; padding: 0;';
+                
+                var modalIframe = document.createElement('iframe');
+                modalIframe.id = 'deanpromoodle-modal-iframe';
+                modalIframe.style.cssText = 'width: 100%; height: 100%; border: none; min-height: 500px;';
+                modalIframe.allow = 'fullscreen';
+                
+                modalContent.appendChild(modalIframe);
+                modalContainer.appendChild(modalHeader);
+                modalContainer.appendChild(modalContent);
+                modalOverlay.appendChild(modalContainer);
+                try {
+                    document.body.appendChild(modalOverlay);
+                    
+                    // Close modal on Escape key
+                    document.addEventListener('keydown', function(e) {
+                        if (e.key === 'Escape') {
+                            var overlay = document.getElementById('deanpromoodle-modal-overlay');
+                            if (overlay && overlay.style.display === 'flex') {
+                                closeModal();
+                            }
+                        }
+                    });
+                } catch (err) {
+                    console.error('Error creating modal:', err);
+                }
+            }
+            
+            // Create User Agreement link
+            var agreementLink = document.createElement('a');
+            agreementLink.href = '#';
+            agreementLink.textContent = 'Пользовательское соглашение';
+            agreementLink.style.cssText = 'color: #007bff; text-decoration: none; transition: color 0.3s; cursor: pointer;';
+            agreementLink.onmouseover = function() { this.style.color = '#0056b3'; this.style.textDecoration = 'underline'; };
+            agreementLink.onmouseout = function() { this.style.color = '#007bff'; this.style.textDecoration = 'none'; };
+            agreementLink.onclick = function(e) {
+                e.preventDefault();
+                openModal('https://mbs.ru/assets/agreement.html', 'Пользовательское соглашение');
+            };
+            
+            // Create separator
+            var separator = document.createElement('span');
+            separator.textContent = '|';
+            separator.style.cssText = 'color: #adb5bd;';
+            
+            // Create Privacy Policy link
+            var privacyLink = document.createElement('a');
+            privacyLink.href = '#';
+            privacyLink.textContent = 'Политика конфиденциальности';
+            privacyLink.style.cssText = 'color: #007bff; text-decoration: none; transition: color 0.3s; cursor: pointer;';
+            privacyLink.onmouseover = function() { this.style.color = '#0056b3'; this.style.textDecoration = 'underline'; };
+            privacyLink.onmouseout = function() { this.style.color = '#007bff'; this.style.textDecoration = 'none'; };
+            privacyLink.onclick = function(e) {
+                e.preventDefault();
+                openModal('https://seminary.msk.ru/politika-konfidenczialnosti/', 'Политика конфиденциальности');
+            };
+            
+            // Append elements
+            linksWrapper.appendChild(agreementLink);
+            linksWrapper.appendChild(separator);
+            linksWrapper.appendChild(privacyLink);
+            footerLinks.appendChild(linksWrapper);
+            
+                    // Insert footer links
+                    if (footer === document.body) {
+                        // If footer is body, insert before closing body tag
+                        footer.appendChild(footerLinks);
+                    } else {
+                        // Insert at the end of footer
+                        footer.appendChild(footerLinks);
+                    }
+                } catch (err) {
+                    console.error('Error adding footer links:', err);
+                }
+            }
+        
+        // Try to add footer links
+        function tryAddFooterLinks(attempt) {
+            attempt = attempt || 0;
+            if (attempt > 5) return; // Maximum 5 attempts
+            
+            // If footer links already added, do nothing
+            if (document.getElementById('deanpromoodle-footer-links')) {
+                return;
+            }
+            
+            // Try to add immediately
+            addFooterLinks();
+            
+            // If not added and we haven't tried enough times, wait and retry
+            if (!document.getElementById('deanpromoodle-footer-links') && attempt < 3) {
+                setTimeout(function() { tryAddFooterLinks(attempt + 1); }, 500);
+            }
+        }
+        
+        // Try to add immediately
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function() {
+                setTimeout(function() { tryAddFooterLinks(0); }, 100);
+            });
+        } else {
+            setTimeout(function() { tryAddFooterLinks(0); }, 100);
+        }
+        
+            // Also try to add after delays for dynamic loading
+            setTimeout(function() { tryAddFooterLinks(0); }, 500);
+            setTimeout(function() { tryAddFooterLinks(0); }, 1000);
+            setTimeout(function() { tryAddFooterLinks(0); }, 2000);
+        } catch (err) {
+            console.error('Error in footer links script:', err);
+        }
+    })();
+    ";
+    
+    $PAGE->requires->js_init_code($footerLinksJs);
+    
+    // Check if user is logged in - early return for non-logged-in users (for buttons only)
+    if (!isloggedin() || isguestuser()) {
         return;
     }
     
@@ -531,228 +755,4 @@ function local_deanpromoodle_before_footer() {
     ";
     
     $PAGE->requires->js_init_code($cookieConsentJs);
-    
-    // Add footer links for User Agreement and Privacy Policy
-    $footerLinksJs = "
-    (function() {
-        try {
-            // Check if footer links already added
-            if (document.getElementById('deanpromoodle-footer-links')) {
-                return;
-            }
-            
-            function addFooterLinks() {
-                try {
-                    // Check again before adding
-                    if (document.getElementById('deanpromoodle-footer-links')) {
-                        return;
-                    }
-            
-            // Find footer element
-            var footer = document.querySelector('footer, .footer, #page-footer, .site-footer');
-            if (!footer) {
-                // Try to find footer by common Moodle classes
-                footer = document.querySelector('[role=\"contentinfo\"], .footer-content, .footer-container');
-            }
-            
-            // If footer not found, create one or append to body
-            if (!footer) {
-                footer = document.body;
-            }
-            
-            // Create footer links container
-            var footerLinks = document.createElement('div');
-            footerLinks.id = 'deanpromoodle-footer-links';
-            footerLinks.style.cssText = 'text-align: center; padding: 15px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; margin-top: 20px; font-size: 13px; color: #6c757d;';
-            
-            // Create links wrapper
-            var linksWrapper = document.createElement('div');
-            linksWrapper.style.cssText = 'display: inline-flex; align-items: center; gap: 15px; flex-wrap: wrap; justify-content: center;';
-            
-            // Function to close modal (defined first)
-            function closeModal() {
-                var overlay = document.getElementById('deanpromoodle-modal-overlay');
-                var iframe = document.getElementById('deanpromoodle-modal-iframe');
-                
-                if (overlay) {
-                    overlay.style.display = 'none';
-                    if (document.body) {
-                        document.body.style.overflow = ''; // Restore body scroll
-                    }
-                }
-                if (iframe) {
-                    iframe.src = ''; // Clear iframe content
-                }
-            }
-            
-            // Function to open modal
-            function openModal(url, title) {
-                var overlay = document.getElementById('deanpromoodle-modal-overlay');
-                var iframe = document.getElementById('deanpromoodle-modal-iframe');
-                var modalTitle = document.getElementById('deanpromoodle-modal-title');
-                
-                if (overlay && iframe && modalTitle) {
-                    modalTitle.textContent = title;
-                    iframe.src = url;
-                    overlay.style.display = 'flex';
-                    if (document.body) {
-                        document.body.style.overflow = 'hidden'; // Prevent body scroll
-                    }
-                }
-            }
-            
-            // Create modal overlay and container (if not exists)
-            // Wait for body to be available
-            if (!document.getElementById('deanpromoodle-modal-overlay')) {
-                if (!document.body) {
-                    // Body not ready, skip modal creation for now
-                    return;
-                }
-                var modalOverlay = document.createElement('div');
-                modalOverlay.id = 'deanpromoodle-modal-overlay';
-                modalOverlay.style.cssText = 'display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.7); z-index: 10001; align-items: center; justify-content: center;';
-                modalOverlay.onclick = function(e) {
-                    if (e.target === modalOverlay) {
-                        closeModal();
-                    }
-                };
-                
-                var modalContainer = document.createElement('div');
-                modalContainer.id = 'deanpromoodle-modal-container';
-                modalContainer.style.cssText = 'position: relative; background-color: white; border-radius: 8px; width: 90%; max-width: 900px; max-height: 90vh; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3); display: flex; flex-direction: column;';
-                
-                var modalHeader = document.createElement('div');
-                modalHeader.style.cssText = 'padding: 15px 20px; border-bottom: 1px solid #dee2e6; display: flex; justify-content: space-between; align-items: center; background-color: #f8f9fa;';
-                
-                var modalTitle = document.createElement('h3');
-                modalTitle.id = 'deanpromoodle-modal-title';
-                modalTitle.style.cssText = 'margin: 0; font-size: 18px; font-weight: 600; color: #333;';
-                
-                var closeButton = document.createElement('button');
-                closeButton.innerHTML = '&times;';
-                closeButton.style.cssText = 'background: none; border: none; font-size: 28px; color: #666; cursor: pointer; padding: 0; width: 30px; height: 30px; line-height: 1; transition: color 0.3s;';
-                closeButton.onmouseover = function() { this.style.color = '#000'; };
-                closeButton.onmouseout = function() { this.style.color = '#666'; };
-                closeButton.onclick = closeModal;
-                
-                modalHeader.appendChild(modalTitle);
-                modalHeader.appendChild(closeButton);
-                
-                var modalContent = document.createElement('div');
-                modalContent.id = 'deanpromoodle-modal-content';
-                modalContent.style.cssText = 'flex: 1; overflow: auto; padding: 0;';
-                
-                var modalIframe = document.createElement('iframe');
-                modalIframe.id = 'deanpromoodle-modal-iframe';
-                modalIframe.style.cssText = 'width: 100%; height: 100%; border: none; min-height: 500px;';
-                modalIframe.allow = 'fullscreen';
-                
-                modalContent.appendChild(modalIframe);
-                modalContainer.appendChild(modalHeader);
-                modalContainer.appendChild(modalContent);
-                modalOverlay.appendChild(modalContainer);
-                try {
-                    document.body.appendChild(modalOverlay);
-                    
-                    // Close modal on Escape key
-                    document.addEventListener('keydown', function(e) {
-                        if (e.key === 'Escape') {
-                            var overlay = document.getElementById('deanpromoodle-modal-overlay');
-                            if (overlay && overlay.style.display === 'flex') {
-                                closeModal();
-                            }
-                        }
-                    });
-                } catch (err) {
-                    console.error('Error creating modal:', err);
-                }
-            }
-            
-            // Create User Agreement link
-            var agreementLink = document.createElement('a');
-            agreementLink.href = '#';
-            agreementLink.textContent = 'Пользовательское соглашение';
-            agreementLink.style.cssText = 'color: #007bff; text-decoration: none; transition: color 0.3s; cursor: pointer;';
-            agreementLink.onmouseover = function() { this.style.color = '#0056b3'; this.style.textDecoration = 'underline'; };
-            agreementLink.onmouseout = function() { this.style.color = '#007bff'; this.style.textDecoration = 'none'; };
-            agreementLink.onclick = function(e) {
-                e.preventDefault();
-                openModal('https://mbs.ru/assets/agreement.html', 'Пользовательское соглашение');
-            };
-            
-            // Create separator
-            var separator = document.createElement('span');
-            separator.textContent = '|';
-            separator.style.cssText = 'color: #adb5bd;';
-            
-            // Create Privacy Policy link
-            var privacyLink = document.createElement('a');
-            privacyLink.href = '#';
-            privacyLink.textContent = 'Политика конфиденциальности';
-            privacyLink.style.cssText = 'color: #007bff; text-decoration: none; transition: color 0.3s; cursor: pointer;';
-            privacyLink.onmouseover = function() { this.style.color = '#0056b3'; this.style.textDecoration = 'underline'; };
-            privacyLink.onmouseout = function() { this.style.color = '#007bff'; this.style.textDecoration = 'none'; };
-            privacyLink.onclick = function(e) {
-                e.preventDefault();
-                openModal('https://seminary.msk.ru/politika-konfidenczialnosti/', 'Политика конфиденциальности');
-            };
-            
-            // Append elements
-            linksWrapper.appendChild(agreementLink);
-            linksWrapper.appendChild(separator);
-            linksWrapper.appendChild(privacyLink);
-            footerLinks.appendChild(linksWrapper);
-            
-                    // Insert footer links
-                    if (footer === document.body) {
-                        // If footer is body, insert before closing body tag
-                        footer.appendChild(footerLinks);
-                    } else {
-                        // Insert at the end of footer
-                        footer.appendChild(footerLinks);
-                    }
-                } catch (err) {
-                    console.error('Error adding footer links:', err);
-                }
-            }
-        
-        // Try to add footer links
-        function tryAddFooterLinks(attempt) {
-            attempt = attempt || 0;
-            if (attempt > 5) return; // Maximum 5 attempts
-            
-            // If footer links already added, do nothing
-            if (document.getElementById('deanpromoodle-footer-links')) {
-                return;
-            }
-            
-            // Try to add immediately
-            addFooterLinks();
-            
-            // If not added and we haven't tried enough times, wait and retry
-            if (!document.getElementById('deanpromoodle-footer-links') && attempt < 3) {
-                setTimeout(function() { tryAddFooterLinks(attempt + 1); }, 500);
-            }
-        }
-        
-        // Try to add immediately
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', function() {
-                setTimeout(function() { tryAddFooterLinks(0); }, 100);
-            });
-        } else {
-            setTimeout(function() { tryAddFooterLinks(0); }, 100);
-        }
-        
-            // Also try to add after delays for dynamic loading
-            setTimeout(function() { tryAddFooterLinks(0); }, 500);
-            setTimeout(function() { tryAddFooterLinks(0); }, 1000);
-            setTimeout(function() { tryAddFooterLinks(0); }, 2000);
-        } catch (err) {
-            console.error('Error in footer links script:', err);
-        }
-    })();
-    ";
-    
-    $PAGE->requires->js_init_code($footerLinksJs);
 }
