@@ -166,13 +166,13 @@ function local_deanpromoodle_before_footer() {
         } else {
             // Если не найдено в системном контексте, проверяем во ВСЕХ контекстах курсов
             // Используем прямой SQL запрос для поиска роли teacher в любом контексте курса
+            // НЕ добавляем LIMIT, так как Moodle автоматически добавляет его в record_exists_sql
             $hasrole = $DB->record_exists_sql(
                 "SELECT 1 FROM {role_assignments} ra
                  JOIN {context} ctx ON ctx.id = ra.contextid
                  WHERE ra.userid = ? 
                  AND ra.roleid = ? 
-                 AND ctx.contextlevel = 50
-                 LIMIT 1",
+                 AND ctx.contextlevel = 50",
                 [$USER->id, $teacherroleid]
             );
             
@@ -242,13 +242,13 @@ function local_deanpromoodle_before_footer() {
         $teacherroleid = 3; // ID роли teacher
         
         // Проверяем во ВСЕХ контекстах курсов через прямой SQL запрос
+        // НЕ добавляем LIMIT, так как Moodle автоматически добавляет его в record_exists_sql
         $hasrole = $DB->record_exists_sql(
             "SELECT 1 FROM {role_assignments} ra
              JOIN {context} ctx ON ctx.id = ra.contextid
              WHERE ra.userid = ? 
              AND ra.roleid = ? 
-             AND ctx.contextlevel = 50
-             LIMIT 1",
+             AND ctx.contextlevel = 50",
             [$USER->id, $teacherroleid]
         );
         
