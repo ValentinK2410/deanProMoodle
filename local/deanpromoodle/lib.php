@@ -551,14 +551,103 @@ function local_deanpromoodle_before_footer() {
             var linksWrapper = document.createElement('div');
             linksWrapper.style.cssText = 'display: inline-flex; align-items: center; gap: 15px; flex-wrap: wrap; justify-content: center;';
             
+            // Create modal overlay and container (if not exists)
+            if (!document.getElementById('deanpromoodle-modal-overlay')) {
+                var modalOverlay = document.createElement('div');
+                modalOverlay.id = 'deanpromoodle-modal-overlay';
+                modalOverlay.style.cssText = 'display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.7); z-index: 10001; align-items: center; justify-content: center;';
+                modalOverlay.onclick = function(e) {
+                    if (e.target === modalOverlay) {
+                        closeModal();
+                    }
+                };
+                
+                var modalContainer = document.createElement('div');
+                modalContainer.id = 'deanpromoodle-modal-container';
+                modalContainer.style.cssText = 'position: relative; background-color: white; border-radius: 8px; width: 90%; max-width: 900px; max-height: 90vh; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3); display: flex; flex-direction: column;';
+                
+                var modalHeader = document.createElement('div');
+                modalHeader.style.cssText = 'padding: 15px 20px; border-bottom: 1px solid #dee2e6; display: flex; justify-content: space-between; align-items: center; background-color: #f8f9fa;';
+                
+                var modalTitle = document.createElement('h3');
+                modalTitle.id = 'deanpromoodle-modal-title';
+                modalTitle.style.cssText = 'margin: 0; font-size: 18px; font-weight: 600; color: #333;';
+                
+                var closeButton = document.createElement('button');
+                closeButton.innerHTML = '&times;';
+                closeButton.style.cssText = 'background: none; border: none; font-size: 28px; color: #666; cursor: pointer; padding: 0; width: 30px; height: 30px; line-height: 1; transition: color 0.3s;';
+                closeButton.onmouseover = function() { this.style.color = '#000'; };
+                closeButton.onmouseout = function() { this.style.color = '#666'; };
+                closeButton.onclick = closeModal;
+                
+                modalHeader.appendChild(modalTitle);
+                modalHeader.appendChild(closeButton);
+                
+                var modalContent = document.createElement('div');
+                modalContent.id = 'deanpromoodle-modal-content';
+                modalContent.style.cssText = 'flex: 1; overflow: auto; padding: 0;';
+                
+                var modalIframe = document.createElement('iframe');
+                modalIframe.id = 'deanpromoodle-modal-iframe';
+                modalIframe.style.cssText = 'width: 100%; height: 100%; border: none; min-height: 500px;';
+                modalIframe.allow = 'fullscreen';
+                
+                modalContent.appendChild(modalIframe);
+                modalContainer.appendChild(modalHeader);
+                modalContainer.appendChild(modalContent);
+                modalOverlay.appendChild(modalContainer);
+                document.body.appendChild(modalOverlay);
+            }
+            
+            // Function to open modal
+            function openModal(url, title) {
+                var overlay = document.getElementById('deanpromoodle-modal-overlay');
+                var iframe = document.getElementById('deanpromoodle-modal-iframe');
+                var modalTitle = document.getElementById('deanpromoodle-modal-title');
+                
+                if (overlay && iframe && modalTitle) {
+                    modalTitle.textContent = title;
+                    iframe.src = url;
+                    overlay.style.display = 'flex';
+                    document.body.style.overflow = 'hidden'; // Prevent body scroll
+                }
+            }
+            
+            // Function to close modal
+            function closeModal() {
+                var overlay = document.getElementById('deanpromoodle-modal-overlay');
+                var iframe = document.getElementById('deanpromoodle-modal-iframe');
+                
+                if (overlay) {
+                    overlay.style.display = 'none';
+                    document.body.style.overflow = ''; // Restore body scroll
+                }
+                if (iframe) {
+                    iframe.src = ''; // Clear iframe content
+                }
+            }
+            
+            // Close modal on Escape key
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    var overlay = document.getElementById('deanpromoodle-modal-overlay');
+                    if (overlay && overlay.style.display === 'flex') {
+                        closeModal();
+                    }
+                }
+            });
+            
             // Create User Agreement link
             var agreementLink = document.createElement('a');
-            agreementLink.href = 'https://mbs.ru/assets/agreement.html';
-            agreementLink.target = '_blank';
+            agreementLink.href = '#';
             agreementLink.textContent = 'Пользовательское соглашение';
-            agreementLink.style.cssText = 'color: #007bff; text-decoration: none; transition: color 0.3s;';
+            agreementLink.style.cssText = 'color: #007bff; text-decoration: none; transition: color 0.3s; cursor: pointer;';
             agreementLink.onmouseover = function() { this.style.color = '#0056b3'; this.style.textDecoration = 'underline'; };
             agreementLink.onmouseout = function() { this.style.color = '#007bff'; this.style.textDecoration = 'none'; };
+            agreementLink.onclick = function(e) {
+                e.preventDefault();
+                openModal('https://mbs.ru/assets/agreement.html', 'Пользовательское соглашение');
+            };
             
             // Create separator
             var separator = document.createElement('span');
@@ -567,12 +656,15 @@ function local_deanpromoodle_before_footer() {
             
             // Create Privacy Policy link
             var privacyLink = document.createElement('a');
-            privacyLink.href = 'https://seminary.msk.ru/politika-konfidenczialnosti/';
-            privacyLink.target = '_blank';
+            privacyLink.href = '#';
             privacyLink.textContent = 'Политика конфиденциальности';
-            privacyLink.style.cssText = 'color: #007bff; text-decoration: none; transition: color 0.3s;';
+            privacyLink.style.cssText = 'color: #007bff; text-decoration: none; transition: color 0.3s; cursor: pointer;';
             privacyLink.onmouseover = function() { this.style.color = '#0056b3'; this.style.textDecoration = 'underline'; };
             privacyLink.onmouseout = function() { this.style.color = '#007bff'; this.style.textDecoration = 'none'; };
+            privacyLink.onclick = function(e) {
+                e.preventDefault();
+                openModal('https://seminary.msk.ru/politika-konfidenczialnosti/', 'Политика конфиденциальности');
+            };
             
             // Append elements
             linksWrapper.appendChild(agreementLink);
