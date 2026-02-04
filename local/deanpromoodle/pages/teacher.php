@@ -418,149 +418,151 @@ echo html_writer::end_div(); // teacher-profile-header-main
 
 echo $OUTPUT->tabtree($tabs, $tab);
 
-// Блок со статистикой за выбранный месяц
-$monthnameru = [
-    1 => 'Январь', 2 => 'Февраль', 3 => 'Март', 4 => 'Апрель',
-    5 => 'Май', 6 => 'Июнь', 7 => 'Июль', 8 => 'Август',
-    9 => 'Сентябрь', 10 => 'Октябрь', 11 => 'Ноябрь', 12 => 'Декабрь'
-];
-$monthdisplay = isset($monthnameru[$selectedmonth]) ? $monthnameru[$selectedmonth] . ' ' . $selectedyear : date('F Y', $selectedmonthstart);
+// Блок со статистикой за выбранный месяц (не показываем на вкладке "Поиск студента")
+if ($tab != 'searchstudent') {
+    $monthnameru = [
+        1 => 'Январь', 2 => 'Февраль', 3 => 'Март', 4 => 'Апрель',
+        5 => 'Май', 6 => 'Июнь', 7 => 'Июль', 8 => 'Август',
+        9 => 'Сентябрь', 10 => 'Октябрь', 11 => 'Ноябрь', 12 => 'Декабрь'
+    ];
+    $monthdisplay = isset($monthnameru[$selectedmonth]) ? $monthnameru[$selectedmonth] . ' ' . $selectedyear : date('F Y', $selectedmonthstart);
 
-// Форма выбора месяца и года
-echo html_writer::start_div('alert alert-info', ['style' => 'margin-top: 20px; margin-bottom: 20px; padding: 15px;']);
-echo html_writer::start_tag('form', [
-    'method' => 'get',
-    'action' => new moodle_url('/local/deanpromoodle/pages/teacher.php'),
-    'class' => 'form-inline',
-    'style' => 'margin-bottom: 10px;'
-]);
-echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'tab', 'value' => $tab]);
-echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'courseid', 'value' => $courseid]);
+    // Форма выбора месяца и года
+    echo html_writer::start_div('alert alert-info', ['style' => 'margin-top: 20px; margin-bottom: 20px; padding: 15px;']);
+    echo html_writer::start_tag('form', [
+        'method' => 'get',
+        'action' => new moodle_url('/local/deanpromoodle/pages/teacher.php'),
+        'class' => 'form-inline',
+        'style' => 'margin-bottom: 10px;'
+    ]);
+    echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'tab', 'value' => $tab]);
+    echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'courseid', 'value' => $courseid]);
 
-echo html_writer::tag('strong', 'Статистика за: ', ['style' => 'margin-right: 10px;']);
+    echo html_writer::tag('strong', 'Статистика за: ', ['style' => 'margin-right: 10px;']);
 
-// Выбор месяца
-$monthoptions = [];
-foreach ($monthnameru as $num => $name) {
-    $monthoptions[$num] = $name;
-}
-echo html_writer::label('Месяц: ', 'statmonth');
-echo html_writer::select($monthoptions, 'statmonth', $selectedmonth, false, ['class' => 'form-control', 'style' => 'display: inline-block; margin-left: 5px; margin-right: 10px;']);
-
-// Выбор года
-$yearoptions = [];
-$currentyear = date('Y');
-for ($y = $currentyear - 5; $y <= $currentyear + 1; $y++) {
-    $yearoptions[$y] = $y;
-}
-echo html_writer::label('Год: ', 'statyear');
-echo html_writer::select($yearoptions, 'statyear', $selectedyear, false, ['class' => 'form-control', 'style' => 'display: inline-block; margin-left: 5px; margin-right: 10px;']);
-
-echo html_writer::empty_tag('input', ['type' => 'submit', 'value' => 'Показать', 'class' => 'btn btn-primary', 'style' => 'margin-left: 10px;']);
-echo html_writer::end_tag('form');
-
-// Подсчет не проверенных заданий
-$ungradedassignmentscount = $assignmentscount;
-
-// Подсчет не отвеченных сообщений (с учетом таблицы local_deanpromoodle_forum_no_reply)
-$unrepliedforumscount = 0;
-if (!empty($teachercourses) && !empty($teacherroleids) && $studentroleid) {
-    $forumids = [];
-    $courseforums = [];
-    foreach ($teachercourses as $course) {
-        $forums = get_all_instances_in_course('forum', $course, false);
-        foreach ($forums as $forum) {
-            $forumids[] = $forum->id;
-            $courseforums[$forum->id] = $course;
-        }
+    // Выбор месяца
+    $monthoptions = [];
+    foreach ($monthnameru as $num => $name) {
+        $monthoptions[$num] = $name;
     }
-    if (!empty($forumids)) {
-        $coursecontexts = [];
-        $allcourseids = array_unique(array_column($courseforums, 'id'));
-        foreach ($allcourseids as $cid) {
-            $coursecontexts[$cid] = context_course::instance($cid);
-        }
-        $systemcontext = context_system::instance();
-        $placeholders = implode(',', array_fill(0, count($teacherroleids), '?'));
-        $coursecontextids = array_map(function($ctx) { return $ctx->id; }, $coursecontexts);
-        $coursecontextplaceholders = implode(',', array_fill(0, count($coursecontextids), '?'));
-        
-        $allteacheruserids = $DB->get_fieldset_sql(
-            "SELECT DISTINCT ra.userid
-             FROM {role_assignments} ra
-             WHERE (ra.contextid IN ($coursecontextplaceholders) OR ra.contextid = ?)
-             AND ra.roleid IN ($placeholders)",
-            array_merge($coursecontextids, [$systemcontext->id], $teacherroleids)
-        );
-        
-        $allstudentuserids = $DB->get_fieldset_sql(
-            "SELECT DISTINCT ra.userid
-             FROM {role_assignments} ra
-             WHERE ra.contextid IN ($coursecontextplaceholders)
-             AND ra.roleid = ?",
-            array_merge($coursecontextids, [$studentroleid])
-        );
-        
-        if (!empty($allteacheruserids) && !empty($allstudentuserids)) {
-            $forumplaceholders = implode(',', array_fill(0, count($forumids), '?'));
-            $teacherplaceholders = implode(',', array_fill(0, count($allteacheruserids), '?'));
-            $studentplaceholders = implode(',', array_fill(0, count($allstudentuserids), '?'));
-            
-            // Проверяем существование таблицы local_deanpromoodle_forum_no_reply
-            $dbman = $DB->get_manager();
-            $tableexists = $dbman->table_exists('local_deanpromoodle_forum_no_reply');
-            
-            $noreplyjoin = '';
-            $noreplywhere = '';
-            if ($tableexists) {
-                $noreplyjoin = "LEFT JOIN {local_deanpromoodle_forum_no_reply} fnr ON fnr.postid = p.id";
-                $noreplywhere = "AND fnr.id IS NULL";
+    echo html_writer::label('Месяц: ', 'statmonth');
+    echo html_writer::select($monthoptions, 'statmonth', $selectedmonth, false, ['class' => 'form-control', 'style' => 'display: inline-block; margin-left: 5px; margin-right: 10px;']);
+
+    // Выбор года
+    $yearoptions = [];
+    $currentyear = date('Y');
+    for ($y = $currentyear - 5; $y <= $currentyear + 1; $y++) {
+        $yearoptions[$y] = $y;
+    }
+    echo html_writer::label('Год: ', 'statyear');
+    echo html_writer::select($yearoptions, 'statyear', $selectedyear, false, ['class' => 'form-control', 'style' => 'display: inline-block; margin-left: 5px; margin-right: 10px;']);
+
+    echo html_writer::empty_tag('input', ['type' => 'submit', 'value' => 'Показать', 'class' => 'btn btn-primary', 'style' => 'margin-left: 10px;']);
+    echo html_writer::end_tag('form');
+
+    // Подсчет не проверенных заданий
+    $ungradedassignmentscount = $assignmentscount;
+
+    // Подсчет не отвеченных сообщений (с учетом таблицы local_deanpromoodle_forum_no_reply)
+    $unrepliedforumscount = 0;
+    if (!empty($teachercourses) && !empty($teacherroleids) && $studentroleid) {
+        $forumids = [];
+        $courseforums = [];
+        foreach ($teachercourses as $course) {
+            $forums = get_all_instances_in_course('forum', $course, false);
+            foreach ($forums as $forum) {
+                $forumids[] = $forum->id;
+                $courseforums[$forum->id] = $course;
             }
+        }
+        if (!empty($forumids)) {
+            $coursecontexts = [];
+            $allcourseids = array_unique(array_column($courseforums, 'id'));
+            foreach ($allcourseids as $cid) {
+                $coursecontexts[$cid] = context_course::instance($cid);
+            }
+            $systemcontext = context_system::instance();
+            $placeholders = implode(',', array_fill(0, count($teacherroleids), '?'));
+            $coursecontextids = array_map(function($ctx) { return $ctx->id; }, $coursecontexts);
+            $coursecontextplaceholders = implode(',', array_fill(0, count($coursecontextids), '?'));
             
-            $unrepliedforumscount = $DB->count_records_sql(
-                "SELECT COUNT(DISTINCT p.id)
-                 FROM {forum_posts} p
-                 JOIN {user} u ON u.id = p.userid
-                 JOIN {forum_discussions} d ON d.id = p.discussion
-                 JOIN {forum} f ON f.id = d.forum
-                 LEFT JOIN {forum_posts} p2 ON p2.discussion = p.discussion 
-                     AND p2.created > p.created 
-                     AND p2.userid IN ($teacherplaceholders)
-                 $noreplyjoin
-                 WHERE d.forum IN ($forumplaceholders)
-                 AND p.userid IN ($studentplaceholders)
-                 AND p2.id IS NULL
-                 $noreplywhere",
-                array_merge($forumids, $allteacheruserids, $allstudentuserids)
+            $allteacheruserids = $DB->get_fieldset_sql(
+                "SELECT DISTINCT ra.userid
+                 FROM {role_assignments} ra
+                 WHERE (ra.contextid IN ($coursecontextplaceholders) OR ra.contextid = ?)
+                 AND ra.roleid IN ($placeholders)",
+                array_merge($coursecontextids, [$systemcontext->id], $teacherroleids)
             );
+            
+            $allstudentuserids = $DB->get_fieldset_sql(
+                "SELECT DISTINCT ra.userid
+                 FROM {role_assignments} ra
+                 WHERE ra.contextid IN ($coursecontextplaceholders)
+                 AND ra.roleid = ?",
+                array_merge($coursecontextids, [$studentroleid])
+            );
+            
+            if (!empty($allteacheruserids) && !empty($allstudentuserids)) {
+                $forumplaceholders = implode(',', array_fill(0, count($forumids), '?'));
+                $teacherplaceholders = implode(',', array_fill(0, count($allteacheruserids), '?'));
+                $studentplaceholders = implode(',', array_fill(0, count($allstudentuserids), '?'));
+                
+                // Проверяем существование таблицы local_deanpromoodle_forum_no_reply
+                $dbman = $DB->get_manager();
+                $tableexists = $dbman->table_exists('local_deanpromoodle_forum_no_reply');
+                
+                $noreplyjoin = '';
+                $noreplywhere = '';
+                if ($tableexists) {
+                    $noreplyjoin = "LEFT JOIN {local_deanpromoodle_forum_no_reply} fnr ON fnr.postid = p.id";
+                    $noreplywhere = "AND fnr.id IS NULL";
+                }
+                
+                $unrepliedforumscount = $DB->count_records_sql(
+                    "SELECT COUNT(DISTINCT p.id)
+                     FROM {forum_posts} p
+                     JOIN {user} u ON u.id = p.userid
+                     JOIN {forum_discussions} d ON d.id = p.discussion
+                     JOIN {forum} f ON f.id = d.forum
+                     LEFT JOIN {forum_posts} p2 ON p2.discussion = p.discussion 
+                         AND p2.created > p.created 
+                         AND p2.userid IN ($teacherplaceholders)
+                     $noreplyjoin
+                     WHERE d.forum IN ($forumplaceholders)
+                     AND p.userid IN ($studentplaceholders)
+                     AND p2.id IS NULL
+                     $noreplywhere",
+                    array_merge($forumids, $allteacheruserids, $allstudentuserids)
+                );
+            }
         }
     }
-}
 
-// Отображение статистики в новом формате
-echo html_writer::start_div('', ['style' => 'margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(0,0,0,0.1);']);
-echo html_writer::start_tag('table', ['class' => 'teacher-statistics-table', 'style' => 'width: 100%; border-collapse: collapse;']);
-echo html_writer::start_tag('thead');
-echo html_writer::start_tag('tr');
-echo html_writer::tag('th', 'СДЕЛАНО', ['style' => 'background-color: #d4edda; padding: 10px; text-align: center; border: 1px solid #c3e6cb;']);
-echo html_writer::tag('th', 'НЕ СДЕЛАНО', ['style' => 'background-color: #f8d7da; padding: 10px; text-align: center; border: 1px solid #f5c6cb;']);
-echo html_writer::end_tag('tr');
-echo html_writer::end_tag('thead');
-echo html_writer::start_tag('tbody');
-echo html_writer::start_tag('tr');
-echo html_writer::start_tag('td', ['style' => 'background-color: #d4edda; padding: 10px; border: 1px solid #c3e6cb;']);
-echo html_writer::tag('div', 'Проверено заданий: ' . $gradedassignmentscount, ['style' => 'margin-bottom: 5px;']);
-echo html_writer::tag('div', 'Ответов на сообщения: ' . $forumrepliescount, ['style' => '']);
-echo html_writer::end_tag('td');
-echo html_writer::start_tag('td', ['style' => 'background-color: #f8d7da; padding: 10px; border: 1px solid #f5c6cb;']);
-echo html_writer::tag('div', 'Не проверено заданий: ' . $ungradedassignmentscount, ['style' => 'margin-bottom: 5px;']);
-echo html_writer::tag('div', 'Не отвечено сообщений: ' . $unrepliedforumscount, ['style' => '']);
-echo html_writer::end_tag('td');
-echo html_writer::end_tag('tr');
-echo html_writer::end_tag('tbody');
-echo html_writer::end_tag('table');
-echo html_writer::end_div();
-echo html_writer::end_div();
+    // Отображение статистики в новом формате
+    echo html_writer::start_div('', ['style' => 'margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(0,0,0,0.1);']);
+    echo html_writer::start_tag('table', ['class' => 'teacher-statistics-table', 'style' => 'width: 100%; border-collapse: collapse;']);
+    echo html_writer::start_tag('thead');
+    echo html_writer::start_tag('tr');
+    echo html_writer::tag('th', 'СДЕЛАНО', ['style' => 'background-color: #d4edda; padding: 10px; text-align: center; border: 1px solid #c3e6cb;']);
+    echo html_writer::tag('th', 'НЕ СДЕЛАНО', ['style' => 'background-color: #f8d7da; padding: 10px; text-align: center; border: 1px solid #f5c6cb;']);
+    echo html_writer::end_tag('tr');
+    echo html_writer::end_tag('thead');
+    echo html_writer::start_tag('tbody');
+    echo html_writer::start_tag('tr');
+    echo html_writer::start_tag('td', ['style' => 'background-color: #d4edda; padding: 10px; border: 1px solid #c3e6cb;']);
+    echo html_writer::tag('div', 'Проверено заданий: ' . $gradedassignmentscount, ['style' => 'margin-bottom: 5px;']);
+    echo html_writer::tag('div', 'Ответов на сообщения: ' . $forumrepliescount, ['style' => '']);
+    echo html_writer::end_tag('td');
+    echo html_writer::start_tag('td', ['style' => 'background-color: #f8d7da; padding: 10px; border: 1px solid #f5c6cb;']);
+    echo html_writer::tag('div', 'Не проверено заданий: ' . $ungradedassignmentscount, ['style' => 'margin-bottom: 5px;']);
+    echo html_writer::tag('div', 'Не отвечено сообщений: ' . $unrepliedforumscount, ['style' => '']);
+    echo html_writer::end_tag('td');
+    echo html_writer::end_tag('tr');
+    echo html_writer::end_tag('tbody');
+    echo html_writer::end_tag('table');
+    echo html_writer::end_div();
+    echo html_writer::end_div();
+}
 
 // Фильтр по курсам
 if (count($teachercourses) > 1) {
