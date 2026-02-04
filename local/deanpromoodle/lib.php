@@ -295,8 +295,51 @@ function local_deanpromoodle_before_footer() {
                 return;
             }
             
-            // Find moodle-sso-buttons-container
+            // Find moodle-sso-buttons-container or create our own container
             var ssoContainer = document.querySelector('.moodle-sso-buttons-container');
+            var ourContainer = document.querySelector('.dean-pro-moodle');
+            
+            // If our container already exists, use it
+            if (ourContainer) {
+                ssoContainer = ourContainer;
+            } else if (!ssoContainer) {
+                // Create our own independent container
+                ourContainer = document.createElement('div');
+                ourContainer.className = 'dean-pro-moodle';
+                ourContainer.style.cssText = 'display: inline-flex; gap: 10px; align-items: center; margin-left: 5px; margin-right: 10px;';
+                
+                // Find insertion point (same logic as moodle-sso-buttons.php)
+                var topBar = document.querySelector('.top-bar, .header-top, .top-header, .navbar-top');
+                var userMenu = document.querySelector('.usermenu, .user-menu, .dropdown-toggle');
+                var navBar = document.querySelector('.navbar-nav, nav.navbar, .navbar');
+                var insertionPoint = null;
+                
+                // Try to find insertion point
+                if (topBar) {
+                    var iconsContainer = topBar.querySelector('.d-flex, .ml-auto, .navbar-nav');
+                    insertionPoint = iconsContainer || topBar;
+                } else if (userMenu && userMenu.parentElement) {
+                    insertionPoint = userMenu.parentElement;
+                } else if (navBar) {
+                    insertionPoint = navBar;
+                } else {
+                    insertionPoint = document.querySelector('header') || document.body;
+                }
+                
+                // Insert our container
+                if (insertionPoint) {
+                    if (userMenu && userMenu.parentElement === insertionPoint) {
+                        insertionPoint.insertBefore(ourContainer, userMenu);
+                    } else if (insertionPoint.firstChild) {
+                        insertionPoint.insertBefore(ourContainer, insertionPoint.firstChild);
+                    } else {
+                        insertionPoint.appendChild(ourContainer);
+                    }
+                }
+                
+                ssoContainer = ourContainer;
+            }
+            
             if (!ssoContainer) {
                 return;
             }
@@ -368,16 +411,18 @@ function local_deanpromoodle_before_footer() {
                 return;
             }
             
-            // Check if moodle-sso-buttons-container exists
+            // Check if moodle-sso-buttons-container or our container exists
             var ssoContainer = document.querySelector('.moodle-sso-buttons-container');
-            if (!ssoContainer && attempt < 3) {
-                // If container not found, wait and try again
+            var ourContainer = document.querySelector('.dean-pro-moodle');
+            
+            // If neither container found and we haven't tried enough times, wait and retry
+            if (!ssoContainer && !ourContainer && attempt < 3) {
                 setTimeout(function() { tryAddButton(attempt + 1); }, 500);
                 return;
             }
             
-            // If container found, add buttons
-            if (ssoContainer) {
+            // If at least one container found or we can create our own, add buttons
+            if (ssoContainer || ourContainer || attempt >= 2) {
                 addLKButton();
             }
         }
