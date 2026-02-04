@@ -146,22 +146,30 @@ function local_deanpromoodle_before_footer() {
         $isadmin = true;
         $lkurl = new moodle_url('/local/deanpromoodle/pages/admin.php');
     } else {
-        // Check if user is teacher
-        $teacherroles = ['teacher', 'editingteacher', 'coursecreator'];
-        $roles = get_user_roles($context, $USER->id, false);
-        foreach ($roles as $role) {
-            if (in_array($role->shortname, $teacherroles)) {
+        // Check if user is teacher - только роль teacher с id=3 в любом курсе
+        $teacherroleid = 3; // ID роли teacher
+        $isteacher = false;
+        
+        // Проверяем роль teacher в системном контексте
+        $systemroles = get_user_roles($context, $USER->id, false);
+        foreach ($systemroles as $role) {
+            if ($role->id == $teacherroleid || $role->shortname == 'teacher') {
                 $isteacher = true;
                 break;
             }
         }
+        
+        // Если не найдено в системном контексте, проверяем в контекстах курсов
         if (!$isteacher) {
-            $systemcontext = context_system::instance();
-            $systemroles = get_user_roles($systemcontext, $USER->id, false);
-            foreach ($systemroles as $role) {
-                if (in_array($role->shortname, $teacherroles)) {
-                    $isteacher = true;
-                    break;
+            $courses = enrol_get_all_users_courses($USER->id, true);
+            foreach ($courses as $course) {
+                $coursecontext = context_course::instance($course->id);
+                $courseroles = get_user_roles($coursecontext, $USER->id, false);
+                foreach ($courseroles as $role) {
+                    if ($role->id == $teacherroleid || $role->shortname == 'teacher') {
+                        $isteacher = true;
+                        break 2;
+                    }
                 }
             }
         }
