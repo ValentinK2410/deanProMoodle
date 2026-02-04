@@ -146,29 +146,44 @@ function local_deanpromoodle_before_footer() {
         $isadmin = true;
         $lkurl = new moodle_url('/local/deanpromoodle/pages/admin.php');
     } else {
+        global $DB;
+        
         // Check if user is teacher - только роль teacher с id=3 в любом курсе
         $teacherroleid = 3; // ID роли teacher
         $isteacher = false;
         
-        // Проверяем роль teacher в системном контексте
-        $systemroles = get_user_roles($context, $USER->id, false);
-        foreach ($systemroles as $role) {
-            if ($role->id == $teacherroleid || $role->shortname == 'teacher') {
-                $isteacher = true;
-                break;
-            }
-        }
+        // Проверяем роль teacher через прямой SQL запрос к role_assignments
+        // Сначала проверяем в системном контексте
+        $systemcontextid = $context->id;
+        $hasrole = $DB->record_exists('role_assignments', [
+            'userid' => $USER->id,
+            'roleid' => $teacherroleid,
+            'contextid' => $systemcontextid
+        ]);
         
-        // Если не найдено в системном контексте, проверяем в контекстах курсов
-        if (!$isteacher) {
+        if ($hasrole) {
+            $isteacher = true;
+        } else {
+            // Если не найдено в системном контексте, проверяем в контекстах курсов
             $courses = enrol_get_all_users_courses($USER->id, true);
-            foreach ($courses as $course) {
-                $coursecontext = context_course::instance($course->id);
-                $courseroles = get_user_roles($coursecontext, $USER->id, false);
-                foreach ($courseroles as $role) {
-                    if ($role->id == $teacherroleid || $role->shortname == 'teacher') {
+            if (!empty($courses)) {
+                $courseids = array_keys($courses);
+                $coursecontextids = $DB->get_fieldset_sql(
+                    "SELECT id FROM {context} WHERE instanceid IN (" . implode(',', array_fill(0, count($courseids), '?')) . ") AND contextlevel = 50",
+                    $courseids
+                );
+                
+                if (!empty($coursecontextids)) {
+                    $placeholders = implode(',', array_fill(0, count($coursecontextids), '?'));
+                    $hasrole = $DB->record_exists_sql(
+                        "SELECT 1 FROM {role_assignments} 
+                         WHERE userid = ? AND roleid = ? AND contextid IN ($placeholders) 
+                         LIMIT 1",
+                        array_merge([$USER->id, $teacherroleid], $coursecontextids)
+                    );
+                    
+                    if ($hasrole) {
                         $isteacher = true;
-                        break 2;
                     }
                 }
             }
@@ -176,6 +191,7 @@ function local_deanpromoodle_before_footer() {
         
         // Check if user is student (check in any course context)
         $studentroles = ['student'];
+        $roles = get_user_roles($context, $USER->id, false);
         foreach ($roles as $role) {
             if (in_array($role->shortname, $studentroles)) {
                 $isstudent = true;
