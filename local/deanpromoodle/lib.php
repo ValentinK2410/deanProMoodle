@@ -230,11 +230,6 @@ function local_deanpromoodle_before_footer() {
         $lkurl = new moodle_url('/local/deanpromoodle/pages/student.php', ['tab' => 'courses']);
     }
     
-    // If URL is not defined, don't add button
-    if (!$lkurl) {
-        return;
-    }
-    
     // Проверяем еще раз роль teacher, если она не была определена ранее
     // Это нужно для случая, когда проверка выполнилась до определения $isteacher
     if (!$isteacher && !$isadmin) {
@@ -254,21 +249,24 @@ function local_deanpromoodle_before_footer() {
         
         if ($hasrole) {
             $isteacher = true;
-            // Если $lkurl не установлен, устанавливаем его
-            if (!$lkurl) {
-                $lkurl = new moodle_url('/local/deanpromoodle/pages/teacher.php');
-            }
         }
     }
     
-    // Add JavaScript to insert LK button into header
-    $lkurlstring = $lkurl->out(false);
+    // Определяем URL для кнопки "Преподаватель" (показывается независимо от кнопки "Деканат")
     $teacherurlstring = '';
     // Кнопка "Преподаватель" показывается для админов и преподавателей
     if ($isadmin || $isteacher) {
         $teacherurl = new moodle_url('/local/deanpromoodle/pages/teacher.php');
         $teacherurlstring = $teacherurl->out(false);
     }
+    
+    // Если нет ни кнопки "Деканат", ни кнопки "Преподаватель", не добавляем ничего
+    if (!$lkurl && !$teacherurlstring) {
+        return;
+    }
+    
+    // Add JavaScript to insert buttons into header
+    $lkurlstring = $lkurl ? $lkurl->out(false) : '';
     
     // Get button texts from language files
     $lkButtonTextRaw = get_string('lkbutton', 'local_deanpromoodle');
@@ -293,7 +291,7 @@ function local_deanpromoodle_before_footer() {
         
         function addLKButton() {
             // Check again before adding
-            if (document.getElementById('lk-button-deanpromoodle')) {
+            if (document.getElementById('lk-button-deanpromoodle') || document.getElementById('teacher-button-deanpromoodle')) {
                 return;
             }
             
@@ -303,7 +301,8 @@ function local_deanpromoodle_before_footer() {
                 return;
             }
             
-            // Create LK button
+            " . (!empty($lkurlstring) ? "
+            // Create LK (Деканат) button
             var lkButton = document.createElement('a');
             lkButton.id = 'lk-button-deanpromoodle';
             lkButton.href = " . $lkUrlJson . ";
@@ -314,8 +313,9 @@ function local_deanpromoodle_before_footer() {
             
             // Add LK button to container
             ssoContainer.appendChild(lkButton);
+            " : "") . "
             
-            " . (($isadmin || $isteacher) && !empty($teacherurlstring) ? "
+            " . (!empty($teacherurlstring) ? "
             // Create Teacher button for admins and teachers
             var teacherButton = document.createElement('a');
             teacherButton.id = 'teacher-button-deanpromoodle';
@@ -335,8 +335,8 @@ function local_deanpromoodle_before_footer() {
             attempt = attempt || 0;
             if (attempt > 5) return; // Maximum 5 attempts
             
-            // If button already added, do nothing
-            if (document.getElementById('lk-button-deanpromoodle')) {
+            // If buttons already added, do nothing
+            if (document.getElementById('lk-button-deanpromoodle') || document.getElementById('teacher-button-deanpromoodle')) {
                 return;
             }
             
