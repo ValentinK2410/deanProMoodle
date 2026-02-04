@@ -210,19 +210,19 @@ function local_deanpromoodle_before_footer() {
         }
         
         // Determine URL based on role
-        if ($isteacher && !$isadmin) {
-            $lkurl = new moodle_url('/local/deanpromoodle/pages/teacher.php');
-        } elseif ($isstudent && !$isteacher && !$isadmin) {
-            $lkurl = new moodle_url('/local/deanpromoodle/pages/student.php', ['tab' => 'courses']);
-        } elseif ($isteacher && $isadmin) {
-            // Если пользователь и преподаватель и админ, используем админскую страницу для ЛК
+        // Кнопка "Деканат" (ЛК) показывается только студентам и админам
+        // Преподаватели, которые не являются студентами, не видят кнопку "Деканат"
+        if ($isadmin) {
+            // Админ всегда видит кнопку "Деканат" (ведет на админскую страницу)
             $lkurl = new moodle_url('/local/deanpromoodle/pages/admin.php');
+        } elseif ($isstudent && !$isteacher) {
+            // Студент (не преподаватель) видит кнопку "Деканат" (ведет на страницу студента)
+            $lkurl = new moodle_url('/local/deanpromoodle/pages/student.php', ['tab' => 'courses']);
+        } elseif ($isstudent && $isteacher) {
+            // Если пользователь и студент и преподаватель, показываем кнопку "Деканат" (ведет на страницу студента)
+            $lkurl = new moodle_url('/local/deanpromoodle/pages/student.php', ['tab' => 'courses']);
         }
-    }
-    
-    // Если URL не определен, но пользователь является преподавателем, устанавливаем URL преподавателя
-    if (!$lkurl && $isteacher) {
-        $lkurl = new moodle_url('/local/deanpromoodle/pages/teacher.php');
+        // Если пользователь только преподаватель (не студент и не админ) - кнопка "Деканат" не показывается
     }
     
     // Если URL все еще не определен, но пользователь является студентом, устанавливаем URL студента

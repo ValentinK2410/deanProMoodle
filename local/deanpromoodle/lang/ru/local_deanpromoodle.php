@@ -129,8 +129,8 @@ $string['searchprogram'] = 'Поиск программы';
 $string['searchsubject'] = 'Поиск предмета';
 
 // Тексты кнопок
-$string['lkbutton'] = 'ЛК';
-$string['lkbuttontitle'] = 'Личный кабинет';
+$string['lkbutton'] = 'Деканат';
+$string['lkbuttontitle'] = 'Деканат';
 $string['teacherbutton'] = 'Преподаватель';
 $string['teacherbuttontitle'] = 'Панель преподавателя';
 

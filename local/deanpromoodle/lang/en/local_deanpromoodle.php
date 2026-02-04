@@ -118,8 +118,8 @@ $string['searchprogram'] = 'Search program';
 $string['searchsubject'] = 'Search subject';
 
 // Button texts
-$string['lkbutton'] = 'LK';
-$string['lkbuttontitle'] = 'Personal cabinet';
+$string['lkbutton'] = 'Dean\'s Office';
+$string['lkbuttontitle'] = 'Dean\'s Office';
 $string['teacherbutton'] = 'Teacher';
 $string['teacherbuttontitle'] = 'Teacher panel';
 
