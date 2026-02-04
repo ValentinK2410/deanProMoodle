@@ -519,16 +519,18 @@ function local_deanpromoodle_before_footer() {
     // Add footer links for User Agreement and Privacy Policy
     $footerLinksJs = "
     (function() {
-        // Check if footer links already added
-        if (document.getElementById('deanpromoodle-footer-links')) {
-            return;
-        }
-        
-        function addFooterLinks() {
-            // Check again before adding
+        try {
+            // Check if footer links already added
             if (document.getElementById('deanpromoodle-footer-links')) {
                 return;
             }
+            
+            function addFooterLinks() {
+                try {
+                    // Check again before adding
+                    if (document.getElementById('deanpromoodle-footer-links')) {
+                        return;
+                    }
             
             // Find footer element
             var footer = document.querySelector('footer, .footer, #page-footer, .site-footer');
@@ -551,8 +553,45 @@ function local_deanpromoodle_before_footer() {
             var linksWrapper = document.createElement('div');
             linksWrapper.style.cssText = 'display: inline-flex; align-items: center; gap: 15px; flex-wrap: wrap; justify-content: center;';
             
+            // Function to close modal (defined first)
+            function closeModal() {
+                var overlay = document.getElementById('deanpromoodle-modal-overlay');
+                var iframe = document.getElementById('deanpromoodle-modal-iframe');
+                
+                if (overlay) {
+                    overlay.style.display = 'none';
+                    if (document.body) {
+                        document.body.style.overflow = ''; // Restore body scroll
+                    }
+                }
+                if (iframe) {
+                    iframe.src = ''; // Clear iframe content
+                }
+            }
+            
+            // Function to open modal
+            function openModal(url, title) {
+                var overlay = document.getElementById('deanpromoodle-modal-overlay');
+                var iframe = document.getElementById('deanpromoodle-modal-iframe');
+                var modalTitle = document.getElementById('deanpromoodle-modal-title');
+                
+                if (overlay && iframe && modalTitle) {
+                    modalTitle.textContent = title;
+                    iframe.src = url;
+                    overlay.style.display = 'flex';
+                    if (document.body) {
+                        document.body.style.overflow = 'hidden'; // Prevent body scroll
+                    }
+                }
+            }
+            
             // Create modal overlay and container (if not exists)
+            // Wait for body to be available
             if (!document.getElementById('deanpromoodle-modal-overlay')) {
+                if (!document.body) {
+                    // Body not ready, skip modal creation for now
+                    return;
+                }
                 var modalOverlay = document.createElement('div');
                 modalOverlay.id = 'deanpromoodle-modal-overlay';
                 modalOverlay.style.cssText = 'display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.7); z-index: 10001; align-items: center; justify-content: center;';
@@ -596,46 +635,22 @@ function local_deanpromoodle_before_footer() {
                 modalContainer.appendChild(modalHeader);
                 modalContainer.appendChild(modalContent);
                 modalOverlay.appendChild(modalContainer);
-                document.body.appendChild(modalOverlay);
-            }
-            
-            // Function to open modal
-            function openModal(url, title) {
-                var overlay = document.getElementById('deanpromoodle-modal-overlay');
-                var iframe = document.getElementById('deanpromoodle-modal-iframe');
-                var modalTitle = document.getElementById('deanpromoodle-modal-title');
-                
-                if (overlay && iframe && modalTitle) {
-                    modalTitle.textContent = title;
-                    iframe.src = url;
-                    overlay.style.display = 'flex';
-                    document.body.style.overflow = 'hidden'; // Prevent body scroll
+                try {
+                    document.body.appendChild(modalOverlay);
+                    
+                    // Close modal on Escape key
+                    document.addEventListener('keydown', function(e) {
+                        if (e.key === 'Escape') {
+                            var overlay = document.getElementById('deanpromoodle-modal-overlay');
+                            if (overlay && overlay.style.display === 'flex') {
+                                closeModal();
+                            }
+                        }
+                    });
+                } catch (err) {
+                    console.error('Error creating modal:', err);
                 }
             }
-            
-            // Function to close modal
-            function closeModal() {
-                var overlay = document.getElementById('deanpromoodle-modal-overlay');
-                var iframe = document.getElementById('deanpromoodle-modal-iframe');
-                
-                if (overlay) {
-                    overlay.style.display = 'none';
-                    document.body.style.overflow = ''; // Restore body scroll
-                }
-                if (iframe) {
-                    iframe.src = ''; // Clear iframe content
-                }
-            }
-            
-            // Close modal on Escape key
-            document.addEventListener('keydown', function(e) {
-                if (e.key === 'Escape') {
-                    var overlay = document.getElementById('deanpromoodle-modal-overlay');
-                    if (overlay && overlay.style.display === 'flex') {
-                        closeModal();
-                    }
-                }
-            });
             
             // Create User Agreement link
             var agreementLink = document.createElement('a');
@@ -672,15 +687,18 @@ function local_deanpromoodle_before_footer() {
             linksWrapper.appendChild(privacyLink);
             footerLinks.appendChild(linksWrapper);
             
-            // Insert footer links
-            if (footer === document.body) {
-                // If footer is body, insert before closing body tag
-                footer.appendChild(footerLinks);
-            } else {
-                // Insert at the end of footer
-                footer.appendChild(footerLinks);
+                    // Insert footer links
+                    if (footer === document.body) {
+                        // If footer is body, insert before closing body tag
+                        footer.appendChild(footerLinks);
+                    } else {
+                        // Insert at the end of footer
+                        footer.appendChild(footerLinks);
+                    }
+                } catch (err) {
+                    console.error('Error adding footer links:', err);
+                }
             }
-        }
         
         // Try to add footer links
         function tryAddFooterLinks(attempt) {
@@ -710,10 +728,13 @@ function local_deanpromoodle_before_footer() {
             setTimeout(function() { tryAddFooterLinks(0); }, 100);
         }
         
-        // Also try to add after delays for dynamic loading
-        setTimeout(function() { tryAddFooterLinks(0); }, 500);
-        setTimeout(function() { tryAddFooterLinks(0); }, 1000);
-        setTimeout(function() { tryAddFooterLinks(0); }, 2000);
+            // Also try to add after delays for dynamic loading
+            setTimeout(function() { tryAddFooterLinks(0); }, 500);
+            setTimeout(function() { tryAddFooterLinks(0); }, 1000);
+            setTimeout(function() { tryAddFooterLinks(0); }, 2000);
+        } catch (err) {
+            console.error('Error in footer links script:', err);
+        }
     })();
     ";
     
