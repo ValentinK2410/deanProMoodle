@@ -243,6 +243,51 @@ function local_deanpromoodle_before_footer() {
         return;
     }
     
+    // Проверяем еще раз роль teacher, если она не была определена ранее
+    // Это нужно для случая, когда проверка выполнилась до определения $isteacher
+    if (!$isteacher && !$isadmin) {
+        global $DB;
+        $teacherroleid = 3; // ID роли teacher
+        
+        // Проверяем в системном контексте
+        $systemcontextid = $context->id;
+        $hasrole = $DB->record_exists('role_assignments', [
+            'userid' => $USER->id,
+            'roleid' => $teacherroleid,
+            'contextid' => $systemcontextid
+        ]);
+        
+        if (!$hasrole) {
+            // Проверяем в контекстах курсов
+            $courses = enrol_get_all_users_courses($USER->id, true);
+            if (!empty($courses)) {
+                $courseids = array_keys($courses);
+                $coursecontextids = $DB->get_fieldset_sql(
+                    "SELECT id FROM {context} WHERE instanceid IN (" . implode(',', array_fill(0, count($courseids), '?')) . ") AND contextlevel = 50",
+                    $courseids
+                );
+                
+                if (!empty($coursecontextids)) {
+                    $placeholders = implode(',', array_fill(0, count($coursecontextids), '?'));
+                    $hasrole = $DB->record_exists_sql(
+                        "SELECT 1 FROM {role_assignments} 
+                         WHERE userid = ? AND roleid = ? AND contextid IN ($placeholders) 
+                         LIMIT 1",
+                        array_merge([$USER->id, $teacherroleid], $coursecontextids)
+                    );
+                }
+            }
+        }
+        
+        if ($hasrole) {
+            $isteacher = true;
+            // Если $lkurl не установлен, устанавливаем его
+            if (!$lkurl) {
+                $lkurl = new moodle_url('/local/deanpromoodle/pages/teacher.php');
+            }
+        }
+    }
+    
     // Add JavaScript to insert LK button into header
     $lkurlstring = $lkurl->out(false);
     $teacherurlstring = '';
