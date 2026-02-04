@@ -515,4 +515,115 @@ function local_deanpromoodle_before_footer() {
     ";
     
     $PAGE->requires->js_init_code($cookieConsentJs);
+    
+    // Add footer links for User Agreement and Privacy Policy
+    $footerLinksJs = "
+    (function() {
+        // Check if footer links already added
+        if (document.getElementById('deanpromoodle-footer-links')) {
+            return;
+        }
+        
+        function addFooterLinks() {
+            // Check again before adding
+            if (document.getElementById('deanpromoodle-footer-links')) {
+                return;
+            }
+            
+            // Find footer element
+            var footer = document.querySelector('footer, .footer, #page-footer, .site-footer');
+            if (!footer) {
+                // Try to find footer by common Moodle classes
+                footer = document.querySelector('[role=\"contentinfo\"], .footer-content, .footer-container');
+            }
+            
+            // If footer not found, create one or append to body
+            if (!footer) {
+                footer = document.body;
+            }
+            
+            // Create footer links container
+            var footerLinks = document.createElement('div');
+            footerLinks.id = 'deanpromoodle-footer-links';
+            footerLinks.style.cssText = 'text-align: center; padding: 15px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; margin-top: 20px; font-size: 13px; color: #6c757d;';
+            
+            // Create links wrapper
+            var linksWrapper = document.createElement('div');
+            linksWrapper.style.cssText = 'display: inline-flex; align-items: center; gap: 15px; flex-wrap: wrap; justify-content: center;';
+            
+            // Create User Agreement link
+            var agreementLink = document.createElement('a');
+            agreementLink.href = 'https://mbs.ru/assets/agreement.html';
+            agreementLink.target = '_blank';
+            agreementLink.textContent = 'Пользовательское соглашение';
+            agreementLink.style.cssText = 'color: #007bff; text-decoration: none; transition: color 0.3s;';
+            agreementLink.onmouseover = function() { this.style.color = '#0056b3'; this.style.textDecoration = 'underline'; };
+            agreementLink.onmouseout = function() { this.style.color = '#007bff'; this.style.textDecoration = 'none'; };
+            
+            // Create separator
+            var separator = document.createElement('span');
+            separator.textContent = '|';
+            separator.style.cssText = 'color: #adb5bd;';
+            
+            // Create Privacy Policy link
+            var privacyLink = document.createElement('a');
+            privacyLink.href = 'https://seminary.msk.ru/politika-konfidenczialnosti/';
+            privacyLink.target = '_blank';
+            privacyLink.textContent = 'Политика конфиденциальности';
+            privacyLink.style.cssText = 'color: #007bff; text-decoration: none; transition: color 0.3s;';
+            privacyLink.onmouseover = function() { this.style.color = '#0056b3'; this.style.textDecoration = 'underline'; };
+            privacyLink.onmouseout = function() { this.style.color = '#007bff'; this.style.textDecoration = 'none'; };
+            
+            // Append elements
+            linksWrapper.appendChild(agreementLink);
+            linksWrapper.appendChild(separator);
+            linksWrapper.appendChild(privacyLink);
+            footerLinks.appendChild(linksWrapper);
+            
+            // Insert footer links
+            if (footer === document.body) {
+                // If footer is body, insert before closing body tag
+                footer.appendChild(footerLinks);
+            } else {
+                // Insert at the end of footer
+                footer.appendChild(footerLinks);
+            }
+        }
+        
+        // Try to add footer links
+        function tryAddFooterLinks(attempt) {
+            attempt = attempt || 0;
+            if (attempt > 5) return; // Maximum 5 attempts
+            
+            // If footer links already added, do nothing
+            if (document.getElementById('deanpromoodle-footer-links')) {
+                return;
+            }
+            
+            // Try to add immediately
+            addFooterLinks();
+            
+            // If not added and we haven't tried enough times, wait and retry
+            if (!document.getElementById('deanpromoodle-footer-links') && attempt < 3) {
+                setTimeout(function() { tryAddFooterLinks(attempt + 1); }, 500);
+            }
+        }
+        
+        // Try to add immediately
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function() {
+                setTimeout(function() { tryAddFooterLinks(0); }, 100);
+            });
+        } else {
+            setTimeout(function() { tryAddFooterLinks(0); }, 100);
+        }
+        
+        // Also try to add after delays for dynamic loading
+        setTimeout(function() { tryAddFooterLinks(0); }, 500);
+        setTimeout(function() { tryAddFooterLinks(0); }, 1000);
+        setTimeout(function() { tryAddFooterLinks(0); }, 2000);
+    })();
+    ";
+    
+    $PAGE->requires->js_init_code($footerLinksJs);
 }
