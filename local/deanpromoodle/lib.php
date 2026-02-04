@@ -444,4 +444,75 @@ function local_deanpromoodle_before_footer() {
     ";
     
     $PAGE->requires->js_init_code($js);
+    
+    // Add cookie consent banner
+    $cookieConsentJs = "
+    (function() {
+        // Check if user has already accepted cookies
+        if (localStorage.getItem('deanpromoodle_cookie_consent') === 'accepted') {
+            return;
+        }
+        
+        // Create cookie consent banner
+        var cookieBanner = document.createElement('div');
+        cookieBanner.id = 'deanpromoodle-cookie-banner';
+        cookieBanner.style.cssText = 'position: fixed; bottom: 0; left: 0; right: 0; background-color: rgba(0, 0, 0, 0.9); color: white; padding: 20px; z-index: 10000; box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 15px;';
+        
+        // Create text container
+        var textContainer = document.createElement('div');
+        textContainer.style.cssText = 'flex: 1; min-width: 250px;';
+        
+        var text = document.createElement('p');
+        text.style.cssText = 'margin: 0; font-size: 14px; line-height: 1.5;';
+        text.textContent = 'Мы используем cookies для улучшения работы сайта и персонализации контента. Продолжая использовать сайт, вы соглашаетесь с использованием cookies.';
+        textContainer.appendChild(text);
+        
+        // Create button container
+        var buttonContainer = document.createElement('div');
+        buttonContainer.style.cssText = 'display: flex; gap: 10px; flex-shrink: 0;';
+        
+        // Create Accept button
+        var acceptButton = document.createElement('button');
+        acceptButton.textContent = 'Принять';
+        acceptButton.style.cssText = 'padding: 10px 20px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: 500; transition: background-color 0.3s;';
+        acceptButton.onmouseover = function() { this.style.backgroundColor = '#0056b3'; };
+        acceptButton.onmouseout = function() { this.style.backgroundColor = '#007bff'; };
+        acceptButton.onclick = function() {
+            localStorage.setItem('deanpromoodle_cookie_consent', 'accepted');
+            cookieBanner.style.display = 'none';
+            // Set cookie for server-side access (expires in 1 year)
+            var expiryDate = new Date();
+            expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+            document.cookie = 'deanpromoodle_cookie_consent=accepted; expires=' + expiryDate.toUTCString() + '; path=/; SameSite=Lax';
+        };
+        
+        // Create Decline button (optional)
+        var declineButton = document.createElement('button');
+        declineButton.textContent = 'Отклонить';
+        declineButton.style.cssText = 'padding: 10px 20px; background-color: transparent; color: white; border: 1px solid white; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: 500; transition: background-color 0.3s;';
+        declineButton.onmouseover = function() { this.style.backgroundColor = 'rgba(255, 255, 255, 0.1)'; };
+        declineButton.onmouseout = function() { this.style.backgroundColor = 'transparent'; };
+        declineButton.onclick = function() {
+            localStorage.setItem('deanpromoodle_cookie_consent', 'declined');
+            cookieBanner.style.display = 'none';
+        };
+        
+        buttonContainer.appendChild(acceptButton);
+        buttonContainer.appendChild(declineButton);
+        
+        cookieBanner.appendChild(textContainer);
+        cookieBanner.appendChild(buttonContainer);
+        
+        // Add banner to page
+        document.body.appendChild(cookieBanner);
+        
+        // Add animation
+        setTimeout(function() {
+            cookieBanner.style.transition = 'transform 0.3s ease-out';
+            cookieBanner.style.transform = 'translateY(0)';
+        }, 100);
+    })();
+    ";
+    
+    $PAGE->requires->js_init_code($cookieConsentJs);
 }
