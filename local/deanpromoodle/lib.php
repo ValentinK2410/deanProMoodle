@@ -284,14 +284,14 @@ function local_deanpromoodle_before_footer() {
     
     $js = "
     (function() {
-        // Check if button already added
-        if (document.getElementById('lk-button-deanpromoodle')) {
+        // Check if buttons already added
+        if (document.getElementById('lk-button-deanpromoodle') || document.getElementById('teacher-button-deanpromoodle') || document.getElementById('telegram-button-deanpromoodle')) {
             return;
         }
         
         function addLKButton() {
             // Check again before adding
-            if (document.getElementById('lk-button-deanpromoodle') || document.getElementById('teacher-button-deanpromoodle')) {
+            if (document.getElementById('lk-button-deanpromoodle') || document.getElementById('teacher-button-deanpromoodle') || document.getElementById('telegram-button-deanpromoodle')) {
                 return;
             }
             
@@ -328,6 +328,34 @@ function local_deanpromoodle_before_footer() {
             // Add Teacher button to container
             ssoContainer.appendChild(teacherButton);
             " : "") . "
+            
+            // Create Telegram button (always visible)
+            var telegramButton = document.createElement('a');
+            telegramButton.id = 'telegram-button-deanpromoodle';
+            telegramButton.href = 'https://t.me/+I9rjz2wfEpI4NjIy';
+            telegramButton.target = '_blank';
+            telegramButton.className = 'deanpromoodle-button deanpromoodle-button-telegram';
+            telegramButton.style.cssText = 'display: inline-flex; align-items: center; justify-content: center; padding: 8px 12px; border-radius: 4px; text-decoration: none; font-size: 14px; font-weight: 500; transition: 0.3s; cursor: pointer; border: medium; white-space: nowrap; color: white; margin-left: 5px; margin-right: 10px; background-color: rgb(37, 150, 190);';
+            telegramButton.title = 'Техподдержка в Telegram';
+            
+            // Add Telegram icon (SVG)
+            var telegramIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            telegramIcon.setAttribute('width', '18');
+            telegramIcon.setAttribute('height', '18');
+            telegramIcon.setAttribute('viewBox', '0 0 24 24');
+            telegramIcon.setAttribute('fill', 'currentColor');
+            telegramIcon.style.cssText = 'margin-right: 6px;';
+            var telegramPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            telegramPath.setAttribute('d', 'M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.161c-.174 1.857-.923 6.654-1.304 8.84-.152.856-.432 1.142-.709 1.17-.598.055-1.052-.395-1.631-.774-.906-.68-1.42-1.103-2.302-1.767-1.016-.83-.357-1.287.221-2.031.152-.193 2.776-2.555 2.828-2.771.006-.027.012-.128-.047-.18-.059-.052-.144-.034-.207-.02-.089.018-1.5.955-4.234 2.803-.401.27-.764.401-1.089.401-.357-.006-1.043-.201-1.552-.367-.625-.204-1.121-.312-1.078-.658.021-.173.321-.348.884-.533 3.47-1.523 5.79-2.527 6.96-3.03 3.33-1.425 4.014-1.673 4.463-1.683.099-.002.321.024.465.146.118.099.151.232.167.326.016.094.036.309.02.477z');
+            telegramIcon.appendChild(telegramPath);
+            telegramButton.appendChild(telegramIcon);
+            
+            // Add text
+            var telegramText = document.createTextNode('Техподдержка');
+            telegramButton.appendChild(telegramText);
+            
+            // Add Telegram button to container
+            ssoContainer.appendChild(telegramButton);
         }
         
         // Try to add button with multiple attempts
@@ -336,7 +364,7 @@ function local_deanpromoodle_before_footer() {
             if (attempt > 5) return; // Maximum 5 attempts
             
             // If buttons already added, do nothing
-            if (document.getElementById('lk-button-deanpromoodle') || document.getElementById('teacher-button-deanpromoodle')) {
+            if (document.getElementById('lk-button-deanpromoodle') || document.getElementById('teacher-button-deanpromoodle') || document.getElementById('telegram-button-deanpromoodle')) {
                 return;
             }
             
