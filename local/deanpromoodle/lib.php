@@ -128,9 +128,25 @@ function local_deanpromoodle_has_access($pagename) {
 function local_deanpromoodle_before_footer() {
     global $PAGE, $USER, $OUTPUT;
     
-    // Check if user is logged in
+    // Check if user is logged in - early return for non-logged-in users
     if (!isloggedin() || isguestuser()) {
         return;
+    }
+    
+    // Additional safety check: ensure $PAGE is available
+    if (!isset($PAGE) || !is_object($PAGE)) {
+        return;
+    }
+    
+    // Don't add scripts on login page or other special pages
+    if (isset($PAGE->pagetype)) {
+        $pagetype = $PAGE->pagetype;
+        // Skip on login, signup, and other auth pages
+        if (strpos($pagetype, 'login') !== false || 
+            strpos($pagetype, 'signup') !== false ||
+            strpos($pagetype, 'auth') !== false) {
+            return;
+        }
     }
     
     // Determine user role and URL for LK button
