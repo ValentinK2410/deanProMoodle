@@ -222,7 +222,20 @@ function local_deanpromoodle_before_footer() {
             $lkurl = new moodle_url('/local/deanpromoodle/pages/teacher.php');
         } elseif ($isstudent && !$isteacher && !$isadmin) {
             $lkurl = new moodle_url('/local/deanpromoodle/pages/student.php', ['tab' => 'courses']);
+        } elseif ($isteacher && $isadmin) {
+            // Если пользователь и преподаватель и админ, используем админскую страницу для ЛК
+            $lkurl = new moodle_url('/local/deanpromoodle/pages/admin.php');
         }
+    }
+    
+    // Если URL не определен, но пользователь является преподавателем, устанавливаем URL преподавателя
+    if (!$lkurl && $isteacher) {
+        $lkurl = new moodle_url('/local/deanpromoodle/pages/teacher.php');
+    }
+    
+    // Если URL все еще не определен, но пользователь является студентом, устанавливаем URL студента
+    if (!$lkurl && $isstudent) {
+        $lkurl = new moodle_url('/local/deanpromoodle/pages/student.php', ['tab' => 'courses']);
     }
     
     // If URL is not defined, don't add button
