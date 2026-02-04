@@ -164,28 +164,20 @@ function local_deanpromoodle_before_footer() {
         if ($hasrole) {
             $isteacher = true;
         } else {
-            // Если не найдено в системном контексте, проверяем в контекстах курсов
-            $courses = enrol_get_all_users_courses($USER->id, true);
-            if (!empty($courses)) {
-                $courseids = array_keys($courses);
-                $coursecontextids = $DB->get_fieldset_sql(
-                    "SELECT id FROM {context} WHERE instanceid IN (" . implode(',', array_fill(0, count($courseids), '?')) . ") AND contextlevel = 50",
-                    $courseids
-                );
-                
-                if (!empty($coursecontextids)) {
-                    $placeholders = implode(',', array_fill(0, count($coursecontextids), '?'));
-                    $hasrole = $DB->record_exists_sql(
-                        "SELECT 1 FROM {role_assignments} 
-                         WHERE userid = ? AND roleid = ? AND contextid IN ($placeholders) 
-                         LIMIT 1",
-                        array_merge([$USER->id, $teacherroleid], $coursecontextids)
-                    );
-                    
-                    if ($hasrole) {
-                        $isteacher = true;
-                    }
-                }
+            // Если не найдено в системном контексте, проверяем во ВСЕХ контекстах курсов
+            // Используем прямой SQL запрос для поиска роли teacher в любом контексте курса
+            $hasrole = $DB->record_exists_sql(
+                "SELECT 1 FROM {role_assignments} ra
+                 JOIN {context} ctx ON ctx.id = ra.contextid
+                 WHERE ra.userid = ? 
+                 AND ra.roleid = ? 
+                 AND ctx.contextlevel = 50
+                 LIMIT 1",
+                [$USER->id, $teacherroleid]
+            );
+            
+            if ($hasrole) {
+                $isteacher = true;
             }
         }
         
@@ -249,35 +241,16 @@ function local_deanpromoodle_before_footer() {
         global $DB;
         $teacherroleid = 3; // ID роли teacher
         
-        // Проверяем в системном контексте
-        $systemcontextid = $context->id;
-        $hasrole = $DB->record_exists('role_assignments', [
-            'userid' => $USER->id,
-            'roleid' => $teacherroleid,
-            'contextid' => $systemcontextid
-        ]);
-        
-        if (!$hasrole) {
-            // Проверяем в контекстах курсов
-            $courses = enrol_get_all_users_courses($USER->id, true);
-            if (!empty($courses)) {
-                $courseids = array_keys($courses);
-                $coursecontextids = $DB->get_fieldset_sql(
-                    "SELECT id FROM {context} WHERE instanceid IN (" . implode(',', array_fill(0, count($courseids), '?')) . ") AND contextlevel = 50",
-                    $courseids
-                );
-                
-                if (!empty($coursecontextids)) {
-                    $placeholders = implode(',', array_fill(0, count($coursecontextids), '?'));
-                    $hasrole = $DB->record_exists_sql(
-                        "SELECT 1 FROM {role_assignments} 
-                         WHERE userid = ? AND roleid = ? AND contextid IN ($placeholders) 
-                         LIMIT 1",
-                        array_merge([$USER->id, $teacherroleid], $coursecontextids)
-                    );
-                }
-            }
-        }
+        // Проверяем во ВСЕХ контекстах курсов через прямой SQL запрос
+        $hasrole = $DB->record_exists_sql(
+            "SELECT 1 FROM {role_assignments} ra
+             JOIN {context} ctx ON ctx.id = ra.contextid
+             WHERE ra.userid = ? 
+             AND ra.roleid = ? 
+             AND ctx.contextlevel = 50
+             LIMIT 1",
+            [$USER->id, $teacherroleid]
+        );
         
         if ($hasrole) {
             $isteacher = true;
