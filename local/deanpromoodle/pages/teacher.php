@@ -897,18 +897,6 @@ switch ($tab) {
             $noreplywhere = "AND fnr.id IS NULL";
         }
         
-        // Проверяем ответы только от преподавателей с roleid = 3
-        // Используем подзапрос для проверки, что ответ от пользователя с roleid = 3
-        $teachercheck = "LEFT JOIN {forum_posts} p2 ON p2.discussion = p.discussion 
-             AND p2.created > p.created 
-             AND EXISTS (
-                 SELECT 1 FROM {role_assignments} ra2
-                 JOIN {context} ctx2 ON ctx2.id = ra2.contextid
-                 WHERE ra2.userid = p2.userid
-                 AND ra2.roleid = ?
-                 AND (ctx2.contextlevel = 50 OR ctx2.id = ?)
-             )";
-        
         // Исключаем сообщения от преподавателей (включая текущего пользователя)
         // Проверяем, что автор сообщения НЕ является преподавателем с roleid = 3
         $excludeteachers = "AND NOT EXISTS (
@@ -919,13 +907,25 @@ switch ($tab) {
              AND (ctx3.contextlevel = 50 OR ctx3.id = ?)
          )";
         
+        // Проверяем, что НЕТ ответов от преподавателей с roleid = 3 после сообщения студента
+        // Используем NOT EXISTS для более надежной проверки
+        $noanswerfromteacher = "AND NOT EXISTS (
+             SELECT 1 FROM {forum_posts} p2
+             JOIN {role_assignments} ra2 ON ra2.userid = p2.userid
+             JOIN {context} ctx2 ON ctx2.id = ra2.contextid
+             WHERE p2.discussion = p.discussion
+             AND p2.created > p.created
+             AND ra2.roleid = ?
+             AND (ctx2.contextlevel = 50 OR ctx2.id = ?)
+         )";
+        
         // Собираем параметры в правильном порядке для SQL запроса
-        // Порядок: forumids, studentuserids, teacherroleid (для EXISTS в teachercheck), systemcontextid (для EXISTS в teachercheck), teacherroleid (для excludeteachers), systemcontextid (для excludeteachers)
+        // Порядок: forumids, studentuserids, teacherroleid (для excludeteachers), systemcontextid (для excludeteachers), teacherroleid (для noanswerfromteacher), systemcontextid (для noanswerfromteacher)
         $sqlparams = array_merge(
             $forumids, 
             $allstudentuserids, 
-            [$teacherroleid, $systemcontext->id], // для teachercheck EXISTS
-            [$teacherroleid, $systemcontext->id]  // для excludeteachers NOT EXISTS
+            [$teacherroleid, $systemcontext->id], // для excludeteachers NOT EXISTS
+            [$teacherroleid, $systemcontext->id]  // для noanswerfromteacher NOT EXISTS
         );
         
         $posts = $DB->get_records_sql(
@@ -937,12 +937,11 @@ switch ($tab) {
              JOIN {user} u ON u.id = p.userid
              JOIN {forum_discussions} d ON d.id = p.discussion
              JOIN {forum} f ON f.id = d.forum
-             $teachercheck
              $noreplyjoin
              WHERE d.forum IN ($forumplaceholders)
              AND p.userid IN ($studentplaceholders)
              $excludeteachers
-             AND p2.id IS NULL
+             $noanswerfromteacher
              $noreplywhere
              ORDER BY p.created DESC
              LIMIT 1000",
