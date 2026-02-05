@@ -817,10 +817,11 @@ switch ($tab) {
         $unrepliedposts = [];
         
         // Получаем роли один раз перед циклом
-        $teacherroleids = $DB->get_fieldset_select('role', 'id', "shortname IN ('teacher', 'editingteacher', 'manager')");
+        // Используем только roleid = 3 (teacher) для проверки ответов преподавателей
+        $teacherroleid = 3; // ID роли teacher
         $studentroleid = $DB->get_field('role', 'id', ['shortname' => 'student']);
         
-        if (empty($teacherroleids) || !$studentroleid) {
+        if (!$studentroleid) {
             echo html_writer::div(get_string('noforumspostsfound', 'local_deanpromoodle'), 'alert alert-info');
             break;
         }
@@ -848,24 +849,22 @@ switch ($tab) {
             $coursecontexts[$cid] = context_course::instance($cid);
         }
         
-        // Получаем всех преподавателей для всех курсов одним запросом
+        // Получаем всех преподавателей с roleid = 3 для всех курсов одним запросом
         $systemcontext = context_system::instance();
-        $placeholders = implode(',', array_fill(0, count($teacherroleids), '?'));
         $coursecontextids = array_map(function($ctx) { return $ctx->id; }, $coursecontexts);
         $coursecontextplaceholders = implode(',', array_fill(0, count($coursecontextids), '?'));
         
         $allteacheruserids = $DB->get_fieldset_sql(
             "SELECT DISTINCT ra.userid
              FROM {role_assignments} ra
-             WHERE (ra.contextid IN ($coursecontextplaceholders) OR ra.contextid = ?)
-             AND ra.roleid IN ($placeholders)",
-            array_merge($coursecontextids, [$systemcontext->id], $teacherroleids)
+             JOIN {context} ctx ON ctx.id = ra.contextid
+             WHERE ((ctx.id IN ($coursecontextplaceholders) AND ctx.contextlevel = 50) OR ctx.id = ?)
+             AND ra.roleid = ?",
+            array_merge($coursecontextids, [$systemcontext->id, $teacherroleid])
         );
         
-        if (empty($allteacheruserids)) {
-            echo html_writer::div(get_string('noforumspostsfound', 'local_deanpromoodle'), 'alert alert-info');
-            break;
-        }
+        // Если нет преподавателей, все равно продолжаем (может быть, нет ответов)
+        // Не прерываем выполнение, так как могут быть сообщения студентов без ответов
         
         // Получаем всех студентов для всех курсов одним запросом
         $allstudentuserids = $DB->get_fieldset_sql(
@@ -883,7 +882,6 @@ switch ($tab) {
         
         // Оптимизированный запрос: получаем все сообщения одним запросом
         $forumplaceholders = implode(',', array_fill(0, count($forumids), '?'));
-        $teacherplaceholders = implode(',', array_fill(0, count($allteacheruserids), '?'));
         $studentplaceholders = implode(',', array_fill(0, count($allstudentuserids), '?'));
         
         // Проверяем существование таблицы local_deanpromoodle_forum_no_reply
@@ -899,6 +897,37 @@ switch ($tab) {
             $noreplywhere = "AND fnr.id IS NULL";
         }
         
+        // Проверяем ответы только от преподавателей с roleid = 3
+        // Используем подзапрос для проверки, что ответ от пользователя с roleid = 3
+        $teachercheck = "LEFT JOIN {forum_posts} p2 ON p2.discussion = p.discussion 
+             AND p2.created > p.created 
+             AND EXISTS (
+                 SELECT 1 FROM {role_assignments} ra2
+                 JOIN {context} ctx2 ON ctx2.id = ra2.contextid
+                 WHERE ra2.userid = p2.userid
+                 AND ra2.roleid = ?
+                 AND (ctx2.contextlevel = 50 OR ctx2.id = ?)
+             )";
+        
+        // Исключаем сообщения от преподавателей (включая текущего пользователя)
+        // Проверяем, что автор сообщения НЕ является преподавателем с roleid = 3
+        $excludeteachers = "AND NOT EXISTS (
+             SELECT 1 FROM {role_assignments} ra3
+             JOIN {context} ctx3 ON ctx3.id = ra3.contextid
+             WHERE ra3.userid = p.userid
+             AND ra3.roleid = ?
+             AND (ctx3.contextlevel = 50 OR ctx3.id = ?)
+         )";
+        
+        // Собираем параметры в правильном порядке для SQL запроса
+        // Порядок: forumids, studentuserids, teacherroleid (для EXISTS в teachercheck), systemcontextid (для EXISTS в teachercheck), teacherroleid (для excludeteachers), systemcontextid (для excludeteachers)
+        $sqlparams = array_merge(
+            $forumids, 
+            $allstudentuserids, 
+            [$teacherroleid, $systemcontext->id], // для teachercheck EXISTS
+            [$teacherroleid, $systemcontext->id]  // для excludeteachers NOT EXISTS
+        );
+        
         $posts = $DB->get_records_sql(
             "SELECT p.id, p.discussion, p.userid, p.subject, p.message, p.created,
                     u.firstname, u.lastname, u.email,
@@ -908,17 +937,16 @@ switch ($tab) {
              JOIN {user} u ON u.id = p.userid
              JOIN {forum_discussions} d ON d.id = p.discussion
              JOIN {forum} f ON f.id = d.forum
-             LEFT JOIN {forum_posts} p2 ON p2.discussion = p.discussion 
-                 AND p2.created > p.created 
-                 AND p2.userid IN ($teacherplaceholders)
+             $teachercheck
              $noreplyjoin
              WHERE d.forum IN ($forumplaceholders)
              AND p.userid IN ($studentplaceholders)
+             $excludeteachers
              AND p2.id IS NULL
              $noreplywhere
              ORDER BY p.created DESC
              LIMIT 1000",
-            array_merge($forumids, $allteacheruserids, $allstudentuserids)
+            $sqlparams
         );
         
         // Обрабатываем результаты
