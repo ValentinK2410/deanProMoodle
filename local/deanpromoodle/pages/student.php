@@ -1459,6 +1459,12 @@ if ($action == 'viewprogram' && $programid > 0) {
                             $completionclass = 'completion-status-completed';
                         }
                     }
+                    
+                    // Добавляем процент завершения к статусу через дефис
+                    if ($finalgradepercent !== null) {
+                        $completionstatus .= ' - ' . round($finalgradepercent, 2) . '%';
+                    }
+                    
                     echo html_writer::tag('td', 
                         '<span class="' . $completionclass . '">' . htmlspecialchars($completionstatus, ENT_QUOTES, 'UTF-8') . '</span>'
                     );
