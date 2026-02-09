@@ -551,7 +551,6 @@ if ($action == 'viewprogram' && $programid > 0) {
                     echo html_writer::tag('th', 'Кол-во кредитов', ['style' => 'width: 120px;']);
                     echo html_writer::tag('th', 'Статус завершения', ['style' => 'width: 180px;']);
                     echo html_writer::tag('th', 'Оценка', ['style' => 'width: 150px;']);
-                    echo html_writer::tag('th', 'Курсы');
                     echo html_writer::end_tag('tr');
                     echo html_writer::end_tag('thead');
                     // Функция для вычисления статуса завершения и оценки курса
@@ -849,27 +848,43 @@ if ($action == 'viewprogram' && $programid > 0) {
                             $displayGrade = $displayCompletion;
                         }
                         
-                        // Формируем HTML списка курсов - показываем только зачисленные курсы
+                        // Формируем tooltip и ссылку для названия предмета
+                        $subjectNameHtml = '';
+                        $tooltipText = '';
+                        $firstCourseUrl = null;
+                        
                         if (!empty($enrolledcourses)) {
-                            $courseshtml = '<ul class="subject-courses-list">';
+                            // Формируем список курсов для tooltip
+                            $courseNames = [];
                             foreach ($enrolledcourses as $course) {
-                                $courseurl = new moodle_url('/course/view.php', ['id' => $course->id]);
-                                $courseshtml .= '<li>' . html_writer::link($courseurl, 
-                                    '<i class="fas fa-check"></i> ' . htmlspecialchars($course->fullname, ENT_QUOTES, 'UTF-8'), 
-                                    ['class' => 'course-link-enrolled', 'target' => '_blank']
-                                ) . '</li>';
+                                $courseNames[] = htmlspecialchars($course->fullname, ENT_QUOTES, 'UTF-8');
+                                if ($firstCourseUrl === null) {
+                                    $firstCourseUrl = new moodle_url('/course/view.php', ['id' => $course->id]);
+                                }
                             }
-                            $courseshtml .= '</ul>';
+                            $tooltipText = 'Курсы: ' . implode(', ', $courseNames);
+                            
+                            // Делаем название предмета кликабельным
+                            $subjectNameHtml = html_writer::link(
+                                $firstCourseUrl,
+                                htmlspecialchars($subject->name, ENT_QUOTES, 'UTF-8'),
+                                [
+                                    'style' => 'font-weight: 500; text-decoration: none; color: inherit; cursor: pointer;',
+                                    'title' => $tooltipText,
+                                    'target' => '_blank',
+                                    'onmouseover' => 'this.style.textDecoration="underline"; this.style.color="#007bff";',
+                                    'onmouseout' => 'this.style.textDecoration="none"; this.style.color="inherit";'
+                                ]
+                            );
                         } else {
-                            // Если нет зачисленных курсов, показываем сообщение
-                            $courseshtml = '<span class="text-muted">Нет доступных курсов</span>';
+                            // Если нет курсов, просто текст
+                            $subjectNameHtml = htmlspecialchars($subject->name, ENT_QUOTES, 'UTF-8');
+                            $tooltipText = 'Нет доступных курсов';
                         }
                         
                         echo html_writer::start_tag('tr');
                         echo html_writer::tag('td', $index + 1);
-                        echo html_writer::tag('td', htmlspecialchars($subject->name, ENT_QUOTES, 'UTF-8'), [
-                            'style' => 'font-weight: 500;'
-                        ]);
+                        echo html_writer::tag('td', $subjectNameHtml);
                         
                         // Кол-во кредитов
                         $credits = '-';
@@ -887,9 +902,6 @@ if ($action == 'viewprogram' && $programid > 0) {
                         $gradeBadgeContent = $displayGrade['gradeicon'] . htmlspecialchars($displayGrade['gradetext'], ENT_QUOTES, 'UTF-8');
                         $gradeBadge = '<span class="grade-badge ' . $displayGrade['gradeclass'] . '">' . $gradeBadgeContent . '</span>';
                         echo html_writer::tag('td', $gradeBadge);
-                        
-                        // Курсы - только те, на которые зачислен студент
-                        echo html_writer::tag('td', $courseshtml);
                         
                         echo html_writer::end_tag('tr');
                     }
