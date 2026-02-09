@@ -3840,71 +3840,166 @@ if ($action == 'viewprogram' && $programid > 0) {
                 
                 if ($subjectid > 0 && !empty($institution_name)) {
                     try {
-                        if ($action == 'add_external_credit') {
-                            // Проверяем, нет ли уже внешнего зачета по этому предмету
-                            $existing = $DB->get_record('local_deanpromoodle_student_external_credits', [
-                                'studentid' => $viewingstudent->id,
-                                'subjectid' => $subjectid
-                            ]);
-                            
-                            if ($existing) {
-                                echo html_writer::div('Внешний зачет по этому предмету уже существует. Используйте редактирование.', 'alert alert-warning');
+                        // Проверяем существование предмета
+                        $subject = $DB->get_record('local_deanpromoodle_subjects', ['id' => $subjectid]);
+                        if (!$subject) {
+                            echo html_writer::div('Предмет не найден в базе данных', 'alert alert-danger');
+                        } else {
+                            // Проверяем существование institution_id, если он указан
+                            if ($institution_id > 0) {
+                                $institution = $DB->get_record('local_deanpromoodle_institutions', ['id' => $institution_id]);
+                                if (!$institution) {
+                                    echo html_writer::div('Учебное заведение с указанным ID не найдено в базе данных', 'alert alert-danger');
+                                } else {
+                                    // Продолжаем обработку
+                                    if ($action == 'add_external_credit') {
+                                        // Проверяем, нет ли уже внешнего зачета по этому предмету
+                                        $existing = $DB->get_record('local_deanpromoodle_student_external_credits', [
+                                            'studentid' => $viewingstudent->id,
+                                            'subjectid' => $subjectid
+                                        ]);
+                                        
+                                        if ($existing) {
+                                            echo html_writer::div('Внешний зачет по этому предмету уже существует. Используйте редактирование.', 'alert alert-warning');
+                                        } else {
+                                            $record = new stdClass();
+                                            $record->studentid = $viewingstudent->id;
+                                            $record->subjectid = $subjectid;
+                                            $record->grade = !empty($grade) ? $grade : null;
+                                            $record->grade_percent = $grade_percent !== null ? $grade_percent : null;
+                                            $record->institution_name = $institution_name;
+                                            $record->institution_id = $institution_id > 0 ? $institution_id : null;
+                                            $record->credited_date = $credited_date > 0 ? $credited_date : time();
+                                            $record->document_number = !empty($document_number) ? $document_number : null;
+                                            $record->notes = !empty($notes) ? $notes : null;
+                                            $record->createdby = $USER->id;
+                                            $record->timecreated = time();
+                                            $record->timemodified = time();
+                                            
+                                            $DB->insert_record('local_deanpromoodle_student_external_credits', $record);
+                                            
+                                            $redirecturl = new moodle_url('/local/deanpromoodle/pages/student.php', [
+                                                'tab' => 'programs',
+                                                'subtab' => 'external_credits',
+                                                'studentid' => $studentid
+                                            ]);
+                                            redirect($redirecturl, 'Внешний зачет успешно добавлен', null, \core\output\notification::NOTIFY_SUCCESS);
+                                        }
+                                    } else if ($action == 'edit_external_credit' && $externalcreditid > 0) {
+                                        $record = $DB->get_record('local_deanpromoodle_student_external_credits', [
+                                            'id' => $externalcreditid,
+                                            'studentid' => $viewingstudent->id
+                                        ]);
+                                        
+                                        if ($record) {
+                                            $record->subjectid = $subjectid;
+                                            $record->grade = !empty($grade) ? $grade : null;
+                                            $record->grade_percent = $grade_percent !== null ? $grade_percent : null;
+                                            $record->institution_name = $institution_name;
+                                            $record->institution_id = $institution_id > 0 ? $institution_id : null;
+                                            $record->credited_date = $credited_date > 0 ? $credited_date : $record->credited_date;
+                                            $record->document_number = !empty($document_number) ? $document_number : null;
+                                            $record->notes = !empty($notes) ? $notes : null;
+                                            $record->timemodified = time();
+                                            
+                                            $DB->update_record('local_deanpromoodle_student_external_credits', $record);
+                                            
+                                            $redirecturl = new moodle_url('/local/deanpromoodle/pages/student.php', [
+                                                'tab' => 'programs',
+                                                'subtab' => 'external_credits',
+                                                'studentid' => $studentid
+                                            ]);
+                                            redirect($redirecturl, 'Внешний зачет успешно обновлен', null, \core\output\notification::NOTIFY_SUCCESS);
+                                        } else {
+                                            echo html_writer::div('Внешний зачет не найден', 'alert alert-danger');
+                                        }
+                                    }
+                                }
                             } else {
-                                $record = new stdClass();
-                                $record->studentid = $viewingstudent->id;
-                                $record->subjectid = $subjectid;
-                                $record->grade = $grade ?: null;
-                                $record->grade_percent = $grade_percent;
-                                $record->institution_name = $institution_name;
-                                $record->institution_id = $institution_id > 0 ? $institution_id : null;
-                                $record->credited_date = $credited_date > 0 ? $credited_date : time();
-                                $record->document_number = $document_number ?: null;
-                                $record->notes = $notes ?: null;
-                                $record->createdby = $USER->id;
-                                $record->timecreated = time();
-                                $record->timemodified = time();
-                                
-                                $DB->insert_record('local_deanpromoodle_student_external_credits', $record);
-                                
-                                $redirecturl = new moodle_url('/local/deanpromoodle/pages/student.php', [
-                                    'tab' => 'programs',
-                                    'subtab' => 'external_credits',
-                                    'studentid' => $studentid
-                                ]);
-                                redirect($redirecturl, 'Внешний зачет успешно добавлен', null, \core\output\notification::NOTIFY_SUCCESS);
-                            }
-                        } else if ($action == 'edit_external_credit' && $externalcreditid > 0) {
-                            $record = $DB->get_record('local_deanpromoodle_student_external_credits', [
-                                'id' => $externalcreditid,
-                                'studentid' => $viewingstudent->id
-                            ]);
-                            
-                            if ($record) {
-                                $record->subjectid = $subjectid;
-                                $record->grade = $grade ?: null;
-                                $record->grade_percent = $grade_percent;
-                                $record->institution_name = $institution_name;
-                                $record->institution_id = $institution_id > 0 ? $institution_id : null;
-                                $record->credited_date = $credited_date > 0 ? $credited_date : $record->credited_date;
-                                $record->document_number = $document_number ?: null;
-                                $record->notes = $notes ?: null;
-                                $record->timemodified = time();
-                                
-                                $DB->update_record('local_deanpromoodle_student_external_credits', $record);
-                                
-                                $redirecturl = new moodle_url('/local/deanpromoodle/pages/student.php', [
-                                    'tab' => 'programs',
-                                    'subtab' => 'external_credits',
-                                    'studentid' => $studentid
-                                ]);
-                                redirect($redirecturl, 'Внешний зачет успешно обновлен', null, \core\output\notification::NOTIFY_SUCCESS);
-                            } else {
-                                echo html_writer::div('Внешний зачет не найден', 'alert alert-danger');
+                                // institution_id не указан, продолжаем без проверки
+                                if ($action == 'add_external_credit') {
+                                    // Проверяем, нет ли уже внешнего зачета по этому предмету
+                                    $existing = $DB->get_record('local_deanpromoodle_student_external_credits', [
+                                        'studentid' => $viewingstudent->id,
+                                        'subjectid' => $subjectid
+                                    ]);
+                                    
+                                    if ($existing) {
+                                        echo html_writer::div('Внешний зачет по этому предмету уже существует. Используйте редактирование.', 'alert alert-warning');
+                                    } else {
+                                        $record = new stdClass();
+                                        $record->studentid = $viewingstudent->id;
+                                        $record->subjectid = $subjectid;
+                                        $record->grade = !empty($grade) ? $grade : null;
+                                        $record->grade_percent = $grade_percent !== null ? $grade_percent : null;
+                                        $record->institution_name = $institution_name;
+                                        $record->institution_id = null;
+                                        $record->credited_date = $credited_date > 0 ? $credited_date : time();
+                                        $record->document_number = !empty($document_number) ? $document_number : null;
+                                        $record->notes = !empty($notes) ? $notes : null;
+                                        $record->createdby = $USER->id;
+                                        $record->timecreated = time();
+                                        $record->timemodified = time();
+                                        
+                                        $DB->insert_record('local_deanpromoodle_student_external_credits', $record);
+                                        
+                                        $redirecturl = new moodle_url('/local/deanpromoodle/pages/student.php', [
+                                            'tab' => 'programs',
+                                            'subtab' => 'external_credits',
+                                            'studentid' => $studentid
+                                        ]);
+                                        redirect($redirecturl, 'Внешний зачет успешно добавлен', null, \core\output\notification::NOTIFY_SUCCESS);
+                                    }
+                                } else if ($action == 'edit_external_credit' && $externalcreditid > 0) {
+                                    $record = $DB->get_record('local_deanpromoodle_student_external_credits', [
+                                        'id' => $externalcreditid,
+                                        'studentid' => $viewingstudent->id
+                                    ]);
+                                    
+                                    if ($record) {
+                                        $record->subjectid = $subjectid;
+                                        $record->grade = !empty($grade) ? $grade : null;
+                                        $record->grade_percent = $grade_percent !== null ? $grade_percent : null;
+                                        $record->institution_name = $institution_name;
+                                        $record->institution_id = null;
+                                        $record->credited_date = $credited_date > 0 ? $credited_date : $record->credited_date;
+                                        $record->document_number = !empty($document_number) ? $document_number : null;
+                                        $record->notes = !empty($notes) ? $notes : null;
+                                        $record->timemodified = time();
+                                        
+                                        $DB->update_record('local_deanpromoodle_student_external_credits', $record);
+                                        
+                                        $redirecturl = new moodle_url('/local/deanpromoodle/pages/student.php', [
+                                            'tab' => 'programs',
+                                            'subtab' => 'external_credits',
+                                            'studentid' => $studentid
+                                        ]);
+                                        redirect($redirecturl, 'Внешний зачет успешно обновлен', null, \core\output\notification::NOTIFY_SUCCESS);
+                                    } else {
+                                        echo html_writer::div('Внешний зачет не найден', 'alert alert-danger');
+                                    }
+                                }
                             }
                         }
+                    } catch (\dml_exception $e) {
+                        // Ошибка базы данных
+                        $errormsg = 'Ошибка записи в базу данных';
+                        if ($e->getMessage()) {
+                            $errormsg .= ': ' . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8');
+                        }
+                        // Проверяем тип ошибки для более понятного сообщения
+                        if (strpos($e->getMessage(), 'foreign key constraint') !== false) {
+                            $errormsg = 'Ошибка: указанное учебное заведение или предмет не существует в базе данных';
+                        } else if (strpos($e->getMessage(), 'Duplicate entry') !== false || strpos($e->getMessage(), 'unique constraint') !== false) {
+                            $errormsg = 'Ошибка: внешний зачет по этому предмету уже существует для данного студента';
+                        }
+                        echo html_writer::div($errormsg, 'alert alert-danger');
                     } catch (\Exception $e) {
-                        echo html_writer::div('Ошибка: ' . $e->getMessage(), 'alert alert-danger');
+                        // Общая ошибка
+                        echo html_writer::div('Ошибка: ' . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8'), 'alert alert-danger');
                     }
+                } else {
+                    echo html_writer::div('Пожалуйста, заполните все обязательные поля: предмет и название учебного заведения', 'alert alert-warning');
                 }
             }
             
