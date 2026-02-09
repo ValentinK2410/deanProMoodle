@@ -213,8 +213,7 @@
         <KEY NAME="createdby" TYPE="foreign" FIELDS="createdby" REFTABLE="user" REFFIELDS="id"/>
       </KEYS>
       <INDEXES>
-        <INDEX NAME="studentid" UNIQUE="false" FIELDS="studentid"/>
-        <INDEX NAME="createdby" UNIQUE="false" FIELDS="createdby"/>
+        <!-- Индексы для studentid и createdby создаются автоматически при создании внешних ключей -->
         <INDEX NAME="timecreated" UNIQUE="false" FIELDS="timecreated"/>
       </INDEXES>
     </TABLE>

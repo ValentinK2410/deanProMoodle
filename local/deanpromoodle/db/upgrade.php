@@ -210,8 +210,8 @@ function xmldb_local_deanpromoodle_upgrade($oldversion) {
             $table->add_key('studentid', XMLDB_KEY_FOREIGN, ['studentid'], 'user', ['id']);
             $table->add_key('createdby', XMLDB_KEY_FOREIGN, ['createdby'], 'user', ['id']);
             
-            $table->add_index('studentid', XMLDB_INDEX_NOTUNIQUE, ['studentid']);
-            $table->add_index('createdby', XMLDB_INDEX_NOTUNIQUE, ['createdby']);
+            // Индексы для studentid и createdby создаются автоматически при создании внешних ключей
+            // Добавляем только индекс для timecreated
             $table->add_index('timecreated', XMLDB_INDEX_NOTUNIQUE, ['timecreated']);
             
             $dbman->create_table($table);
