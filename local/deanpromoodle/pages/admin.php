@@ -325,23 +325,6 @@ $PAGE->set_pagelayout('admin');
 
 // Подключение CSS
 $PAGE->requires->css('/local/deanpromoodle/styles.css');
-    // Отключаем буферизацию вывода для корректной отправки файла
-    if (ob_get_level()) {
-        ob_end_clean();
-    }
-    
-    try {
-        $program = $DB->get_record('local_deanpromoodle_programs', ['id' => $programid]);
-        if (!$program) {
-            // Если программа не найдена, выводим ошибку после заголовков
-            echo $OUTPUT->header();
-            echo html_writer::div('Программа не найдена.', 'alert alert-danger');
-            echo $OUTPUT->footer();
-            exit;
-        }
-        
-        // Получаем все предметы программы
-        $subjects = $DB->get_records_sql(
             "SELECT s.id, s.name, s.code, s.shortdescription, s.description, s.credits, s.academic_hours, s.independent_hours, ps.sortorder
              FROM {local_deanpromoodle_program_subjects} ps
              JOIN {local_deanpromoodle_subjects} s ON s.id = ps.subjectid
