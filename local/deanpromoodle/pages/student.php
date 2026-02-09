@@ -3878,20 +3878,36 @@ if ($action == 'viewprogram' && $programid > 0) {
                                             echo html_writer::div('Внешний зачет по этому предмету уже существует. Используйте редактирование.', 'alert alert-warning');
                                         } else {
                                             $record = new stdClass();
-                                            $record->studentid = $viewingstudent->id;
-                                            $record->subjectid = $subjectid;
-                                            $record->grade = !empty($grade) ? $grade : null;
-                                            $record->grade_percent = $grade_percent !== null ? $grade_percent : null;
-                                            $record->institution_name = $institution_name;
-                                            $record->institution_id = $institution_id > 0 ? $institution_id : null;
-                                            $record->credited_date = $credited_date > 0 ? $credited_date : time();
-                                            $record->document_number = !empty($document_number) ? $document_number : null;
-                                            $record->notes = !empty($notes) ? $notes : null;
-                                            $record->createdby = $USER->id;
+                                            $record->studentid = (int)$viewingstudent->id;
+                                            $record->subjectid = (int)$subjectid;
+                                            $record->grade = !empty(trim($grade)) ? trim($grade) : null;
+                                            $record->grade_percent = ($grade_percent !== null && $grade_percent !== '') ? (float)$grade_percent : null;
+                                            // Убеждаемся, что institution_name не пустая строка
+                                            $record->institution_name = !empty(trim($institution_name)) ? trim($institution_name) : null;
+                                            $record->institution_id = ($institution_id > 0) ? (int)$institution_id : null;
+                                            $record->credited_date = ($credited_date > 0) ? (int)$credited_date : time();
+                                            $record->document_number = !empty(trim($document_number)) ? trim($document_number) : null;
+                                            $record->notes = !empty(trim($notes)) ? trim($notes) : null;
+                                            $record->createdby = (int)$USER->id;
                                             $record->timecreated = time();
                                             $record->timemodified = time();
                                             
-                                            $DB->insert_record('local_deanpromoodle_student_external_credits', $record);
+                                            // Дополнительная проверка обязательных полей перед записью
+                                            if (empty($record->studentid) || empty($record->subjectid) || empty($record->createdby)) {
+                                                echo html_writer::div('Ошибка: не заполнены обязательные поля (студент, предмет или создатель)', 'alert alert-danger');
+                                            } else if (empty($record->institution_name)) {
+                                                echo html_writer::div('Ошибка: не указано название учебного заведения', 'alert alert-danger');
+                                            } else {
+                                                // Логируем данные перед записью (только для админов)
+                                                if ($isadmin) {
+                                                    debugging('Попытка добавления внешнего зачета. Данные: studentid=' . $record->studentid . 
+                                                             ', subjectid=' . $record->subjectid . 
+                                                             ', institution_name=' . $record->institution_name . 
+                                                             ', institution_id=' . ($record->institution_id ?? 'null') .
+                                                             ', createdby=' . $record->createdby, DEBUG_DEVELOPER);
+                                                }
+                                                
+                                                $DB->insert_record('local_deanpromoodle_student_external_credits', $record);
                                             
                                             $redirecturl = new moodle_url('/local/deanpromoodle/pages/student.php', [
                                                 'tab' => 'programs',
@@ -3943,20 +3959,35 @@ if ($action == 'viewprogram' && $programid > 0) {
                                         echo html_writer::div('Внешний зачет по этому предмету уже существует. Используйте редактирование.', 'alert alert-warning');
                                     } else {
                                         $record = new stdClass();
-                                        $record->studentid = $viewingstudent->id;
-                                        $record->subjectid = $subjectid;
-                                        $record->grade = !empty($grade) ? $grade : null;
-                                        $record->grade_percent = $grade_percent !== null ? $grade_percent : null;
-                                        $record->institution_name = $institution_name;
+                                        $record->studentid = (int)$viewingstudent->id;
+                                        $record->subjectid = (int)$subjectid;
+                                        $record->grade = !empty(trim($grade)) ? trim($grade) : null;
+                                        $record->grade_percent = ($grade_percent !== null && $grade_percent !== '') ? (float)$grade_percent : null;
+                                        // Убеждаемся, что institution_name не пустая строка
+                                        $record->institution_name = !empty(trim($institution_name)) ? trim($institution_name) : null;
                                         $record->institution_id = null;
-                                        $record->credited_date = $credited_date > 0 ? $credited_date : time();
-                                        $record->document_number = !empty($document_number) ? $document_number : null;
-                                        $record->notes = !empty($notes) ? $notes : null;
-                                        $record->createdby = $USER->id;
+                                        $record->credited_date = ($credited_date > 0) ? (int)$credited_date : time();
+                                        $record->document_number = !empty(trim($document_number)) ? trim($document_number) : null;
+                                        $record->notes = !empty(trim($notes)) ? trim($notes) : null;
+                                        $record->createdby = (int)$USER->id;
                                         $record->timecreated = time();
                                         $record->timemodified = time();
                                         
-                                        $DB->insert_record('local_deanpromoodle_student_external_credits', $record);
+                                        // Дополнительная проверка обязательных полей перед записью
+                                        if (empty($record->studentid) || empty($record->subjectid) || empty($record->createdby)) {
+                                            echo html_writer::div('Ошибка: не заполнены обязательные поля (студент, предмет или создатель)', 'alert alert-danger');
+                                        } else if (empty($record->institution_name)) {
+                                            echo html_writer::div('Ошибка: не указано название учебного заведения', 'alert alert-danger');
+                                        } else {
+                                            // Логируем данные перед записью (только для админов)
+                                            if ($isadmin) {
+                                                debugging('Попытка добавления внешнего зачета (без institution_id). Данные: studentid=' . $record->studentid . 
+                                                         ', subjectid=' . $record->subjectid . 
+                                                         ', institution_name=' . $record->institution_name . 
+                                                         ', createdby=' . $record->createdby, DEBUG_DEVELOPER);
+                                            }
+                                            
+                                            $DB->insert_record('local_deanpromoodle_student_external_credits', $record);
                                         
                                         $redirecturl = new moodle_url('/local/deanpromoodle/pages/student.php', [
                                             'tab' => 'programs',
