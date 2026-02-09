@@ -1387,6 +1387,138 @@ switch ($tab) {
             }
         }
         
+        // Обработка экспорта предметов программы в Excel
+        if ($action == 'export_subjects' && $programid > 0) {
+            try {
+                $program = $DB->get_record('local_deanpromoodle_programs', ['id' => $programid]);
+                if (!$program) {
+                    echo html_writer::div('Программа не найдена.', 'alert alert-danger');
+                    break;
+                }
+                
+                // Получаем все предметы программы
+                $subjects = $DB->get_records_sql(
+                    "SELECT s.id, s.name, s.code, s.shortdescription, s.description, s.credits, s.academic_hours, s.independent_hours, ps.sortorder
+                     FROM {local_deanpromoodle_program_subjects} ps
+                     JOIN {local_deanpromoodle_subjects} s ON s.id = ps.subjectid
+                     WHERE ps.programid = ?
+                     ORDER BY ps.sortorder ASC",
+                    [$programid]
+                );
+                
+                // Проверяем доступность PhpSpreadsheet
+                $usePhpSpreadsheet = false;
+                $phpspreadsheetpath = $CFG->dirroot . '/vendor/phpoffice/phpspreadsheet/src/PhpSpreadsheet/IOFactory.php';
+                if (file_exists($phpspreadsheetpath)) {
+                    require_once($phpspreadsheetpath);
+                    $usePhpSpreadsheet = true;
+                }
+                
+                if (!$usePhpSpreadsheet) {
+                    // Если PhpSpreadsheet недоступна, используем CSV
+                    $filename = 'program_subjects_' . $programid . '_' . date('Y-m-d') . '.csv';
+                    header('Content-Type: text/csv; charset=UTF-8');
+                    header('Content-Disposition: attachment; filename="' . $filename . '"');
+                    header('Cache-Control: must-revalidate, post-check=0, pre-check=0');
+                    header('Pragma: public');
+                    
+                    // Добавляем BOM для правильного отображения кириллицы в Excel
+                    echo "\xEF\xBB\xBF";
+                    
+                    $output = fopen('php://output', 'w');
+                    
+                    // Заголовки
+                    fputcsv($output, [
+                        'Порядок',
+                        'Название',
+                        'Код',
+                        'Краткое описание',
+                        'Описание',
+                        'Кредиты',
+                        'Академические часы',
+                        'Часы самостоятельной работы'
+                    ], ';');
+                    
+                    // Данные
+                    foreach ($subjects as $subject) {
+                        fputcsv($output, [
+                            $subject->sortorder,
+                            $subject->name ?? '',
+                            $subject->code ?? '',
+                            $subject->shortdescription ?? '',
+                            strip_tags($subject->description ?? ''),
+                            $subject->credits ?? '',
+                            $subject->academic_hours ?? '',
+                            $subject->independent_hours ?? ''
+                        ], ';');
+                    }
+                    
+                    fclose($output);
+                    exit;
+                } else {
+                    // Используем PhpSpreadsheet для создания Excel файла
+                    $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+                    $sheet = $spreadsheet->getActiveSheet();
+                    
+                    // Устанавливаем название листа
+                    $sheet->setTitle('Предметы программы');
+                    
+                    // Заголовки
+                    $headers = [
+                        'Порядок',
+                        'Название',
+                        'Код',
+                        'Краткое описание',
+                        'Описание',
+                        'Кредиты',
+                        'Академические часы',
+                        'Часы самостоятельной работы'
+                    ];
+                    
+                    $col = 1;
+                    foreach ($headers as $header) {
+                        $sheet->setCellValueByColumnAndRow($col, 1, $header);
+                        $sheet->getStyleByColumnAndRow($col, 1)->getFont()->setBold(true);
+                        $sheet->getColumnDimensionByColumn($col)->setAutoSize(true);
+                        $col++;
+                    }
+                    
+                    // Данные
+                    $row = 2;
+                    foreach ($subjects as $subject) {
+                        $col = 1;
+                        $sheet->setCellValueByColumnAndRow($col++, $row, $subject->sortorder);
+                        $sheet->setCellValueByColumnAndRow($col++, $row, $subject->name ?? '');
+                        $sheet->setCellValueByColumnAndRow($col++, $row, $subject->code ?? '');
+                        $sheet->setCellValueByColumnAndRow($col++, $row, $subject->shortdescription ?? '');
+                        $sheet->setCellValueByColumnAndRow($col++, $row, strip_tags($subject->description ?? ''));
+                        $sheet->setCellValueByColumnAndRow($col++, $row, $subject->credits ?? '');
+                        $sheet->setCellValueByColumnAndRow($col++, $row, $subject->academic_hours ?? '');
+                        $sheet->setCellValueByColumnAndRow($col++, $row, $subject->independent_hours ?? '');
+                        $row++;
+                    }
+                    
+                    // Автоподбор ширины колонок
+                    foreach (range(1, count($headers)) as $col) {
+                        $sheet->getColumnDimensionByColumn($col)->setAutoSize(true);
+                    }
+                    
+                    // Сохранение файла
+                    $filename = 'program_subjects_' . $programid . '_' . date('Y-m-d') . '.xlsx';
+                    header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+                    header('Content-Disposition: attachment; filename="' . $filename . '"');
+                    header('Cache-Control: must-revalidate, post-check=0, pre-check=0');
+                    header('Pragma: public');
+                    
+                    $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+                    $writer->save('php://output');
+                    exit;
+                }
+            } catch (\Exception $e) {
+                echo html_writer::div('Ошибка при экспорте: ' . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8'), 'alert alert-danger');
+            }
+        }
+        
         // Обработка просмотра программы (только просмотр, без изменения порядка)
         if ($action == 'view' && $programid > 0) {
             try {
@@ -1450,7 +1582,19 @@ switch ($tab) {
                     echo html_writer::end_div();
                     
                     // Список предметов
-                    echo html_writer::tag('h3', 'Предметы программы', ['style' => 'margin-bottom: 15px;']);
+                    echo html_writer::start_div('', ['style' => 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;']);
+                    echo html_writer::tag('h3', 'Предметы программы', ['style' => 'margin: 0;']);
+                    if (!empty($subjects)) {
+                        echo html_writer::link(
+                            new moodle_url('/local/deanpromoodle/pages/admin.php', ['tab' => 'programs', 'action' => 'export_subjects', 'programid' => $programid]),
+                            '<i class="fas fa-file-excel"></i> Экспорт в Excel',
+                            [
+                                'class' => 'btn btn-success',
+                                'style' => 'text-decoration: none;'
+                            ]
+                        );
+                    }
+                    echo html_writer::end_div();
                     
                     // Стили для таблицы предметов
                     echo html_writer::start_tag('style');
