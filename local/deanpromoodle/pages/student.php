@@ -3898,16 +3898,29 @@ if ($action == 'viewprogram' && $programid > 0) {
                                             } else if (empty($record->institution_name)) {
                                                 echo html_writer::div('Ошибка: не указано название учебного заведения', 'alert alert-danger');
                                             } else {
-                                                // Логируем данные перед записью (только для админов)
+                                                // Логируем ВСЕ данные перед записью (только для админов)
                                                 if ($isadmin) {
-                                                    debugging('Попытка добавления внешнего зачета. Данные: studentid=' . $record->studentid . 
-                                                             ', subjectid=' . $record->subjectid . 
-                                                             ', institution_name=' . $record->institution_name . 
-                                                             ', institution_id=' . ($record->institution_id ?? 'null') .
-                                                             ', createdby=' . $record->createdby, DEBUG_DEVELOPER);
+                                                    debugging('Попытка добавления внешнего зачета. Все данные записи: ' . 
+                                                             'studentid=' . var_export($record->studentid, true) . 
+                                                             ', subjectid=' . var_export($record->subjectid, true) . 
+                                                             ', grade=' . var_export($record->grade, true) .
+                                                             ', grade_percent=' . var_export($record->grade_percent, true) .
+                                                             ', institution_name=' . var_export($record->institution_name, true) . 
+                                                             ', institution_id=' . var_export($record->institution_id, true) .
+                                                             ', credited_date=' . var_export($record->credited_date, true) .
+                                                             ', document_number=' . var_export($record->document_number, true) .
+                                                             ', notes=' . var_export($record->notes, true) .
+                                                             ', createdby=' . var_export($record->createdby, true) .
+                                                             ', timecreated=' . var_export($record->timecreated, true) .
+                                                             ', timemodified=' . var_export($record->timemodified, true), DEBUG_DEVELOPER);
                                                 }
                                                 
-                                                $DB->insert_record('local_deanpromoodle_student_external_credits', $record);
+                                                try {
+                                                    $DB->insert_record('local_deanpromoodle_student_external_credits', $record);
+                                                } catch (\dml_exception $e) {
+                                                    // Перебрасываем исключение для обработки в общем блоке catch
+                                                    throw $e;
+                                                }
                                                 
                                                 $redirecturl = new moodle_url('/local/deanpromoodle/pages/student.php', [
                                                     'tab' => 'programs',
@@ -3980,15 +3993,29 @@ if ($action == 'viewprogram' && $programid > 0) {
                                         } else if (empty($record->institution_name)) {
                                             echo html_writer::div('Ошибка: не указано название учебного заведения', 'alert alert-danger');
                                         } else {
-                                            // Логируем данные перед записью (только для админов)
+                                            // Логируем ВСЕ данные перед записью (только для админов)
                                             if ($isadmin) {
-                                                debugging('Попытка добавления внешнего зачета (без institution_id). Данные: studentid=' . $record->studentid . 
-                                                         ', subjectid=' . $record->subjectid . 
-                                                         ', institution_name=' . $record->institution_name . 
-                                                         ', createdby=' . $record->createdby, DEBUG_DEVELOPER);
+                                                debugging('Попытка добавления внешнего зачета (без institution_id). Все данные записи: ' . 
+                                                         'studentid=' . var_export($record->studentid, true) . 
+                                                         ', subjectid=' . var_export($record->subjectid, true) . 
+                                                         ', grade=' . var_export($record->grade, true) .
+                                                         ', grade_percent=' . var_export($record->grade_percent, true) .
+                                                         ', institution_name=' . var_export($record->institution_name, true) . 
+                                                         ', institution_id=' . var_export($record->institution_id, true) .
+                                                         ', credited_date=' . var_export($record->credited_date, true) .
+                                                         ', document_number=' . var_export($record->document_number, true) .
+                                                         ', notes=' . var_export($record->notes, true) .
+                                                         ', createdby=' . var_export($record->createdby, true) .
+                                                         ', timecreated=' . var_export($record->timecreated, true) .
+                                                         ', timemodified=' . var_export($record->timemodified, true), DEBUG_DEVELOPER);
                                             }
                                             
-                                            $DB->insert_record('local_deanpromoodle_student_external_credits', $record);
+                                            try {
+                                                $DB->insert_record('local_deanpromoodle_student_external_credits', $record);
+                                            } catch (\dml_exception $e) {
+                                                // Перебрасываем исключение для обработки в общем блоке catch
+                                                throw $e;
+                                            }
                                             
                                             $redirecturl = new moodle_url('/local/deanpromoodle/pages/student.php', [
                                                 'tab' => 'programs',
@@ -4036,38 +4063,60 @@ if ($action == 'viewprogram' && $programid > 0) {
                         
                         // Логируем детали ошибки для отладки (только для админов)
                         if ($isadmin && !empty($errordetails)) {
-                            debugging('DML Exception при сохранении внешнего зачета: ' . $errordetails, DEBUG_DEVELOPER);
+                            debugging('DML Exception при сохранении внешнего зачета. Полное сообщение: ' . $errordetails . 
+                                     ' | Код ошибки: ' . $e->getCode() . 
+                                     ' | Файл: ' . $e->getFile() . 
+                                     ' | Строка: ' . $e->getLine(), DEBUG_DEVELOPER);
                         }
                         
                         // Проверяем тип ошибки для более понятного сообщения
-                        if (strpos($errordetails, 'foreign key constraint') !== false || strpos($errordetails, 'FOREIGN KEY') !== false) {
-                            if (strpos($errordetails, 'subjectid') !== false || strpos($errordetails, 'local_deanpromoodle_subjects') !== false) {
+                        $errordetails_lower = mb_strtolower($errordetails);
+                        
+                        if (strpos($errordetails_lower, 'foreign key constraint') !== false || 
+                            strpos($errordetails_lower, 'foreign key') !== false ||
+                            strpos($errordetails_lower, 'constraint fails') !== false) {
+                            if (strpos($errordetails_lower, 'subjectid') !== false || 
+                                strpos($errordetails_lower, 'local_deanpromoodle_subjects') !== false ||
+                                strpos($errordetails_lower, 'fk_subjectid') !== false) {
                                 $errormsg = 'Ошибка: указанный предмет не существует в базе данных';
-                            } else if (strpos($errordetails, 'institution_id') !== false || strpos($errordetails, 'local_deanpromoodle_institutions') !== false) {
-                                $errormsg = 'Ошибка: указанное учебное заведение не существует в базе данных';
-                            } else if (strpos($errordetails, 'studentid') !== false || strpos($errordetails, 'user') !== false) {
+                            } else if (strpos($errordetails_lower, 'institution_id') !== false || 
+                                      strpos($errordetails_lower, 'local_deanpromoodle_institutions') !== false ||
+                                      strpos($errordetails_lower, 'fk_institution') !== false) {
+                                $errormsg = 'Ошибка: указанное учебное заведение не существует в базе данных. Если вы не указывали ID учебного заведения, оставьте поле пустым';
+                            } else if (strpos($errordetails_lower, 'studentid') !== false || 
+                                      strpos($errordetails_lower, 'fk_studentid') !== false ||
+                                      (strpos($errordetails_lower, 'user') !== false && strpos($errordetails_lower, 'constraint') !== false)) {
                                 $errormsg = 'Ошибка: указанный студент не существует в базе данных';
+                            } else if (strpos($errordetails_lower, 'createdby') !== false || 
+                                      strpos($errordetails_lower, 'fk_createdby') !== false) {
+                                $errormsg = 'Ошибка: ошибка авторизации. Пожалуйста, войдите в систему заново';
                             } else {
                                 $errormsg = 'Ошибка: нарушение связи с базой данных. Проверьте правильность указанных данных';
                             }
-                        } else if (strpos($errordetails, 'Duplicate entry') !== false || strpos($errordetails, 'unique constraint') !== false || strpos($errordetails, 'UNIQUE') !== false) {
+                        } else if (strpos($errordetails_lower, 'duplicate entry') !== false || 
+                                   strpos($errordetails_lower, 'unique constraint') !== false || 
+                                   strpos($errordetails_lower, 'duplicate key') !== false ||
+                                   strpos($errordetails_lower, 'student_subject') !== false) {
                             $errormsg = 'Ошибка: внешний зачет по этому предмету уже существует для данного студента';
-                        } else if (strpos($errordetails, 'NOT NULL') !== false || strpos($errordetails, 'cannot be null') !== false) {
-                            $errormsg = 'Ошибка: не заполнены обязательные поля';
+                        } else if (strpos($errordetails_lower, 'not null') !== false || 
+                                   strpos($errordetails_lower, 'cannot be null') !== false ||
+                                   strpos($errordetails_lower, 'column') !== false && strpos($errordetails_lower, 'null') !== false) {
+                            $errormsg = 'Ошибка: не заполнены обязательные поля (студент, предмет или создатель)';
                         } else {
                             // Общая ошибка базы данных
                             $errormsg = 'Ошибка при сохранении данных в базу данных';
-                            if (!empty($errordetails) && $errordetails !== 'Ошибка записи в базу данных' && $errordetails !== 'Ошибка при сохранении данных в базу данных') {
-                                // Показываем детали ошибки только админам
-                                if ($isadmin) {
-                                    $errormsg .= '. Детали: ' . htmlspecialchars(substr($errordetails, 0, 200), ENT_QUOTES, 'UTF-8');
-                                }
+                            // Показываем детали ошибки только админам
+                            if ($isadmin && !empty($errordetails)) {
+                                $errormsg .= '<br><small>Детали: ' . htmlspecialchars(substr($errordetails, 0, 500), ENT_QUOTES, 'UTF-8') . '</small>';
                             }
                         }
                         
                         // Если сообщение пустое, используем стандартное
                         if (empty($errormsg)) {
                             $errormsg = 'Ошибка при сохранении данных';
+                            if ($isadmin && !empty($errordetails)) {
+                                $errormsg .= '<br><small>Детали: ' . htmlspecialchars(substr($errordetails, 0, 500), ENT_QUOTES, 'UTF-8') . '</small>';
+                            }
                         }
                         
                         echo html_writer::div($errormsg, 'alert alert-danger');
