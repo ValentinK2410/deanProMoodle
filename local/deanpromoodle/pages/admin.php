@@ -4179,14 +4179,14 @@ switch ($tab) {
                     // Подсчет курсов
                     $coursescount = $DB->count_records('local_deanpromoodle_subject_courses', ['subjectid' => $subject->id]);
                     
-                    // Подсчет программ и получение их названий
+                    // Подсчет программ и получение их названий и ID
                     $programscount = $DB->count_records('local_deanpromoodle_program_subjects', ['subjectid' => $subject->id]);
                     
-                    // Получаем названия программ для поиска
-                    $programnames = [];
+                    // Получаем ID и названия программ для поиска
+                    $programsearchitems = [];
                     if ($programscount > 0) {
                         $programs = $DB->get_records_sql(
-                            "SELECT p.name 
+                            "SELECT p.id, p.name 
                              FROM {local_deanpromoodle_program_subjects} ps
                              JOIN {local_deanpromoodle_programs} p ON p.id = ps.programid
                              WHERE ps.subjectid = ?
@@ -4194,10 +4194,12 @@ switch ($tab) {
                             [$subject->id]
                         );
                         foreach ($programs as $program) {
-                            $programnames[] = mb_strtolower($program->name);
+                            // Добавляем ID и название программы в нижнем регистре для поиска
+                            $programsearchitems[] = (string)$program->id;
+                            $programsearchitems[] = mb_strtolower($program->name);
                         }
                     }
-                    $programssearchtext = implode(' ', $programnames);
+                    $programssearchtext = implode(' ', $programsearchitems);
                     
                     $subjectsdata[] = (object)[
                         'id' => $subject->id,
@@ -4233,7 +4235,7 @@ switch ($tab) {
                     'type' => 'text',
                     'id' => 'program-search-input',
                     'class' => 'form-control',
-                    'placeholder' => 'Введите название программы...',
+                    'placeholder' => 'Введите ID или название программы...',
                     'style' => 'max-width: 100%;'
                 ]);
                 echo html_writer::end_div();
