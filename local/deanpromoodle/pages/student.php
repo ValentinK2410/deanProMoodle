@@ -4552,26 +4552,24 @@ echo html_writer::tag('p', 'Автор: ' . html_writer::link('https://github.co
 echo html_writer::end_div();
 
 // JavaScript для полноэкранного режима таблицы
-echo html_writer::start_tag('script');
-echo "
+$PAGE->requires->js_init_code("
 function toggleFullscreen() {
     var container = document.getElementById('courses-table-container');
     var table = document.getElementById('courses-table');
     var btn = document.getElementById('fullscreen-toggle-btn');
     
-    if (container.classList.contains('fullscreen-mode')) {
+    if (container && container.classList.contains('fullscreen-mode')) {
         // Выход из полноэкранного режима
         container.classList.remove('fullscreen-mode');
-        table.classList.remove('courses-table-fullscreen');
-        btn.innerHTML = '<i class=\"fas fa-expand\"></i> Развернуть на весь экран';
-    } else {
+        if (table) table.classList.remove('courses-table-fullscreen');
+        if (btn) btn.innerHTML = '<i class=\"fas fa-expand\"></i> Развернуть на весь экран';
+    } else if (container) {
         // Вход в полноэкранный режим
         container.classList.add('fullscreen-mode');
-        table.classList.add('courses-table-fullscreen');
-        btn.innerHTML = '<i class=\"fas fa-compress\"></i> Вернуть как было';
+        if (table) table.classList.add('courses-table-fullscreen');
+        if (btn) btn.innerHTML = '<i class=\"fas fa-compress\"></i> Вернуть как было';
     }
 }
-";
-echo html_writer::end_tag('script');
+");
 
 echo $OUTPUT->footer();
