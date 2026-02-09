@@ -4381,27 +4381,10 @@ switch ($tab) {
                         
                         // CSS для сортировки
                         var style = document.createElement('style');
-                        style.textContent = '
-                            .sortable-header {
-                                position: relative;
-                                padding-right: 25px !important;
-                            }
-                            .sortable-header .sort-icon {
-                                position: absolute;
-                                right: 8px;
-                                top: 50%;
-                                transform: translateY(-50%);
-                                font-size: 12px;
-                                color: #999;
-                                transition: color 0.2s;
-                            }
-                            .sortable-header:hover {
-                                background-color: #f8f9fa !important;
-                            }
-                            .sortable-header:hover .sort-icon {
-                                color: #007bff;
-                            }
-                        ';
+                        style.textContent = '.sortable-header { position: relative; padding-right: 25px !important; } ' +
+                            '.sortable-header .sort-icon { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); font-size: 12px; color: #999; transition: color 0.2s; } ' +
+                            '.sortable-header:hover { background-color: #f8f9fa !important; } ' +
+                            '.sortable-header:hover .sort-icon { color: #007bff; }';
                         document.head.appendChild(style);
                     })();
                 ");
