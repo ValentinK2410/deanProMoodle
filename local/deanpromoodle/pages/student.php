@@ -3983,20 +3983,45 @@ if ($action == 'viewprogram' && $programid > 0) {
                         }
                     } catch (\dml_exception $e) {
                         // Ошибка базы данных
-                        $errormsg = 'Ошибка записи в базу данных';
-                        if ($e->getMessage()) {
-                            $errormsg .= ': ' . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8');
-                        }
+                        $errormsg = '';
+                        $errordetails = $e->getMessage();
+                        
                         // Проверяем тип ошибки для более понятного сообщения
-                        if (strpos($e->getMessage(), 'foreign key constraint') !== false) {
-                            $errormsg = 'Ошибка: указанное учебное заведение или предмет не существует в базе данных';
-                        } else if (strpos($e->getMessage(), 'Duplicate entry') !== false || strpos($e->getMessage(), 'unique constraint') !== false) {
+                        if (strpos($errordetails, 'foreign key constraint') !== false || strpos($errordetails, 'FOREIGN KEY') !== false) {
+                            if (strpos($errordetails, 'subjectid') !== false || strpos($errordetails, 'local_deanpromoodle_subjects') !== false) {
+                                $errormsg = 'Ошибка: указанный предмет не существует в базе данных';
+                            } else if (strpos($errordetails, 'institution_id') !== false || strpos($errordetails, 'local_deanpromoodle_institutions') !== false) {
+                                $errormsg = 'Ошибка: указанное учебное заведение не существует в базе данных';
+                            } else if (strpos($errordetails, 'studentid') !== false || strpos($errordetails, 'user') !== false) {
+                                $errormsg = 'Ошибка: указанный студент не существует в базе данных';
+                            } else {
+                                $errormsg = 'Ошибка: нарушение связи с базой данных. Проверьте правильность указанных данных';
+                            }
+                        } else if (strpos($errordetails, 'Duplicate entry') !== false || strpos($errordetails, 'unique constraint') !== false || strpos($errordetails, 'UNIQUE') !== false) {
                             $errormsg = 'Ошибка: внешний зачет по этому предмету уже существует для данного студента';
+                        } else if (strpos($errordetails, 'NOT NULL') !== false || strpos($errordetails, 'cannot be null') !== false) {
+                            $errormsg = 'Ошибка: не заполнены обязательные поля';
+                        } else {
+                            // Общая ошибка базы данных
+                            $errormsg = 'Ошибка при сохранении данных в базу данных';
+                            if (!empty($errordetails) && $errordetails !== 'Ошибка записи в базу данных') {
+                                $errormsg .= '. ' . htmlspecialchars($errordetails, ENT_QUOTES, 'UTF-8');
+                            }
                         }
+                        
+                        // Если сообщение пустое, используем стандартное
+                        if (empty($errormsg)) {
+                            $errormsg = 'Ошибка при сохранении данных';
+                        }
+                        
                         echo html_writer::div($errormsg, 'alert alert-danger');
                     } catch (\Exception $e) {
                         // Общая ошибка
-                        echo html_writer::div('Ошибка: ' . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8'), 'alert alert-danger');
+                        $errormsg = $e->getMessage();
+                        if (empty($errormsg)) {
+                            $errormsg = 'Произошла неизвестная ошибка';
+                        }
+                        echo html_writer::div('Ошибка: ' . htmlspecialchars($errormsg, ENT_QUOTES, 'UTF-8'), 'alert alert-danger');
                     }
                 } else {
                     echo html_writer::div('Пожалуйста, заполните все обязательные поля: предмет и название учебного заведения', 'alert alert-warning');
