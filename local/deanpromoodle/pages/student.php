@@ -82,13 +82,14 @@ if (!$hasaccess) {
 }
 
 // Получение параметров ДО проверки ролей и редиректов
-$tab = optional_param('tab', 'courses', PARAM_ALPHA); // courses, programs
+$tab = optional_param('tab', 'courses', PARAM_ALPHA); // courses, programs, notes
 $subtab = optional_param('subtab', 'programs', PARAM_ALPHA); // programs, additional для вкладки "Личная информация и статус"
-$action = optional_param('action', '', PARAM_ALPHA); // viewprogram
+$action = optional_param('action', '', PARAM_ALPHANUMEXT); // viewprogram, addnote, editnote, deletenote
 $programid = optional_param('programid', 0, PARAM_INT);
 $testmode = optional_param('test', false, PARAM_BOOL); // Параметр для тестирования - показывать цифровую оценку
 $studentid = optional_param('studentid', 0, PARAM_INT); // ID студента для просмотра (для админов и преподавателей)
 $userimportsetting = optional_param('userimportsetting', false, PARAM_BOOL); // Параметр для показа кнопки импорта из Excel
+$noteid = optional_param('noteid', 0, PARAM_INT); // ID заметки для редактирования/удаления
 
 // Проверка роли пользователя и редирект при необходимости
 global $USER, $DB;
@@ -336,6 +337,13 @@ $taburlparams['tab'] = 'programs';
 $tabs[] = new tabobject('programs', 
     new moodle_url('/local/deanpromoodle/pages/student.php', $taburlparams),
     'Личная информация и статус');
+// Вкладка "Заметки" видна только администратору и преподавателю
+if ($isadmin || $isteacher) {
+    $taburlparams['tab'] = 'notes';
+    $tabs[] = new tabobject('notes', 
+        new moodle_url('/local/deanpromoodle/pages/student.php', $taburlparams),
+        'Заметки');
+}
 
 // Если это просмотр программы, не показываем вкладки
 if ($action != 'viewprogram') {

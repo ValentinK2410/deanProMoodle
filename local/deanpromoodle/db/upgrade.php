@@ -194,5 +194,31 @@ function xmldb_local_deanpromoodle_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026013008, 'local', 'deanpromoodle');
     }
     
+    // Создаем таблицу заметок по студентам
+    if ($oldversion < 2026020901) {
+        $table = new xmldb_table('local_deanpromoodle_student_notes');
+        
+        if (!$dbman->table_exists($table)) {
+            $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+            $table->add_field('studentid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+            $table->add_field('note', XMLDB_TYPE_TEXT, null, null, XMLDB_NOTNULL, null, null);
+            $table->add_field('createdby', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+            $table->add_field('timecreated', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $table->add_field('timemodified', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            
+            $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+            $table->add_key('studentid', XMLDB_KEY_FOREIGN, ['studentid'], 'user', ['id']);
+            $table->add_key('createdby', XMLDB_KEY_FOREIGN, ['createdby'], 'user', ['id']);
+            
+            $table->add_index('studentid', XMLDB_INDEX_NOTUNIQUE, ['studentid']);
+            $table->add_index('createdby', XMLDB_INDEX_NOTUNIQUE, ['createdby']);
+            $table->add_index('timecreated', XMLDB_INDEX_NOTUNIQUE, ['timecreated']);
+            
+            $dbman->create_table($table);
+        }
+        
+        upgrade_plugin_savepoint(true, 2026020901, 'local', 'deanpromoodle');
+    }
+
     return true;
 }

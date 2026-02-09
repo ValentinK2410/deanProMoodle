@@ -26,7 +26,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_deanpromoodle';
-$plugin->version = 2026013008; // YYYYMMDDXX format - добавлены поля academic_hours и independent_hours для предметов
+$plugin->version = 2026020901; // YYYYMMDDXX format - добавлена таблица заметок по студентам
 $plugin->requires = 2022041900; // Moodle 4.0+
 $plugin->maturity = MATURITY_ALPHA;
 $plugin->release = 'v1.0.0-alpha';
