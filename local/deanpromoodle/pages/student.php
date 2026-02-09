@@ -3880,14 +3880,14 @@ if ($action == 'viewprogram' && $programid > 0) {
                                             $record = new stdClass();
                                             $record->studentid = (int)$viewingstudent->id;
                                             $record->subjectid = (int)$subjectid;
-                                            $record->grade = !empty(trim($grade)) ? trim($grade) : null;
+                                            $record->grade = (!empty($grade) && is_string($grade)) ? trim($grade) : (!empty($grade) ? $grade : null);
                                             $record->grade_percent = ($grade_percent !== null && $grade_percent !== '') ? (float)$grade_percent : null;
                                             // Убеждаемся, что institution_name не пустая строка
-                                            $record->institution_name = !empty(trim($institution_name)) ? trim($institution_name) : null;
+                                            $record->institution_name = (!empty($institution_name) && is_string($institution_name)) ? trim($institution_name) : (!empty($institution_name) ? $institution_name : null);
                                             $record->institution_id = ($institution_id > 0) ? (int)$institution_id : null;
                                             $record->credited_date = ($credited_date > 0) ? (int)$credited_date : time();
-                                            $record->document_number = !empty(trim($document_number)) ? trim($document_number) : null;
-                                            $record->notes = !empty(trim($notes)) ? trim($notes) : null;
+                                            $record->document_number = (!empty($document_number) && is_string($document_number)) ? trim($document_number) : (!empty($document_number) ? $document_number : null);
+                                            $record->notes = (!empty($notes) && is_string($notes)) ? trim($notes) : (!empty($notes) ? $notes : null);
                                             $record->createdby = (int)$USER->id;
                                             $record->timecreated = time();
                                             $record->timemodified = time();
@@ -3908,13 +3908,14 @@ if ($action == 'viewprogram' && $programid > 0) {
                                                 }
                                                 
                                                 $DB->insert_record('local_deanpromoodle_student_external_credits', $record);
-                                            
-                                            $redirecturl = new moodle_url('/local/deanpromoodle/pages/student.php', [
-                                                'tab' => 'programs',
-                                                'subtab' => 'external_credits',
-                                                'studentid' => $studentid
-                                            ]);
-                                            redirect($redirecturl, 'Внешний зачет успешно добавлен', null, \core\output\notification::NOTIFY_SUCCESS);
+                                                
+                                                $redirecturl = new moodle_url('/local/deanpromoodle/pages/student.php', [
+                                                    'tab' => 'programs',
+                                                    'subtab' => 'external_credits',
+                                                    'studentid' => $studentid
+                                                ]);
+                                                redirect($redirecturl, 'Внешний зачет успешно добавлен', null, \core\output\notification::NOTIFY_SUCCESS);
+                                            }
                                         }
                                     } else if ($action == 'edit_external_credit' && $externalcreditid > 0) {
                                         $record = $DB->get_record('local_deanpromoodle_student_external_credits', [
@@ -3961,14 +3962,14 @@ if ($action == 'viewprogram' && $programid > 0) {
                                         $record = new stdClass();
                                         $record->studentid = (int)$viewingstudent->id;
                                         $record->subjectid = (int)$subjectid;
-                                        $record->grade = !empty(trim($grade)) ? trim($grade) : null;
+                                        $record->grade = (!empty($grade) && is_string($grade)) ? trim($grade) : (!empty($grade) ? $grade : null);
                                         $record->grade_percent = ($grade_percent !== null && $grade_percent !== '') ? (float)$grade_percent : null;
                                         // Убеждаемся, что institution_name не пустая строка
-                                        $record->institution_name = !empty(trim($institution_name)) ? trim($institution_name) : null;
+                                        $record->institution_name = (!empty($institution_name) && is_string($institution_name)) ? trim($institution_name) : (!empty($institution_name) ? $institution_name : null);
                                         $record->institution_id = null;
                                         $record->credited_date = ($credited_date > 0) ? (int)$credited_date : time();
-                                        $record->document_number = !empty(trim($document_number)) ? trim($document_number) : null;
-                                        $record->notes = !empty(trim($notes)) ? trim($notes) : null;
+                                        $record->document_number = (!empty($document_number) && is_string($document_number)) ? trim($document_number) : (!empty($document_number) ? $document_number : null);
+                                        $record->notes = (!empty($notes) && is_string($notes)) ? trim($notes) : (!empty($notes) ? $notes : null);
                                         $record->createdby = (int)$USER->id;
                                         $record->timecreated = time();
                                         $record->timemodified = time();
@@ -3988,45 +3989,46 @@ if ($action == 'viewprogram' && $programid > 0) {
                                             }
                                             
                                             $DB->insert_record('local_deanpromoodle_student_external_credits', $record);
-                                        
-                                        $redirecturl = new moodle_url('/local/deanpromoodle/pages/student.php', [
-                                            'tab' => 'programs',
-                                            'subtab' => 'external_credits',
-                                            'studentid' => $studentid
-                                        ]);
-                                        redirect($redirecturl, 'Внешний зачет успешно добавлен', null, \core\output\notification::NOTIFY_SUCCESS);
+                                            
+                                            $redirecturl = new moodle_url('/local/deanpromoodle/pages/student.php', [
+                                                'tab' => 'programs',
+                                                'subtab' => 'external_credits',
+                                                'studentid' => $studentid
+                                            ]);
+                                            redirect($redirecturl, 'Внешний зачет успешно добавлен', null, \core\output\notification::NOTIFY_SUCCESS);
+                                        }
                                     }
                                 } else if ($action == 'edit_external_credit' && $externalcreditid > 0) {
-                                    $record = $DB->get_record('local_deanpromoodle_student_external_credits', [
-                                        'id' => $externalcreditid,
-                                        'studentid' => $viewingstudent->id
-                                    ]);
-                                    
-                                    if ($record) {
-                                        $record->subjectid = $subjectid;
-                                        $record->grade = !empty($grade) ? $grade : null;
-                                        $record->grade_percent = $grade_percent !== null ? $grade_percent : null;
-                                        $record->institution_name = $institution_name;
-                                        $record->institution_id = null;
-                                        $record->credited_date = $credited_date > 0 ? $credited_date : $record->credited_date;
-                                        $record->document_number = !empty($document_number) ? $document_number : null;
-                                        $record->notes = !empty($notes) ? $notes : null;
-                                        $record->timemodified = time();
-                                        
-                                        $DB->update_record('local_deanpromoodle_student_external_credits', $record);
-                                        
-                                        $redirecturl = new moodle_url('/local/deanpromoodle/pages/student.php', [
-                                            'tab' => 'programs',
-                                            'subtab' => 'external_credits',
-                                            'studentid' => $studentid
+                                        $record = $DB->get_record('local_deanpromoodle_student_external_credits', [
+                                            'id' => $externalcreditid,
+                                            'studentid' => $viewingstudent->id
                                         ]);
-                                        redirect($redirecturl, 'Внешний зачет успешно обновлен', null, \core\output\notification::NOTIFY_SUCCESS);
-                                    } else {
-                                        echo html_writer::div('Внешний зачет не найден', 'alert alert-danger');
+                                        
+                                        if ($record) {
+                                            $record->subjectid = (int)$subjectid;
+                                            $record->grade = (!empty($grade) && is_string($grade)) ? trim($grade) : (!empty($grade) ? $grade : null);
+                                            $record->grade_percent = ($grade_percent !== null && $grade_percent !== '') ? (float)$grade_percent : null;
+                                            $record->institution_name = (!empty($institution_name) && is_string($institution_name)) ? trim($institution_name) : (!empty($institution_name) ? $institution_name : null);
+                                            $record->institution_id = null;
+                                            $record->credited_date = ($credited_date > 0) ? (int)$credited_date : $record->credited_date;
+                                            $record->document_number = (!empty($document_number) && is_string($document_number)) ? trim($document_number) : (!empty($document_number) ? $document_number : null);
+                                            $record->notes = (!empty($notes) && is_string($notes)) ? trim($notes) : (!empty($notes) ? $notes : null);
+                                            $record->timemodified = time();
+                                            
+                                            $DB->update_record('local_deanpromoodle_student_external_credits', $record);
+                                            
+                                            $redirecturl = new moodle_url('/local/deanpromoodle/pages/student.php', [
+                                                'tab' => 'programs',
+                                                'subtab' => 'external_credits',
+                                                'studentid' => $studentid
+                                            ]);
+                                            redirect($redirecturl, 'Внешний зачет успешно обновлен', null, \core\output\notification::NOTIFY_SUCCESS);
+                                        } else {
+                                            echo html_writer::div('Внешний зачет не найден', 'alert alert-danger');
+                                        }
                                     }
                                 }
                             }
-                        }
                     } catch (\dml_exception $e) {
                         // Ошибка базы данных
                         $errormsg = '';
