@@ -3345,6 +3345,185 @@ if ($action == 'viewprogram' && $programid > 0) {
         echo html_writer::end_div();
         break;
     
+    case 'notes':
+        // Вкладка "Заметки" - только для администратора и преподавателя
+        if (!$isadmin && !$isteacher) {
+            // Если пользователь не админ и не преподаватель, скрываем вкладку
+            redirect(new moodle_url('/local/deanpromoodle/pages/student.php', ['tab' => 'courses', 'studentid' => $studentid]));
+        }
+        
+        echo html_writer::start_div('local-deanpromoodle-student-content', ['style' => 'margin-top: 20px;']);
+        
+        // Обработка действий с заметками (только для администратора)
+        if ($isadmin) {
+            // Добавление новой заметки
+            if ($action == 'addnote' || $action == 'editnote') {
+                $notetext = optional_param('notetext', '', PARAM_TEXT);
+                if ($notetext) {
+                    try {
+                        if ($action == 'addnote') {
+                            // Добавляем новую заметку
+                            $note = new stdClass();
+                            $note->studentid = $viewingstudent->id;
+                            $note->note = $notetext;
+                            $note->createdby = $USER->id;
+                            $note->timecreated = time();
+                            $note->timemodified = time();
+                            $DB->insert_record('local_deanpromoodle_student_notes', $note);
+                            $message = 'Заметка успешно добавлена';
+                        } else if ($action == 'editnote' && $noteid > 0) {
+                            // Редактируем существующую заметку
+                            $note = $DB->get_record('local_deanpromoodle_student_notes', ['id' => $noteid, 'studentid' => $viewingstudent->id]);
+                            if ($note) {
+                                $note->note = $notetext;
+                                $note->timemodified = time();
+                                $DB->update_record('local_deanpromoodle_student_notes', $note);
+                                $message = 'Заметка успешно обновлена';
+                            } else {
+                                $message = 'Заметка не найдена';
+                            }
+                        }
+                        redirect(new moodle_url('/local/deanpromoodle/pages/student.php', ['tab' => 'notes', 'studentid' => $studentid]), $message, null, \core\output\notification::NOTIFY_SUCCESS);
+                    } catch (\Exception $e) {
+                        echo html_writer::div('Ошибка при сохранении заметки: ' . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8'), 'alert alert-danger');
+                    }
+                }
+            }
+            
+            // Удаление заметки
+            if ($action == 'deletenote' && $noteid > 0) {
+                try {
+                    $note = $DB->get_record('local_deanpromoodle_student_notes', ['id' => $noteid, 'studentid' => $viewingstudent->id]);
+                    if ($note) {
+                        $DB->delete_records('local_deanpromoodle_student_notes', ['id' => $noteid]);
+                        redirect(new moodle_url('/local/deanpromoodle/pages/student.php', ['tab' => 'notes', 'studentid' => $studentid]), 'Заметка успешно удалена', null, \core\output\notification::NOTIFY_SUCCESS);
+                    } else {
+                        redirect(new moodle_url('/local/deanpromoodle/pages/student.php', ['tab' => 'notes', 'studentid' => $studentid]), 'Заметка не найдена', null, \core\output\notification::NOTIFY_WARNING);
+                    }
+                } catch (\Exception $e) {
+                    echo html_writer::div('Ошибка при удалении заметки: ' . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8'), 'alert alert-danger');
+                }
+            }
+        }
+        
+        // Получаем все заметки по студенту
+        $notes = $DB->get_records_sql(
+            "SELECT n.*, u.firstname, u.lastname, u.email
+             FROM {local_deanpromoodle_student_notes} n
+             JOIN {user} u ON u.id = n.createdby
+             WHERE n.studentid = ?
+             ORDER BY n.timecreated DESC",
+            [$viewingstudent->id]
+        );
+        
+        echo html_writer::tag('h2', 'Заметки по студенту: ' . fullname($viewingstudent), ['style' => 'margin-bottom: 20px;']);
+        
+        // Форма добавления/редактирования заметки (только для администратора)
+        if ($isadmin) {
+            $editnote = null;
+            if ($action == 'editnote' && $noteid > 0) {
+                $editnote = $DB->get_record('local_deanpromoodle_student_notes', ['id' => $noteid, 'studentid' => $viewingstudent->id]);
+            }
+            
+            echo html_writer::start_div('card', ['style' => 'margin-bottom: 20px; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);']);
+            echo html_writer::tag('h3', $editnote ? 'Редактировать заметку' : 'Добавить заметку', ['style' => 'margin-top: 0; margin-bottom: 15px;']);
+            
+            echo html_writer::start_tag('form', [
+                'method' => 'post',
+                'action' => new moodle_url('/local/deanpromoodle/pages/student.php', ['tab' => 'notes', 'studentid' => $studentid, 'action' => $editnote ? 'editnote' : 'addnote', 'noteid' => $editnote ? $noteid : 0])
+            ]);
+            
+            echo html_writer::start_div('form-group');
+            echo html_writer::label('Текст заметки:', 'notetext');
+            echo html_writer::start_tag('textarea', [
+                'name' => 'notetext',
+                'id' => 'notetext',
+                'class' => 'form-control',
+                'rows' => '5',
+                'required' => true,
+                'style' => 'width: 100%;'
+            ]);
+            echo htmlspecialchars($editnote ? $editnote->note : '', ENT_QUOTES, 'UTF-8');
+            echo html_writer::end_tag('textarea');
+            echo html_writer::end_div();
+            
+            echo html_writer::start_div('form-group');
+            echo html_writer::empty_tag('input', [
+                'type' => 'submit',
+                'value' => $editnote ? 'Сохранить изменения' : 'Добавить заметку',
+                'class' => 'btn btn-primary',
+                'style' => 'margin-right: 10px;'
+            ]);
+            if ($editnote) {
+                echo html_writer::link(
+                    new moodle_url('/local/deanpromoodle/pages/student.php', ['tab' => 'notes', 'studentid' => $studentid]),
+                    'Отмена',
+                    ['class' => 'btn btn-secondary']
+                );
+            }
+            echo html_writer::end_div();
+            
+            echo html_writer::end_tag('form');
+            echo html_writer::end_div();
+        }
+        
+        // Список заметок
+        if (empty($notes)) {
+            echo html_writer::div('Заметок пока нет.', 'alert alert-info');
+        } else {
+            echo html_writer::start_div('notes-list', ['style' => 'background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); padding: 20px;']);
+            echo html_writer::tag('h3', 'Список заметок', ['style' => 'margin-top: 0; margin-bottom: 15px;']);
+            
+            foreach ($notes as $note) {
+                echo html_writer::start_div('card', ['style' => 'margin-bottom: 15px; padding: 15px; border: 1px solid #dee2e6; border-radius: 6px;']);
+                
+                // Текст заметки
+                echo html_writer::start_div('note-text', ['style' => 'margin-bottom: 10px;']);
+                echo htmlspecialchars($note->note, ENT_QUOTES, 'UTF-8');
+                echo html_writer::end_div();
+                
+                // Информация о создателе и дате
+                echo html_writer::start_div('note-meta', ['style' => 'font-size: 12px; color: #6c757d; border-top: 1px solid #f0f0f0; padding-top: 10px;']);
+                echo html_writer::start_div('', ['style' => 'display: flex; justify-content: space-between; align-items: center;']);
+                echo html_writer::start_div('');
+                echo 'Добавлено: ' . fullname((object)['firstname' => $note->firstname, 'lastname' => $note->lastname]) . ' ';
+                echo ' (' . userdate($note->timecreated, '%d.%m.%Y %H:%M') . ')';
+                if ($note->timemodified > $note->timecreated) {
+                    echo ' | Изменено: ' . userdate($note->timemodified, '%d.%m.%Y %H:%M');
+                }
+                echo html_writer::end_div();
+                
+                // Кнопки действий (только для администратора)
+                if ($isadmin) {
+                    echo html_writer::start_div('', ['style' => 'display: flex; gap: 10px;']);
+                    echo html_writer::link(
+                        new moodle_url('/local/deanpromoodle/pages/student.php', ['tab' => 'notes', 'studentid' => $studentid, 'action' => 'editnote', 'noteid' => $note->id]),
+                        '<i class="fas fa-edit"></i> Редактировать',
+                        ['class' => 'btn btn-sm btn-primary', 'style' => 'text-decoration: none;']
+                    );
+                    echo html_writer::link(
+                        new moodle_url('/local/deanpromoodle/pages/student.php', ['tab' => 'notes', 'studentid' => $studentid, 'action' => 'deletenote', 'noteid' => $note->id]),
+                        '<i class="fas fa-trash"></i> Удалить',
+                        [
+                            'class' => 'btn btn-sm btn-danger',
+                            'style' => 'text-decoration: none;',
+                            'onclick' => 'return confirm(\'Вы уверены, что хотите удалить эту заметку?\');'
+                        ]
+                    );
+                    echo html_writer::end_div();
+                }
+                
+                echo html_writer::end_div();
+                echo html_writer::end_div();
+                echo html_writer::end_div();
+            }
+            
+            echo html_writer::end_div();
+        }
+        
+        echo html_writer::end_div();
+        break;
+    
     default:
         // По умолчанию показываем курсы
         $redirectparams = ['tab' => 'courses'];
