@@ -3945,9 +3945,15 @@ if ($action == 'viewprogram' && $programid > 0) {
                                             $record->subjectid = $subjectid;
                                             $record->grade = !empty($grade) ? $grade : null;
                                             $record->grade_percent = $grade_percent !== null ? $grade_percent : null;
-                                            $record->institution_name = $institution_name;
-                                            $record->institution_id = $institution_id > 0 ? $institution_id : null;
-                                            $record->credited_date = $credited_date > 0 ? $credited_date : $record->credited_date;
+                                            $record->institution_name = (!empty($institution_name) && is_string($institution_name)) ? trim($institution_name) : (!empty($institution_name) ? $institution_name : null);
+                                            // Если institution_id не указан или равен 0, не устанавливаем поле вообще
+                                            if ($institution_id > 0) {
+                                                $record->institution_id = (int)$institution_id;
+                                            } else {
+                                                // Если institution_id <= 0, устанавливаем в null
+                                                $record->institution_id = null;
+                                            }
+                                            $record->credited_date = ($credited_date > 0) ? (int)$credited_date : $record->credited_date;
                                             $record->document_number = !empty($document_number) ? $document_number : null;
                                             $record->notes = !empty($notes) ? $notes : null;
                                             $record->timemodified = time();
