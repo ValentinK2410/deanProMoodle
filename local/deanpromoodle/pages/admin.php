@@ -6833,7 +6833,26 @@ switch ($tab) {
                             
                             echo html_writer::start_tag('tr');
                             echo html_writer::tag('td', $member->id);
-                            echo html_writer::tag('td', htmlspecialchars(trim($member->firstname . ' ' . $member->lastname), ENT_QUOTES, 'UTF-8'));
+                            
+                            // ФИО студента - делаем кликабельным
+                            $studentFullName = trim($member->firstname . ' ' . $member->lastname);
+                            $studentUrl = new moodle_url('/local/deanpromoodle/pages/student.php', [
+                                'studentid' => $member->id,
+                                'tab' => 'courses'
+                            ]);
+                            $studentNameLink = html_writer::link(
+                                $studentUrl,
+                                htmlspecialchars($studentFullName, ENT_QUOTES, 'UTF-8'),
+                                [
+                                    'style' => 'text-decoration: none; color: #007bff; font-weight: 500;',
+                                    'title' => 'Перейти в личный кабинет студента',
+                                    'target' => '_blank',
+                                    'onmouseover' => 'this.style.textDecoration="underline";',
+                                    'onmouseout' => 'this.style.textDecoration="none";'
+                                ]
+                            );
+                            echo html_writer::tag('td', $studentNameLink);
+                            
                             echo html_writer::tag('td', htmlspecialchars($member->email, ENT_QUOTES, 'UTF-8'));
                             
                             // Связь с программой
