@@ -173,6 +173,11 @@ $PAGE->requires->css('/local/deanpromoodle/styles.css');
 
 // Обработка экспорта предметов программы в Excel (до вывода заголовков)
 if ($tab == 'programs' && $action == 'export_subjects' && $programid > 0) {
+    // Отключаем буферизацию вывода для корректной отправки файла
+    if (ob_get_level()) {
+        ob_end_clean();
+    }
+    
     try {
         $program = $DB->get_record('local_deanpromoodle_programs', ['id' => $programid]);
         if (!$program) {
