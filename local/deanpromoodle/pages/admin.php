@@ -4210,15 +4210,19 @@ switch ($tab) {
                     $subjectcode = is_string($subject->code) ? $subject->code : (string)$subject->code;
                     
                     // Добавляем data-атрибуты для поиска и сортировки
+                    // Экранируем значения для безопасного использования в HTML
+                    $searchText = mb_strtolower($subject->id . ' ' . $subjectname . ' ' . $subjectcode);
+                    $searchText = htmlspecialchars($searchText, ENT_QUOTES, 'UTF-8');
+                    
                     echo html_writer::start_tag('tr', [
                         'data-sortorder' => $subject->sortorder,
                         'data-id' => $subject->id,
-                        'data-name' => mb_strtolower($subjectname),
-                        'data-code' => mb_strtolower($subjectcode),
+                        'data-name' => htmlspecialchars(mb_strtolower($subjectname), ENT_QUOTES, 'UTF-8'),
+                        'data-code' => htmlspecialchars(mb_strtolower($subjectcode), ENT_QUOTES, 'UTF-8'),
                         'data-coursescount' => $subject->coursescount,
                         'data-programscount' => $subject->programscount,
                         'data-visible' => $subject->visible,
-                        'data-search-text' => mb_strtolower($subject->id . ' ' . $subjectname . ' ' . $subjectcode)
+                        'data-search-text' => $searchText
                     ]);
                     echo html_writer::tag('td', (string)$subject->sortorder);
                     echo html_writer::tag('td', (string)$subject->id);
