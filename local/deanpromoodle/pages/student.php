@@ -1597,7 +1597,7 @@ if ($action == 'viewprogram' && $programid > 0) {
                  JOIN {cohort} c ON c.id = cm.cohortid
                  WHERE cm.userid = ?
                  ORDER BY c.name ASC",
-                [$USER->id]
+                [$viewingstudent->id]
             );
             
             if (empty($studentcohorts)) {
