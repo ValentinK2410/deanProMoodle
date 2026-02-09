@@ -189,9 +189,11 @@ if ($tab == 'programs' && $action == 'export_subjects' && $programid > 0) {
         }
         
         if (!$usePhpSpreadsheet) {
-            // Если PhpSpreadsheet недоступна, используем CSV
+            // Если PhpSpreadsheet недоступна, используем CSV с правильным форматом для Excel
             $filename = 'program_subjects_' . $programid . '_' . date('Y-m-d') . '.csv';
-            header('Content-Type: text/csv; charset=UTF-8');
+            
+            // Используем правильный MIME-тип для Excel
+            header('Content-Type: application/vnd.ms-excel; charset=UTF-8');
             header('Content-Disposition: attachment; filename="' . $filename . '"');
             header('Cache-Control: must-revalidate, post-check=0, pre-check=0');
             header('Pragma: public');
@@ -199,6 +201,8 @@ if ($tab == 'programs' && $action == 'export_subjects' && $programid > 0) {
             // Добавляем BOM для правильного отображения кириллицы в Excel
             echo "\xEF\xBB\xBF";
             
+            // Используем запятую как разделитель (стандарт для Excel)
+            // И создаем файл с правильным форматом
             $output = fopen('php://output', 'w');
             
             // Заголовки
@@ -211,7 +215,7 @@ if ($tab == 'programs' && $action == 'export_subjects' && $programid > 0) {
                 'Кредиты',
                 'Академические часы',
                 'Часы самостоятельной работы'
-            ], ';');
+            ], ',');
             
             // Данные
             foreach ($subjects as $subject) {
@@ -224,7 +228,7 @@ if ($tab == 'programs' && $action == 'export_subjects' && $programid > 0) {
                     $subject->credits ?? '',
                     $subject->academic_hours ?? '',
                     $subject->independent_hours ?? ''
-                ], ';');
+                ], ',');
             }
             
             fclose($output);
