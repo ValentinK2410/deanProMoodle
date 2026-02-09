@@ -1139,14 +1139,19 @@ if ($action == 'getteachercourses' && $teacherid > 0) {
     }
     
     // SQL запрос для поиска студентов
+    // Используем EXISTS для проверки роли студента, чтобы найти студентов во всех контекстах
     $sql = "SELECT DISTINCT u.id, u.firstname, u.lastname, u.email,
                    GROUP_CONCAT(DISTINCT c.name ORDER BY c.name SEPARATOR ', ') as cohortnames
             FROM {user} u
-            INNER JOIN {role_assignments} ra ON ra.userid = u.id
-            INNER JOIN {role} r ON r.id = ra.roleid
             " . $cohortjoin . "
             WHERE u.deleted = 0
-              AND r.shortname = 'student'
+              AND EXISTS (
+                  SELECT 1 
+                  FROM {role_assignments} ra
+                  INNER JOIN {role} r ON r.id = ra.roleid
+                  WHERE ra.userid = u.id
+                  AND r.shortname = 'student'
+              )
               " . $whereclause . "
             GROUP BY u.id, u.firstname, u.lastname, u.email
             ORDER BY u.lastname, u.firstname
