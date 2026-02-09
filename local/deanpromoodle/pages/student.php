@@ -3884,7 +3884,12 @@ if ($action == 'viewprogram' && $programid > 0) {
                                             $record->grade_percent = ($grade_percent !== null && $grade_percent !== '') ? (float)$grade_percent : null;
                                             // Убеждаемся, что institution_name не пустая строка
                                             $record->institution_name = (!empty($institution_name) && is_string($institution_name)) ? trim($institution_name) : (!empty($institution_name) ? $institution_name : null);
-                                            $record->institution_id = ($institution_id > 0) ? (int)$institution_id : null;
+                                            // Если institution_id не указан или равен 0, не устанавливаем поле вообще
+                                            // чтобы избежать проблем с внешним ключом
+                                            if ($institution_id > 0) {
+                                                $record->institution_id = (int)$institution_id;
+                                            }
+                                            // Если institution_id <= 0, поле не устанавливается (будет NULL в БД)
                                             $record->credited_date = ($credited_date > 0) ? (int)$credited_date : time();
                                             $record->document_number = (!empty($document_number) && is_string($document_number)) ? trim($document_number) : (!empty($document_number) ? $document_number : null);
                                             $record->notes = (!empty($notes) && is_string($notes)) ? trim($notes) : (!empty($notes) ? $notes : null);
@@ -3979,7 +3984,7 @@ if ($action == 'viewprogram' && $programid > 0) {
                                         $record->grade_percent = ($grade_percent !== null && $grade_percent !== '') ? (float)$grade_percent : null;
                                         // Убеждаемся, что institution_name не пустая строка
                                         $record->institution_name = (!empty($institution_name) && is_string($institution_name)) ? trim($institution_name) : (!empty($institution_name) ? $institution_name : null);
-                                        $record->institution_id = null;
+                                        // institution_id не устанавливаем, если не указан (будет NULL в БД)
                                         $record->credited_date = ($credited_date > 0) ? (int)$credited_date : time();
                                         $record->document_number = (!empty($document_number) && is_string($document_number)) ? trim($document_number) : (!empty($document_number) ? $document_number : null);
                                         $record->notes = (!empty($notes) && is_string($notes)) ? trim($notes) : (!empty($notes) ? $notes : null);
@@ -4036,7 +4041,7 @@ if ($action == 'viewprogram' && $programid > 0) {
                                             $record->grade = (!empty($grade) && is_string($grade)) ? trim($grade) : (!empty($grade) ? $grade : null);
                                             $record->grade_percent = ($grade_percent !== null && $grade_percent !== '') ? (float)$grade_percent : null;
                                             $record->institution_name = (!empty($institution_name) && is_string($institution_name)) ? trim($institution_name) : (!empty($institution_name) ? $institution_name : null);
-                                            $record->institution_id = null;
+                                            // institution_id не устанавливаем, если не указан (будет NULL в БД)
                                             $record->credited_date = ($credited_date > 0) ? (int)$credited_date : $record->credited_date;
                                             $record->document_number = (!empty($document_number) && is_string($document_number)) ? trim($document_number) : (!empty($document_number) ? $document_number : null);
                                             $record->notes = (!empty($notes) && is_string($notes)) ? trim($notes) : (!empty($notes) ? $notes : null);
