@@ -83,7 +83,7 @@ if (!$hasaccess) {
 
 // Получение параметров ДО проверки ролей и редиректов
 $tab = optional_param('tab', 'courses', PARAM_ALPHA); // courses, programs, notes
-$subtab = optional_param('subtab', 'programs', PARAM_ALPHA); // programs, additional для вкладки "Личная информация и статус"
+$subtab = optional_param('subtab', 'programs', PARAM_ALPHANUMEXT); // programs, additional, external_credits для вкладки "Личная информация и статус"
 $action = optional_param('action', '', PARAM_ALPHANUMEXT); // viewprogram, addnote, editnote, deletenote
 $programid = optional_param('programid', 0, PARAM_INT);
 $testmode = optional_param('test', false, PARAM_BOOL); // Параметр для тестирования - показывать цифровую оценку
@@ -2002,7 +2002,12 @@ if ($action == 'viewprogram' && $programid > 0) {
         // Вкладка "Личная информация и статус"
         echo html_writer::start_div('local-deanpromoodle-student-content', ['style' => 'margin-top: 20px;']);
         
-        // Подвкладки
+        // Убеждаемся, что $isadmin определен правильно (повторная проверка для надежности)
+        // Всегда проверяем права заново, чтобы быть уверенными
+        $isadmin = has_capability('moodle/site:config', $context) || 
+                   has_capability('local/deanpromoodle:viewadmin', $context);
+        
+        // Подвкладки - создаем массив ПЕРЕД проверкой $subtab
         $subtabs = [];
         $subtaburlparams = ['tab' => 'programs', 'subtab' => 'programs'];
         if ($studentid > 0) {
@@ -2016,12 +2021,42 @@ if ($action == 'viewprogram' && $programid > 0) {
             new moodle_url('/local/deanpromoodle/pages/student.php', $subtaburlparams),
             'Дополнительные данные');
         
+        // Если пользователь пытается открыть external_credits, но не является админом, редиректим ДО создания tabtree
+        if ($subtab == 'external_credits' && !$isadmin) {
+            $redirectparams = ['tab' => 'programs', 'subtab' => 'programs'];
+            if ($studentid > 0) {
+                $redirectparams['studentid'] = $studentid;
+            }
+            redirect(new moodle_url('/local/deanpromoodle/pages/student.php', $redirectparams));
+        }
+        
         // Подвкладка "Внешние зачеты" видна только администраторам
+        // ВАЖНО: Добавляем подвкладку ТОЛЬКО если пользователь админ, чтобы tabtree мог её найти
         if ($isadmin) {
             $subtaburlparams['subtab'] = 'external_credits';
             $subtabs[] = new tabobject('external_credits', 
                 new moodle_url('/local/deanpromoodle/pages/student.php', $subtaburlparams),
                 'Внешние зачеты');
+        }
+        
+        // КРИТИЧЕСКИ ВАЖНО: Если админ пытается открыть external_credits, но подвкладка не найдена в массиве,
+        // это означает, что что-то пошло не так. Добавляем подвкладку принудительно.
+        if ($isadmin && $subtab == 'external_credits') {
+            $found = false;
+            foreach ($subtabs as $tab) {
+                // Проверяем свойство id объекта tabobject
+                if (property_exists($tab, 'id') && $tab->id == 'external_credits') {
+                    $found = true;
+                    break;
+                }
+            }
+            if (!$found) {
+                // Если подвкладка не найдена, добавляем её принудительно
+                $subtaburlparams['subtab'] = 'external_credits';
+                $subtabs[] = new tabobject('external_credits', 
+                    new moodle_url('/local/deanpromoodle/pages/student.php', $subtaburlparams),
+                    'Внешние зачеты');
+            }
         }
         
         echo $OUTPUT->tabtree($subtabs, $subtab);
@@ -4204,11 +4239,22 @@ if ($action == 'viewprogram' && $programid > 0) {
             
         default:
             // По умолчанию показываем программы
-            $redirectparams = ['tab' => 'programs', 'subtab' => 'programs'];
-            if ($studentid > 0) {
-                $redirectparams['studentid'] = $studentid;
+            // НО: если админ пытается открыть external_credits, но по какой-то причине case не сработал,
+            // это означает, что подвкладка не была обработана. В этом случае редиректим на external_credits явно.
+            if ($isadmin && $subtab == 'external_credits') {
+                // Это не должно происходить, но если произошло - редиректим на external_credits явно
+                $redirectparams = ['tab' => 'programs', 'subtab' => 'external_credits'];
+                if ($studentid > 0) {
+                    $redirectparams['studentid'] = $studentid;
+                }
+                redirect(new moodle_url('/local/deanpromoodle/pages/student.php', $redirectparams));
+            } else {
+                $redirectparams = ['tab' => 'programs', 'subtab' => 'programs'];
+                if ($studentid > 0) {
+                    $redirectparams['studentid'] = $studentid;
+                }
+                redirect(new moodle_url('/local/deanpromoodle/pages/student.php', $redirectparams));
             }
-            redirect(new moodle_url('/local/deanpromoodle/pages/student.php', $redirectparams));
             break;
         }
         
