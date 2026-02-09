@@ -422,9 +422,9 @@ if ($action == 'viewprogram' && $programid > 0) {
                 }
                 $mycourseids = array_keys($mycourses);
                 
-                // Получаем предметы программы
+                // Получаем предметы программы (включая кредиты)
                 $subjects = $DB->get_records_sql(
-                    "SELECT s.id, s.name, s.code, s.shortdescription, ps.sortorder
+                    "SELECT s.id, s.name, s.code, s.shortdescription, s.credits, ps.sortorder
                      FROM {local_deanpromoodle_program_subjects} ps
                      JOIN {local_deanpromoodle_subjects} s ON s.id = ps.subjectid
                      WHERE ps.programid = ?
@@ -492,6 +492,53 @@ if ($action == 'viewprogram' && $programid > 0) {
                         .course-link-not-enrolled {
                             color: #6c757d;
                         }
+                        /* Стили для статуса завершения */
+                        .completion-status-not-completed {
+                            color: #dc3545;
+                            font-weight: 500;
+                        }
+                        .completion-status-partial {
+                            color: #ffc107;
+                            font-weight: 500;
+                        }
+                        .completion-status-completed {
+                            color: #28a745;
+                            font-weight: 500;
+                        }
+                        /* Стили для итоговых оценок */
+                        .grade-badge {
+                            display: inline-block;
+                            padding: 8px 16px;
+                            border-radius: 20px;
+                            font-weight: 600;
+                            font-size: 14px;
+                            transition: all 0.3s ease;
+                            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+                        }
+                        .grade-badge:hover {
+                            transform: translateY(-2px);
+                            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+                        }
+                        .grade-badge-no-grade {
+                            background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
+                            color: #ffffff;
+                        }
+                        .grade-badge-satisfactory {
+                            background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
+                            color: #212529;
+                        }
+                        .grade-badge-good {
+                            background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+                            color: #ffffff;
+                        }
+                        .grade-badge-excellent {
+                            background: linear-gradient(135deg, #28a745 0%, #218838 100%);
+                            color: #ffffff;
+                        }
+                        .grade-badge i {
+                            margin-right: 6px;
+                            font-size: 16px;
+                        }
                     ";
                     echo html_writer::end_tag('style');
                     
@@ -501,11 +548,219 @@ if ($action == 'viewprogram' && $programid > 0) {
                     echo html_writer::start_tag('tr');
                     echo html_writer::tag('th', '№', ['style' => 'width: 60px;']);
                     echo html_writer::tag('th', 'Название предмета');
-                    echo html_writer::tag('th', 'Код', ['style' => 'width: 150px;']);
-                    echo html_writer::tag('th', 'Статус', ['style' => 'width: 120px;']);
+                    echo html_writer::tag('th', 'Кол-во кредитов', ['style' => 'width: 120px;']);
+                    echo html_writer::tag('th', 'Статус завершения', ['style' => 'width: 180px;']);
+                    echo html_writer::tag('th', 'Оценка', ['style' => 'width: 150px;']);
                     echo html_writer::tag('th', 'Курсы');
                     echo html_writer::end_tag('tr');
                     echo html_writer::end_tag('thead');
+                    // Функция для вычисления статуса завершения и оценки курса
+                    $getCourseCompletionAndGrade = function($courseid, $studentid) use ($DB, $CFG) {
+                        require_once($CFG->libdir . '/gradelib.php');
+                        
+                        $course = get_course($courseid);
+                        $coursegrade = null;
+                        $finalgradepercent = null;
+                        
+                        // Получаем итоговую оценку курса
+                        try {
+                            $courseitem = grade_item::fetch_course_item($courseid);
+                            if ($courseitem) {
+                                $usergrade = grade_grade::fetch(['itemid' => $courseitem->id, 'userid' => $studentid]);
+                                if ($usergrade && $usergrade->finalgrade !== null) {
+                                    $coursegrade = $usergrade->finalgrade;
+                                    $finalgradepercent = $coursegrade;
+                                }
+                            }
+                        } catch (\Exception $e) {
+                            // Игнорируем ошибки
+                        }
+                        
+                        // Проверяем, все ли задания имеют оценку
+                        $allassignmentsgraded = true;
+                        $hasassignments = false;
+                        
+                        // Функция для проверки оценки задания (включая принудительно проставленные)
+                        $checkAssignmentGrade = function($assignmentid, $userid) use ($DB, $CFG) {
+                            require_once($CFG->libdir . '/gradelib.php');
+                            $gradeitem = grade_item::fetch([
+                                'itemtype' => 'mod',
+                                'itemmodule' => 'assign',
+                                'iteminstance' => $assignmentid
+                            ]);
+                            if ($gradeitem) {
+                                $usergrade = grade_grade::fetch(['itemid' => $gradeitem->id, 'userid' => $userid]);
+                                return $usergrade && $usergrade->finalgrade !== null;
+                            }
+                            return false;
+                        };
+                        
+                        try {
+                            $assignments = get_all_instances_in_course('assign', $course, false);
+                            $quizzes = get_all_instances_in_course('quiz', $course, false);
+                            
+                            if (!is_array($assignments)) {
+                                $assignments = [];
+                            }
+                            if (!is_array($quizzes)) {
+                                $quizzes = [];
+                            }
+                            
+                            // Проверяем задания
+                            foreach ($assignments as $assignment) {
+                                $cm = get_coursemodule_from_instance('assign', $assignment->id, $courseid);
+                                if (!$cm || !$cm->visible || !$cm->visibleoncoursepage) {
+                                    continue;
+                                }
+                                
+                                $assignmentname = mb_strtolower($assignment->name);
+                                if (strpos($assignmentname, 'отчет') !== false && strpos($assignmentname, 'чтени') !== false) {
+                                    $hasassignments = true;
+                                    if (!$checkAssignmentGrade($assignment->id, $studentid)) {
+                                        $allassignmentsgraded = false;
+                                    }
+                                }
+                                if (strpos($assignmentname, 'письменн') !== false) {
+                                    $hasassignments = true;
+                                    $submission = $DB->get_record('assign_submission', [
+                                        'assignment' => $assignment->id,
+                                        'userid' => $studentid
+                                    ]);
+                                    $hasfiles = false;
+                                    if ($submission) {
+                                        $filecount = $DB->count_records_sql(
+                                            "SELECT COUNT(*) FROM {assignsubmission_file} WHERE submission = ?",
+                                            [$submission->id]
+                                        );
+                                        $textcount = $DB->count_records_sql(
+                                            "SELECT COUNT(*) FROM {assignsubmission_onlinetext} WHERE submission = ? AND onlinetext IS NOT NULL AND onlinetext != ''",
+                                            [$submission->id]
+                                        );
+                                        $hasfiles = ($filecount > 0 || $textcount > 0);
+                                    }
+                                    if (!$checkAssignmentGrade($assignment->id, $studentid) && !$hasfiles) {
+                                        $allassignmentsgraded = false;
+                                    }
+                                }
+                            }
+                            
+                            // Проверяем тесты (экзамены)
+                            foreach ($quizzes as $quiz) {
+                                $cm = get_coursemodule_from_instance('quiz', $quiz->id, $courseid);
+                                if (!$cm || !$cm->visible || !$cm->visibleoncoursepage) {
+                                    continue;
+                                }
+                                
+                                $quizname = mb_strtolower($quiz->name);
+                                if (strpos($quizname, 'экзамен') !== false) {
+                                    $hasassignments = true;
+                                    
+                                    $grade = $DB->get_record('quiz_grades', [
+                                        'quiz' => $quiz->id,
+                                        'userid' => $studentid
+                                    ]);
+                                    
+                                    $hasgrade = false;
+                                    if ($grade && $grade->grade !== null && $grade->grade >= 0) {
+                                        $hasgrade = true;
+                                    } else {
+                                        try {
+                                            $gradeitem = grade_item::fetch([
+                                                'itemtype' => 'mod',
+                                                'itemmodule' => 'quiz',
+                                                'iteminstance' => $quiz->id,
+                                                'courseid' => $courseid
+                                            ]);
+                                            
+                                            if ($gradeitem) {
+                                                $usergrade = grade_grade::fetch([
+                                                    'itemid' => $gradeitem->id,
+                                                    'userid' => $studentid
+                                                ]);
+                                                
+                                                if ($usergrade && $usergrade->finalgrade !== null && $usergrade->finalgrade >= 0) {
+                                                    $hasgrade = true;
+                                                }
+                                            }
+                                        } catch (\Exception $e) {
+                                            // Игнорируем ошибки
+                                        }
+                                    }
+                                    
+                                    if (!$hasgrade) {
+                                        $allassignmentsgraded = false;
+                                    }
+                                }
+                            }
+                        } catch (\Exception $e) {
+                            // Игнорируем ошибки
+                        }
+                        
+                        // Определяем статус завершения
+                        $completionstatus = '';
+                        $completionclass = '';
+                        if (($finalgradepercent === null || $finalgradepercent < 70) && $allassignmentsgraded && $hasassignments) {
+                            $completionstatus = 'Завершен полностью';
+                            $completionclass = 'completion-status-completed';
+                        } elseif ($finalgradepercent === null || $finalgradepercent < 70) {
+                            $completionstatus = 'Не завершен';
+                            $completionclass = 'completion-status-not-completed';
+                        } elseif ($finalgradepercent >= 70) {
+                            if (!$hasassignments) {
+                                $completionstatus = 'Завершен полностью';
+                                $completionclass = 'completion-status-completed';
+                            } elseif (!$allassignmentsgraded) {
+                                $completionstatus = 'Завершен частично';
+                                $completionclass = 'completion-status-partial';
+                            } else {
+                                $completionstatus = 'Завершен полностью';
+                                $completionclass = 'completion-status-completed';
+                            }
+                        }
+                        
+                        // Добавляем процент завершения к статусу через дефис
+                        if ($finalgradepercent !== null) {
+                            $completionstatus .= ' - ' . round($finalgradepercent, 2) . '%';
+                        }
+                        
+                        // Определяем оценку
+                        $gradeText = '';
+                        $gradeClass = '';
+                        $gradeIcon = '';
+                        $percentForDisplay = $finalgradepercent;
+                        
+                        if ($finalgradepercent === null && $percentForDisplay === null) {
+                            $gradeText = 'нет оценки';
+                            $gradeClass = 'grade-badge-no-grade';
+                            $gradeIcon = '<i class="fas fa-minus-circle"></i>';
+                        } elseif ($percentForDisplay !== null && $percentForDisplay < 70) {
+                            $gradeText = 'нет оценки';
+                            $gradeClass = 'grade-badge-no-grade';
+                            $gradeIcon = '<i class="fas fa-minus-circle"></i>';
+                        } elseif ($percentForDisplay >= 70 && $percentForDisplay < 80) {
+                            $gradeText = '3 (удовлетворительно)';
+                            $gradeClass = 'grade-badge-satisfactory';
+                            $gradeIcon = '<i class="fas fa-check-circle"></i>';
+                        } elseif ($percentForDisplay >= 80 && $percentForDisplay < 90) {
+                            $gradeText = '4 (хорошо)';
+                            $gradeClass = 'grade-badge-good';
+                            $gradeIcon = '<i class="fas fa-star"></i>';
+                        } elseif ($percentForDisplay >= 90) {
+                            $gradeText = '5 (отлично)';
+                            $gradeClass = 'grade-badge-excellent';
+                            $gradeIcon = '<i class="fas fa-trophy"></i>';
+                        }
+                        
+                        return [
+                            'completionstatus' => $completionstatus,
+                            'completionclass' => $completionclass,
+                            'gradetext' => $gradeText,
+                            'gradeclass' => $gradeClass,
+                            'gradeicon' => $gradeIcon,
+                            'finalgradepercent' => $finalgradepercent
+                        ];
+                    };
+                    
                     echo html_writer::start_tag('tbody');
                     
                     foreach ($subjects as $index => $subject) {
@@ -527,8 +782,72 @@ if ($action == 'viewprogram' && $programid > 0) {
                             }
                         }
                         
-                        // Определяем статус предмета: "Начат" если есть хотя бы один зачисленный курс
-                        $subjectstarted = !empty($enrolledcourses);
+                        // Вычисляем статус завершения и оценку для каждого курса
+                        $bestCompletion = null;
+                        $bestGrade = null;
+                        $bestGradePercent = null;
+                        
+                        foreach ($enrolledcourses as $course) {
+                            $result = $getCourseCompletionAndGrade($course->id, $viewingstudent->id);
+                            
+                            // Выбираем лучший статус завершения (приоритет: Завершен полностью > Завершен частично > Не завершен)
+                            if ($bestCompletion === null) {
+                                $bestCompletion = $result;
+                            } else {
+                                $currentPriority = 0;
+                                $bestPriority = 0;
+                                
+                                if (strpos($result['completionstatus'], 'Завершен полностью') !== false) {
+                                    $currentPriority = 3;
+                                } elseif (strpos($result['completionstatus'], 'Завершен частично') !== false) {
+                                    $currentPriority = 2;
+                                } else {
+                                    $currentPriority = 1;
+                                }
+                                
+                                if (strpos($bestCompletion['completionstatus'], 'Завершен полностью') !== false) {
+                                    $bestPriority = 3;
+                                } elseif (strpos($bestCompletion['completionstatus'], 'Завершен частично') !== false) {
+                                    $bestPriority = 2;
+                                } else {
+                                    $bestPriority = 1;
+                                }
+                                
+                                if ($currentPriority > $bestPriority) {
+                                    $bestCompletion = $result;
+                                }
+                            }
+                            
+                            // Выбираем лучшую оценку (наибольший процент)
+                            if ($result['finalgradepercent'] !== null) {
+                                if ($bestGradePercent === null || $result['finalgradepercent'] > $bestGradePercent) {
+                                    $bestGrade = $result;
+                                    $bestGradePercent = $result['finalgradepercent'];
+                                }
+                            }
+                        }
+                        
+                        // Используем лучший результат для отображения
+                        $displayCompletion = $bestCompletion;
+                        $displayGrade = $bestGrade;
+                        
+                        // Если нет курсов с оценками, используем лучший статус завершения
+                        if ($displayGrade === null && $displayCompletion !== null) {
+                            $displayGrade = $displayCompletion;
+                        }
+                        
+                        // Если нет курсов вообще
+                        if ($displayCompletion === null) {
+                            $displayCompletion = [
+                                'completionstatus' => '-',
+                                'completionclass' => '',
+                                'gradetext' => '-',
+                                'gradeclass' => '',
+                                'gradeicon' => '',
+                                'finalgradepercent' => null
+                            ];
+                            $displayGrade = $displayCompletion;
+                        }
                         
                         // Формируем HTML списка курсов - показываем только зачисленные курсы
                         if (!empty($enrolledcourses)) {
@@ -551,18 +870,23 @@ if ($action == 'viewprogram' && $programid > 0) {
                         echo html_writer::tag('td', htmlspecialchars($subject->name, ENT_QUOTES, 'UTF-8'), [
                             'style' => 'font-weight: 500;'
                         ]);
-                        echo html_writer::tag('td', $subject->code ? htmlspecialchars($subject->code, ENT_QUOTES, 'UTF-8') : '-');
                         
-                        // Статус предмета
-                        if ($subjectstarted) {
-                            echo html_writer::tag('td', 
-                                '<span class="subject-status-started"><i class="fas fa-check-circle"></i> Начат</span>'
-                            );
-                        } else {
-                            echo html_writer::tag('td', 
-                                '<span class="subject-status-not-started">Не начат</span>'
-                            );
+                        // Кол-во кредитов
+                        $credits = '-';
+                        if (isset($subject->credits) && $subject->credits !== null && $subject->credits > 0) {
+                            $credits = (string)$subject->credits;
                         }
+                        echo html_writer::tag('td', htmlspecialchars($credits, ENT_QUOTES, 'UTF-8'));
+                        
+                        // Статус завершения
+                        $completionHtml = '<span class="' . $displayCompletion['completionclass'] . '">' . 
+                            htmlspecialchars($displayCompletion['completionstatus'], ENT_QUOTES, 'UTF-8') . '</span>';
+                        echo html_writer::tag('td', $completionHtml);
+                        
+                        // Оценка
+                        $gradeBadgeContent = $displayGrade['gradeicon'] . htmlspecialchars($displayGrade['gradetext'], ENT_QUOTES, 'UTF-8');
+                        $gradeBadge = '<span class="grade-badge ' . $displayGrade['gradeclass'] . '">' . $gradeBadgeContent . '</span>';
+                        echo html_writer::tag('td', $gradeBadge);
                         
                         // Курсы - только те, на которые зачислен студент
                         echo html_writer::tag('td', $courseshtml);
