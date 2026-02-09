@@ -500,6 +500,11 @@ function local_deanpromoodle_before_footer() {
         $teacherurlstring = $teacherurl->out(false);
     }
     
+    // Для администратора всегда должна быть кнопка "Деканат"
+    if ($isadmin && !$lkurl) {
+        $lkurl = new moodle_url('/local/deanpromoodle/pages/admin.php');
+    }
+    
     // Если нет ни кнопки "Деканат", ни кнопки "Преподаватель", не добавляем ничего
     if (!$lkurl && !$teacherurlstring) {
         return;
