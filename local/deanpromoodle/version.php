@@ -26,7 +26,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_deanpromoodle';
-$plugin->version = 2026020901; // YYYYMMDDXX format - добавлена таблица заметок по студентам
+$plugin->version = 2026021001; // YYYYMMDDXX format - добавлена таблица внешних зачетов студентов
 $plugin->requires = 2022041900; // Moodle 4.0+
 $plugin->maturity = MATURITY_ALPHA;
 $plugin->release = 'v1.0.0-alpha';

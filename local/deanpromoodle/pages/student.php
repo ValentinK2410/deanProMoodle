@@ -763,6 +763,12 @@ if ($action == 'viewprogram' && $programid > 0) {
                     echo html_writer::start_tag('tbody');
                     
                     foreach ($subjects as $index => $subject) {
+                        // Проверяем внешний зачет по этому предмету (проверяем заранее, чтобы использовать в tooltip)
+                        $externalcredit = $DB->get_record('local_deanpromoodle_student_external_credits', [
+                            'studentid' => $viewingstudent->id,
+                            'subjectid' => $subject->id
+                        ]);
+                        
                         // Получаем курсы предмета
                         $subjectcourses = $DB->get_records_sql(
                             "SELECT c.id, c.fullname, c.shortname
@@ -826,6 +832,65 @@ if ($action == 'viewprogram' && $programid > 0) {
                             }
                         }
                         
+                        // Обрабатываем внешний зачет, если он есть
+                        
+                        if ($externalcredit) {
+                            // Если есть внешний зачет, используем его данные
+                            $externalgradepercent = $externalcredit->grade_percent !== null ? $externalcredit->grade_percent : null;
+                            
+                            // Определяем оценку из внешнего зачета
+                            if ($externalgradepercent !== null) {
+                                $externalgradetext = '';
+                                $externalgradeclass = '';
+                                $externalgradeicon = '';
+                                
+                                if ($externalgradepercent < 70) {
+                                    $externalgradetext = 'нет оценки';
+                                    $externalgradeclass = 'grade-badge-no-grade';
+                                    $externalgradeicon = '<i class="fas fa-minus-circle"></i>';
+                                } elseif ($externalgradepercent >= 70 && $externalgradepercent < 80) {
+                                    $externalgradetext = '3 (удовлетворительно)';
+                                    $externalgradeclass = 'grade-badge-satisfactory';
+                                    $externalgradeicon = '<i class="fas fa-check-circle"></i>';
+                                } elseif ($externalgradepercent >= 80 && $externalgradepercent < 90) {
+                                    $externalgradetext = '4 (хорошо)';
+                                    $externalgradeclass = 'grade-badge-good';
+                                    $externalgradeicon = '<i class="fas fa-star"></i>';
+                                } elseif ($externalgradepercent >= 90) {
+                                    $externalgradetext = '5 (отлично)';
+                                    $externalgradeclass = 'grade-badge-excellent';
+                                    $externalgradeicon = '<i class="fas fa-trophy"></i>';
+                                }
+                                
+                                // Определяем статус завершения из внешнего зачета
+                                $externalcompletionstatus = 'Завершен полностью';
+                                $externalcompletionclass = 'completion-status-completed';
+                                if ($externalgradepercent !== null) {
+                                    $externalcompletionstatus .= ' - ' . round($externalgradepercent, 2) . '%';
+                                }
+                                
+                                // Внешний зачет имеет приоритет, если он лучше или если нет курсов
+                                if ($bestGradePercent === null || $externalgradepercent > $bestGradePercent) {
+                                    $bestGrade = [
+                                        'gradetext' => $externalgradetext,
+                                        'gradeclass' => $externalgradeclass,
+                                        'gradeicon' => $externalgradeicon,
+                                        'finalgradepercent' => $externalgradepercent
+                                    ];
+                                    $bestGradePercent = $externalgradepercent;
+                                }
+                                
+                                // Статус завершения из внешнего зачета всегда "Завершен полностью"
+                                if ($bestCompletion === null || strpos($bestCompletion['completionstatus'], 'Завершен полностью') === false) {
+                                    $bestCompletion = [
+                                        'completionstatus' => $externalcompletionstatus,
+                                        'completionclass' => $externalcompletionclass,
+                                        'finalgradepercent' => $externalgradepercent
+                                    ];
+                                }
+                            }
+                        }
+                        
                         // Используем лучший результат для отображения
                         $displayCompletion = $bestCompletion;
                         $displayGrade = $bestGrade;
@@ -852,6 +917,7 @@ if ($action == 'viewprogram' && $programid > 0) {
                         $subjectNameHtml = '';
                         $tooltipText = '';
                         $firstCourseUrl = null;
+                        $tooltipParts = [];
                         
                         if (!empty($enrolledcourses)) {
                             // Формируем список курсов для tooltip
@@ -862,8 +928,33 @@ if ($action == 'viewprogram' && $programid > 0) {
                                     $firstCourseUrl = new moodle_url('/course/view.php', ['id' => $course->id]);
                                 }
                             }
-                            $tooltipText = 'Курсы: ' . implode(', ', $courseNames);
-                            
+                            $tooltipParts[] = 'Курсы: ' . implode(', ', $courseNames);
+                        } else {
+                            // Если нет курсов
+                            if (!$externalcredit) {
+                                $tooltipParts[] = 'Нет доступных курсов';
+                            }
+                        }
+                        
+                        // Добавляем информацию о внешнем зачете в tooltip
+                        if ($externalcredit) {
+                            $externalInfo = 'Внешний зачет: ' . htmlspecialchars($externalcredit->institution_name, ENT_QUOTES, 'UTF-8');
+                            if ($externalcredit->grade_percent !== null) {
+                                $externalInfo .= ' (' . round($externalcredit->grade_percent, 2) . '%)';
+                            } else if ($externalcredit->grade) {
+                                $externalInfo .= ' (оценка: ' . htmlspecialchars($externalcredit->grade, ENT_QUOTES, 'UTF-8') . ')';
+                            }
+                            if ($externalcredit->credited_date > 0) {
+                                $externalInfo .= ', дата: ' . userdate($externalcredit->credited_date, '%d.%m.%Y');
+                            }
+                            $tooltipParts[] = $externalInfo;
+                        }
+                        
+                        // Объединяем все части tooltip
+                        $tooltipText = implode(' | ', $tooltipParts);
+                        
+                        // Формируем HTML названия предмета
+                        if (!empty($enrolledcourses) && $firstCourseUrl) {
                             // Делаем название предмета кликабельным
                             $subjectNameHtml = html_writer::link(
                                 $firstCourseUrl,
@@ -877,9 +968,15 @@ if ($action == 'viewprogram' && $programid > 0) {
                                 ]
                             );
                         } else {
-                            // Если нет курсов, просто текст
-                            $subjectNameHtml = htmlspecialchars($subject->name, ENT_QUOTES, 'UTF-8');
-                            $tooltipText = 'Нет доступных курсов';
+                            // Если нет курсов, просто текст с tooltip (если есть внешний зачет)
+                            if (!empty($tooltipText)) {
+                                $subjectNameHtml = html_writer::tag('span', htmlspecialchars($subject->name, ENT_QUOTES, 'UTF-8'), [
+                                    'title' => $tooltipText,
+                                    'style' => 'font-weight: 500; cursor: help;'
+                                ]);
+                            } else {
+                                $subjectNameHtml = htmlspecialchars($subject->name, ENT_QUOTES, 'UTF-8');
+                            }
                         }
                         
                         echo html_writer::start_tag('tr');
@@ -1918,6 +2015,14 @@ if ($action == 'viewprogram' && $programid > 0) {
         $subtabs[] = new tabobject('additional', 
             new moodle_url('/local/deanpromoodle/pages/student.php', $subtaburlparams),
             'Дополнительные данные');
+        
+        // Подвкладка "Внешние зачеты" видна только администраторам
+        if ($isadmin) {
+            $subtaburlparams['subtab'] = 'external_credits';
+            $subtabs[] = new tabobject('external_credits', 
+                new moodle_url('/local/deanpromoodle/pages/student.php', $subtaburlparams),
+                'Внешние зачеты');
+        }
         
         echo $OUTPUT->tabtree($subtabs, $subtab);
         
@@ -3665,6 +3770,435 @@ if ($action == 'viewprogram' && $programid > 0) {
                 }
             } catch (\Exception $e) {
                 echo html_writer::div('Ошибка: ' . $e->getMessage(), 'alert alert-danger');
+            }
+            break;
+            
+        case 'external_credits':
+            // Подвкладка "Внешние зачеты" - только для администраторов
+            if (!$isadmin) {
+                redirect(new moodle_url('/local/deanpromoodle/pages/student.php', [
+                    'tab' => 'programs',
+                    'subtab' => 'programs',
+                    'studentid' => $studentid
+                ]));
+            }
+            
+            // Обработка действий с внешними зачетами
+            $externalcreditid = optional_param('externalcreditid', 0, PARAM_INT);
+            
+            // Добавление/редактирование внешнего зачета
+            if (($action == 'add_external_credit' || $action == 'edit_external_credit') && $externalcreditid >= 0) {
+                $subjectid = optional_param('subjectid', 0, PARAM_INT);
+                $grade = optional_param('grade', '', PARAM_TEXT);
+                $grade_percent = optional_param('grade_percent', null, PARAM_FLOAT);
+                $institution_name = optional_param('institution_name', '', PARAM_TEXT);
+                $institution_id = optional_param('institution_id', 0, PARAM_INT);
+                $credited_date_str = optional_param('credited_date', '', PARAM_TEXT); // Дата в формате YYYY-MM-DD
+                $document_number = optional_param('document_number', '', PARAM_TEXT);
+                $notes = optional_param('notes', '', PARAM_TEXT);
+                
+                // Преобразуем дату из строки в timestamp
+                $credited_date = 0;
+                if (!empty($credited_date_str)) {
+                    $credited_date = strtotime($credited_date_str . ' 00:00:00');
+                }
+                
+                if ($subjectid > 0 && !empty($institution_name)) {
+                    try {
+                        if ($action == 'add_external_credit') {
+                            // Проверяем, нет ли уже внешнего зачета по этому предмету
+                            $existing = $DB->get_record('local_deanpromoodle_student_external_credits', [
+                                'studentid' => $viewingstudent->id,
+                                'subjectid' => $subjectid
+                            ]);
+                            
+                            if ($existing) {
+                                echo html_writer::div('Внешний зачет по этому предмету уже существует. Используйте редактирование.', 'alert alert-warning');
+                            } else {
+                                $record = new stdClass();
+                                $record->studentid = $viewingstudent->id;
+                                $record->subjectid = $subjectid;
+                                $record->grade = $grade ?: null;
+                                $record->grade_percent = $grade_percent;
+                                $record->institution_name = $institution_name;
+                                $record->institution_id = $institution_id > 0 ? $institution_id : null;
+                                $record->credited_date = $credited_date > 0 ? $credited_date : time();
+                                $record->document_number = $document_number ?: null;
+                                $record->notes = $notes ?: null;
+                                $record->createdby = $USER->id;
+                                $record->timecreated = time();
+                                $record->timemodified = time();
+                                
+                                $DB->insert_record('local_deanpromoodle_student_external_credits', $record);
+                                
+                                $redirecturl = new moodle_url('/local/deanpromoodle/pages/student.php', [
+                                    'tab' => 'programs',
+                                    'subtab' => 'external_credits',
+                                    'studentid' => $studentid
+                                ]);
+                                redirect($redirecturl, 'Внешний зачет успешно добавлен', null, \core\output\notification::NOTIFY_SUCCESS);
+                            }
+                        } else if ($action == 'edit_external_credit' && $externalcreditid > 0) {
+                            $record = $DB->get_record('local_deanpromoodle_student_external_credits', [
+                                'id' => $externalcreditid,
+                                'studentid' => $viewingstudent->id
+                            ]);
+                            
+                            if ($record) {
+                                $record->subjectid = $subjectid;
+                                $record->grade = $grade ?: null;
+                                $record->grade_percent = $grade_percent;
+                                $record->institution_name = $institution_name;
+                                $record->institution_id = $institution_id > 0 ? $institution_id : null;
+                                $record->credited_date = $credited_date > 0 ? $credited_date : $record->credited_date;
+                                $record->document_number = $document_number ?: null;
+                                $record->notes = $notes ?: null;
+                                $record->timemodified = time();
+                                
+                                $DB->update_record('local_deanpromoodle_student_external_credits', $record);
+                                
+                                $redirecturl = new moodle_url('/local/deanpromoodle/pages/student.php', [
+                                    'tab' => 'programs',
+                                    'subtab' => 'external_credits',
+                                    'studentid' => $studentid
+                                ]);
+                                redirect($redirecturl, 'Внешний зачет успешно обновлен', null, \core\output\notification::NOTIFY_SUCCESS);
+                            } else {
+                                echo html_writer::div('Внешний зачет не найден', 'alert alert-danger');
+                            }
+                        }
+                    } catch (\Exception $e) {
+                        echo html_writer::div('Ошибка: ' . $e->getMessage(), 'alert alert-danger');
+                    }
+                }
+            }
+            
+            // Удаление внешнего зачета
+            if ($action == 'delete_external_credit' && $externalcreditid > 0) {
+                require_sesskey();
+                try {
+                    $record = $DB->get_record('local_deanpromoodle_student_external_credits', [
+                        'id' => $externalcreditid,
+                        'studentid' => $viewingstudent->id
+                    ]);
+                    
+                    if ($record) {
+                        $DB->delete_records('local_deanpromoodle_student_external_credits', ['id' => $externalcreditid]);
+                        
+                        $redirecturl = new moodle_url('/local/deanpromoodle/pages/student.php', [
+                            'tab' => 'programs',
+                            'subtab' => 'external_credits',
+                            'studentid' => $studentid
+                        ]);
+                        redirect($redirecturl, 'Внешний зачет успешно удален', null, \core\output\notification::NOTIFY_SUCCESS);
+                    } else {
+                        echo html_writer::div('Внешний зачет не найден', 'alert alert-danger');
+                    }
+                } catch (\Exception $e) {
+                    echo html_writer::div('Ошибка: ' . $e->getMessage(), 'alert alert-danger');
+                }
+            }
+            
+            // Форма добавления/редактирования
+            if ($action == 'add_external_credit' || ($action == 'edit_external_credit' && $externalcreditid > 0)) {
+                $externalcredit = null;
+                if ($action == 'edit_external_credit' && $externalcreditid > 0) {
+                    $externalcredit = $DB->get_record('local_deanpromoodle_student_external_credits', [
+                        'id' => $externalcreditid,
+                        'studentid' => $viewingstudent->id
+                    ]);
+                }
+                
+                echo html_writer::tag('h3', $action == 'add_external_credit' ? 'Добавить внешний зачет' : 'Редактировать внешний зачет');
+                
+                // Получаем список предметов
+                $subjects = $DB->get_records('local_deanpromoodle_subjects', ['visible' => 1], 'name ASC');
+                $subjectoptions = [0 => 'Выберите предмет'];
+                foreach ($subjects as $subject) {
+                    $subjectoptions[$subject->id] = $subject->name . ($subject->code ? ' (' . $subject->code . ')' : '');
+                }
+                
+                // Получаем список учебных заведений
+                $institutions = $DB->get_records('local_deanpromoodle_institutions', ['visible' => 1], 'name ASC');
+                $institutionoptions = [0 => 'Выберите учебное заведение (или введите название вручную)'];
+                foreach ($institutions as $institution) {
+                    $institutionoptions[$institution->id] = $institution->name;
+                }
+                
+                $formurl = new moodle_url('/local/deanpromoodle/pages/student.php', [
+                    'tab' => 'programs',
+                    'subtab' => 'external_credits',
+                    'action' => $action,
+                    'studentid' => $studentid
+                ]);
+                if ($externalcreditid > 0) {
+                    $formurl->param('externalcreditid', $externalcreditid);
+                }
+                
+                echo html_writer::start_tag('form', [
+                    'method' => 'post',
+                    'action' => $formurl->out(false)
+                ]);
+                echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'sesskey', 'value' => sesskey()]);
+                
+                echo html_writer::start_tag('table', ['class' => 'table', 'style' => 'max-width: 800px;']);
+                
+                // Предмет
+                echo html_writer::start_tag('tr');
+                echo html_writer::tag('td', html_writer::label('Предмет *', 'subjectid'), ['style' => 'width: 200px;']);
+                echo html_writer::start_tag('td');
+                echo html_writer::select($subjectoptions, 'subjectid', $externalcredit ? $externalcredit->subjectid : 0, false, ['class' => 'form-control', 'required' => 'required']);
+                echo html_writer::end_tag('td');
+                echo html_writer::end_tag('tr');
+                
+                // Оценка (текст)
+                echo html_writer::start_tag('tr');
+                echo html_writer::tag('td', html_writer::label('Оценка (3, 4, 5 или процент)', 'grade'));
+                echo html_writer::start_tag('td');
+                echo html_writer::empty_tag('input', [
+                    'type' => 'text',
+                    'name' => 'grade',
+                    'id' => 'grade',
+                    'class' => 'form-control',
+                    'value' => $externalcredit ? $externalcredit->grade : '',
+                    'placeholder' => '3, 4, 5 или процент'
+                ]);
+                echo html_writer::end_tag('td');
+                echo html_writer::end_tag('tr');
+                
+                // Оценка в процентах
+                echo html_writer::start_tag('tr');
+                echo html_writer::tag('td', html_writer::label('Оценка в процентах (0-100)', 'grade_percent'));
+                echo html_writer::start_tag('td');
+                echo html_writer::empty_tag('input', [
+                    'type' => 'number',
+                    'name' => 'grade_percent',
+                    'id' => 'grade_percent',
+                    'class' => 'form-control',
+                    'value' => $externalcredit && $externalcredit->grade_percent ? $externalcredit->grade_percent : '',
+                    'min' => '0',
+                    'max' => '100',
+                    'step' => '0.01',
+                    'placeholder' => '0-100'
+                ]);
+                echo html_writer::end_tag('td');
+                echo html_writer::end_tag('tr');
+                
+                // Учебное заведение (выбор из списка)
+                echo html_writer::start_tag('tr');
+                echo html_writer::tag('td', html_writer::label('Учебное заведение (из списка)', 'institution_id'));
+                echo html_writer::start_tag('td');
+                echo html_writer::select($institutionoptions, 'institution_id', $externalcredit && $externalcredit->institution_id ? $externalcredit->institution_id : 0, false, ['class' => 'form-control']);
+                echo html_writer::end_tag('td');
+                echo html_writer::end_tag('tr');
+                
+                // Название учебного заведения (вручную)
+                echo html_writer::start_tag('tr');
+                echo html_writer::tag('td', html_writer::label('Название учебного заведения *', 'institution_name'));
+                echo html_writer::start_tag('td');
+                echo html_writer::empty_tag('input', [
+                    'type' => 'text',
+                    'name' => 'institution_name',
+                    'id' => 'institution_name',
+                    'class' => 'form-control',
+                    'value' => $externalcredit ? $externalcredit->institution_name : '',
+                    'required' => 'required',
+                    'placeholder' => 'Название учебного заведения'
+                ]);
+                echo html_writer::end_tag('td');
+                echo html_writer::end_tag('tr');
+                
+                // Дата зачета
+                echo html_writer::start_tag('tr');
+                echo html_writer::tag('td', html_writer::label('Дата зачета', 'credited_date'));
+                echo html_writer::start_tag('td');
+                $credited_date_value = $externalcredit && $externalcredit->credited_date > 0 ? date('Y-m-d', $externalcredit->credited_date) : date('Y-m-d');
+                echo html_writer::empty_tag('input', [
+                    'type' => 'date',
+                    'name' => 'credited_date',
+                    'id' => 'credited_date',
+                    'class' => 'form-control',
+                    'value' => $credited_date_value
+                ]);
+                echo html_writer::end_tag('td');
+                echo html_writer::end_tag('tr');
+                
+                // Номер документа
+                echo html_writer::start_tag('tr');
+                echo html_writer::tag('td', html_writer::label('Номер документа о зачете', 'document_number'));
+                echo html_writer::start_tag('td');
+                echo html_writer::empty_tag('input', [
+                    'type' => 'text',
+                    'name' => 'document_number',
+                    'id' => 'document_number',
+                    'class' => 'form-control',
+                    'value' => $externalcredit ? $externalcredit->document_number : '',
+                    'placeholder' => 'Номер документа'
+                ]);
+                echo html_writer::end_tag('td');
+                echo html_writer::end_tag('tr');
+                
+                // Примечания
+                echo html_writer::start_tag('tr');
+                echo html_writer::tag('td', html_writer::label('Примечания', 'notes'), ['style' => 'vertical-align: top;']);
+                echo html_writer::start_tag('td');
+                echo html_writer::tag('textarea', $externalcredit ? htmlspecialchars($externalcredit->notes, ENT_QUOTES, 'UTF-8') : '', [
+                    'name' => 'notes',
+                    'id' => 'notes',
+                    'class' => 'form-control',
+                    'rows' => '3',
+                    'placeholder' => 'Дополнительные примечания'
+                ]);
+                echo html_writer::end_tag('td');
+                echo html_writer::end_tag('tr');
+                
+                echo html_writer::end_tag('table');
+                
+                echo html_writer::start_tag('div', ['style' => 'margin-top: 15px;']);
+                echo html_writer::empty_tag('input', [
+                    'type' => 'submit',
+                    'value' => $action == 'add_external_credit' ? 'Добавить' : 'Сохранить',
+                    'class' => 'btn btn-primary',
+                    'style' => 'margin-right: 10px;'
+                ]);
+                $cancelurl = new moodle_url('/local/deanpromoodle/pages/student.php', [
+                    'tab' => 'programs',
+                    'subtab' => 'external_credits',
+                    'studentid' => $studentid
+                ]);
+                echo html_writer::link($cancelurl, 'Отмена', ['class' => 'btn btn-secondary']);
+                echo html_writer::end_tag('div');
+                
+                echo html_writer::end_tag('form');
+            } else {
+                // Список внешних зачетов
+                echo html_writer::tag('h3', 'Внешние зачеты студента: ' . fullname($viewingstudent));
+                
+                // Кнопка добавления
+                $addurl = new moodle_url('/local/deanpromoodle/pages/student.php', [
+                    'tab' => 'programs',
+                    'subtab' => 'external_credits',
+                    'action' => 'add_external_credit',
+                    'studentid' => $studentid
+                ]);
+                echo html_writer::link($addurl, '<i class="fas fa-plus"></i> Добавить внешний зачет', [
+                    'class' => 'btn btn-primary',
+                    'style' => 'margin-bottom: 20px;'
+                ]);
+                
+                // Получаем внешние зачеты студента
+                $externalcredits = $DB->get_records_sql(
+                    "SELECT ec.*, s.name as subject_name, s.code as subject_code,
+                            u.firstname as creator_firstname, u.lastname as creator_lastname
+                     FROM {local_deanpromoodle_student_external_credits} ec
+                     JOIN {local_deanpromoodle_subjects} s ON s.id = ec.subjectid
+                     LEFT JOIN {user} u ON u.id = ec.createdby
+                     WHERE ec.studentid = ?
+                     ORDER BY ec.credited_date DESC, s.name ASC",
+                    [$viewingstudent->id]
+                );
+                
+                if (empty($externalcredits)) {
+                    echo html_writer::div('Внешние зачеты не найдены.', 'alert alert-info');
+                } else {
+                    echo html_writer::start_tag('table', ['class' => 'table table-striped table-hover']);
+                    echo html_writer::start_tag('thead');
+                    echo html_writer::start_tag('tr');
+                    echo html_writer::tag('th', 'Предмет');
+                    echo html_writer::tag('th', 'Оценка');
+                    echo html_writer::tag('th', 'Учебное заведение');
+                    echo html_writer::tag('th', 'Дата зачета');
+                    echo html_writer::tag('th', 'Документ');
+                    echo html_writer::tag('th', 'Добавил');
+                    echo html_writer::tag('th', 'Действия', ['style' => 'width: 150px;']);
+                    echo html_writer::end_tag('tr');
+                    echo html_writer::end_tag('thead');
+                    echo html_writer::start_tag('tbody');
+                    
+                    foreach ($externalcredits as $credit) {
+                        echo html_writer::start_tag('tr');
+                        
+                        // Предмет
+                        $subjectname = $credit->subject_name;
+                        if ($credit->subject_code) {
+                            $subjectname .= ' (' . htmlspecialchars($credit->subject_code, ENT_QUOTES, 'UTF-8') . ')';
+                        }
+                        echo html_writer::tag('td', htmlspecialchars($subjectname, ENT_QUOTES, 'UTF-8'));
+                        
+                        // Оценка
+                        $gradedisplay = '-';
+                        if ($credit->grade_percent !== null) {
+                            $gradedisplay = round($credit->grade_percent, 2) . '%';
+                            if ($credit->grade) {
+                                $gradedisplay .= ' (' . htmlspecialchars($credit->grade, ENT_QUOTES, 'UTF-8') . ')';
+                            }
+                        } else if ($credit->grade) {
+                            $gradedisplay = htmlspecialchars($credit->grade, ENT_QUOTES, 'UTF-8');
+                        }
+                        echo html_writer::tag('td', $gradedisplay);
+                        
+                        // Учебное заведение
+                        echo html_writer::tag('td', htmlspecialchars($credit->institution_name, ENT_QUOTES, 'UTF-8'));
+                        
+                        // Дата зачета
+                        $date = $credit->credited_date > 0 ? userdate($credit->credited_date, '%d.%m.%Y') : '-';
+                        echo html_writer::tag('td', $date);
+                        
+                        // Документ
+                        echo html_writer::tag('td', $credit->document_number ? htmlspecialchars($credit->document_number, ENT_QUOTES, 'UTF-8') : '-');
+                        
+                        // Добавил
+                        $creator = $credit->creator_firstname && $credit->creator_lastname 
+                            ? fullname((object)['firstname' => $credit->creator_firstname, 'lastname' => $credit->creator_lastname])
+                            : '-';
+                        echo html_writer::tag('td', htmlspecialchars($creator, ENT_QUOTES, 'UTF-8'));
+                        
+                        // Действия
+                        echo html_writer::start_tag('td');
+                        $editurl = new moodle_url('/local/deanpromoodle/pages/student.php', [
+                            'tab' => 'programs',
+                            'subtab' => 'external_credits',
+                            'action' => 'edit_external_credit',
+                            'externalcreditid' => $credit->id,
+                            'studentid' => $studentid
+                        ]);
+                        echo html_writer::link($editurl, '<i class="fas fa-edit"></i>', [
+                            'class' => 'btn btn-sm btn-warning',
+                            'title' => 'Редактировать',
+                            'style' => 'margin-right: 5px;'
+                        ]);
+                        
+                        $deleteurl = new moodle_url('/local/deanpromoodle/pages/student.php', [
+                            'tab' => 'programs',
+                            'subtab' => 'external_credits',
+                            'action' => 'delete_external_credit',
+                            'externalcreditid' => $credit->id,
+                            'studentid' => $studentid,
+                            'sesskey' => sesskey()
+                        ]);
+                        echo html_writer::link($deleteurl, '<i class="fas fa-trash"></i>', [
+                            'class' => 'btn btn-sm btn-danger',
+                            'title' => 'Удалить',
+                            'onclick' => 'return confirm(\'Вы уверены, что хотите удалить этот внешний зачет?\');'
+                        ]);
+                        echo html_writer::end_tag('td');
+                        
+                        echo html_writer::end_tag('tr');
+                        
+                        // Примечания (если есть) - в отдельной строке
+                        if (!empty($credit->notes)) {
+                            echo html_writer::start_tag('tr', ['style' => 'background-color: #f8f9fa;']);
+                            echo html_writer::tag('td', '<strong>Примечания:</strong> ' . htmlspecialchars($credit->notes, ENT_QUOTES, 'UTF-8'), [
+                                'colspan' => '7',
+                                'style' => 'font-size: 0.9em; padding: 8px 16px;'
+                            ]);
+                            echo html_writer::end_tag('tr');
+                        }
+                    }
+                    
+                    echo html_writer::end_tag('tbody');
+                    echo html_writer::end_tag('table');
+                }
             }
             break;
             

@@ -220,5 +220,43 @@ function xmldb_local_deanpromoodle_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026020901, 'local', 'deanpromoodle');
     }
 
+    // Добавление таблицы внешних зачетов студентов
+    if ($oldversion < 2026021001) {
+        $table = new xmldb_table('local_deanpromoodle_student_external_credits');
+        
+        if (!$dbman->table_exists($table)) {
+            // Создаем поля таблицы
+            $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+            $table->add_field('studentid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+            $table->add_field('subjectid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+            $table->add_field('grade', XMLDB_TYPE_CHAR, '10', null, XMLDB_NOTNULL, null, null, 'Оценка: 3, 4, 5 или процент');
+            $table->add_field('grade_percent', XMLDB_TYPE_NUMBER, '5,2', null, XMLDB_NOTNULL, null, null, 'Оценка в процентах (0-100)');
+            $table->add_field('institution_name', XMLDB_TYPE_CHAR, '255', null, XMLDB_NOTNULL, null, null, 'Название учебного заведения');
+            $table->add_field('institution_id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null, 'ID учебного заведения');
+            $table->add_field('credited_date', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null, 'Дата зачета (timestamp)');
+            $table->add_field('document_number', XMLDB_TYPE_CHAR, '100', null, XMLDB_NOTNULL, null, null, 'Номер документа о зачете');
+            $table->add_field('notes', XMLDB_TYPE_TEXT, null, null, XMLDB_NOTNULL, null, null, 'Примечания');
+            $table->add_field('createdby', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null, 'Кто добавил запись');
+            $table->add_field('timecreated', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $table->add_field('timemodified', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            
+            // Добавляем ключи
+            $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+            $table->add_key('studentid', XMLDB_KEY_FOREIGN, ['studentid'], 'user', ['id']);
+            $table->add_key('subjectid', XMLDB_KEY_FOREIGN, ['subjectid'], 'local_deanpromoodle_subjects', ['id']);
+            $table->add_key('createdby', XMLDB_KEY_FOREIGN, ['createdby'], 'user', ['id']);
+            $table->add_key('institution_id', XMLDB_KEY_FOREIGN, ['institution_id'], 'local_deanpromoodle_institutions', ['id']);
+            $table->add_key('student_subject', XMLDB_KEY_UNIQUE, ['studentid', 'subjectid'], null, null, 'Один студент может иметь только один внешний зачет по предмету');
+            
+            // Добавляем индексы
+            $table->add_index('credited_date', XMLDB_INDEX_NOTUNIQUE, ['credited_date']);
+            $table->add_index('institution_name', XMLDB_INDEX_NOTUNIQUE, ['institution_name']);
+            
+            $dbman->create_table($table);
+        }
+        
+        upgrade_plugin_savepoint(true, 2026021001, 'local', 'deanpromoodle');
+    }
+
     return true;
 }
