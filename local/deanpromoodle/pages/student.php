@@ -3921,8 +3921,20 @@ if ($action == 'viewprogram' && $programid > 0) {
                                                 }
                                                 
                                                 try {
-                                                    $DB->insert_record('local_deanpromoodle_student_external_credits', $record);
+                                                    // Проверяем результат вставки
+                                                    $insertid = $DB->insert_record('local_deanpromoodle_student_external_credits', $record);
+                                                    if (!$insertid) {
+                                                        throw new \dml_exception('insert_record вернул false. Запись не была добавлена в базу данных.');
+                                                    }
+                                                    // Логируем успешную вставку для админов
+                                                    if ($isadmin) {
+                                                        debugging('Внешний зачет успешно добавлен. ID новой записи: ' . $insertid, DEBUG_DEVELOPER);
+                                                    }
                                                 } catch (\dml_exception $e) {
+                                                    // Логируем исключение перед перебросом
+                                                    if ($isadmin) {
+                                                        debugging('Исключение при insert_record: ' . $e->getMessage() . ' | Код: ' . $e->getCode(), DEBUG_DEVELOPER);
+                                                    }
                                                     // Перебрасываем исключение для обработки в общем блоке catch
                                                     throw $e;
                                                 }
@@ -4022,8 +4034,20 @@ if ($action == 'viewprogram' && $programid > 0) {
                                             }
                                             
                                             try {
-                                                $DB->insert_record('local_deanpromoodle_student_external_credits', $record);
+                                                // Проверяем результат вставки
+                                                $insertid = $DB->insert_record('local_deanpromoodle_student_external_credits', $record);
+                                                if (!$insertid) {
+                                                    throw new \dml_exception('insert_record вернул false. Запись не была добавлена в базу данных.');
+                                                }
+                                                // Логируем успешную вставку для админов
+                                                if ($isadmin) {
+                                                    debugging('Внешний зачет успешно добавлен (без institution_id). ID новой записи: ' . $insertid, DEBUG_DEVELOPER);
+                                                }
                                             } catch (\dml_exception $e) {
+                                                // Логируем исключение перед перебросом
+                                                if ($isadmin) {
+                                                    debugging('Исключение при insert_record (без institution_id): ' . $e->getMessage() . ' | Код: ' . $e->getCode(), DEBUG_DEVELOPER);
+                                                }
                                                 // Перебрасываем исключение для обработки в общем блоке catch
                                                 throw $e;
                                             }
@@ -4072,12 +4096,24 @@ if ($action == 'viewprogram' && $programid > 0) {
                         $errormsg = '';
                         $errordetails = $e->getMessage();
                         
+                        // Получаем полную информацию об исключении
+                        $exceptioninfo = [
+                            'message' => $errordetails,
+                            'code' => $e->getCode(),
+                            'file' => $e->getFile(),
+                            'line' => $e->getLine(),
+                            'trace' => $e->getTraceAsString()
+                        ];
+                        
                         // Логируем детали ошибки для отладки (только для админов)
-                        if ($isadmin && !empty($errordetails)) {
-                            debugging('DML Exception при сохранении внешнего зачета. Полное сообщение: ' . $errordetails . 
-                                     ' | Код ошибки: ' . $e->getCode() . 
-                                     ' | Файл: ' . $e->getFile() . 
-                                     ' | Строка: ' . $e->getLine(), DEBUG_DEVELOPER);
+                        if ($isadmin) {
+                            debugging('DML Exception при сохранении внешнего зачета. Полная информация: ' . 
+                                     print_r($exceptioninfo, true), DEBUG_DEVELOPER);
+                            
+                            // Также логируем SQL запрос, если доступен
+                            if (method_exists($e, 'debuginfo')) {
+                                debugging('Debug info: ' . print_r($e->debuginfo(), true), DEBUG_DEVELOPER);
+                            }
                         }
                         
                         // Проверяем тип ошибки для более понятного сообщения
@@ -4117,16 +4153,40 @@ if ($action == 'viewprogram' && $programid > 0) {
                             // Общая ошибка базы данных
                             $errormsg = 'Ошибка при сохранении данных в базу данных';
                             // Показываем детали ошибки только админам
-                            if ($isadmin && !empty($errordetails)) {
-                                $errormsg .= '<br><small>Детали: ' . htmlspecialchars(substr($errordetails, 0, 500), ENT_QUOTES, 'UTF-8') . '</small>';
+                            if ($isadmin) {
+                                $errormsg .= '<br><br><strong>Детали ошибки:</strong><br>';
+                                $errormsg .= '<small style="font-family: monospace; white-space: pre-wrap;">';
+                                $errormsg .= 'Сообщение: ' . htmlspecialchars($errordetails, ENT_QUOTES, 'UTF-8') . "\n";
+                                $errormsg .= 'Код: ' . htmlspecialchars($e->getCode(), ENT_QUOTES, 'UTF-8') . "\n";
+                                $errormsg .= 'Файл: ' . htmlspecialchars($e->getFile(), ENT_QUOTES, 'UTF-8') . "\n";
+                                $errormsg .= 'Строка: ' . htmlspecialchars($e->getLine(), ENT_QUOTES, 'UTF-8') . "\n";
+                                if (method_exists($e, 'debuginfo')) {
+                                    $debuginfo = $e->debuginfo();
+                                    if (!empty($debuginfo)) {
+                                        $errormsg .= 'Debug info: ' . htmlspecialchars(print_r($debuginfo, true), ENT_QUOTES, 'UTF-8') . "\n";
+                                    }
+                                }
+                                $errormsg .= '</small>';
                             }
                         }
                         
                         // Если сообщение пустое, используем стандартное
                         if (empty($errormsg)) {
                             $errormsg = 'Ошибка при сохранении данных';
-                            if ($isadmin && !empty($errordetails)) {
-                                $errormsg .= '<br><small>Детали: ' . htmlspecialchars(substr($errordetails, 0, 500), ENT_QUOTES, 'UTF-8') . '</small>';
+                            if ($isadmin) {
+                                $errormsg .= '<br><br><strong>Детали ошибки:</strong><br>';
+                                $errormsg .= '<small style="font-family: monospace; white-space: pre-wrap;">';
+                                $errormsg .= 'Сообщение: ' . htmlspecialchars($errordetails, ENT_QUOTES, 'UTF-8') . "\n";
+                                $errormsg .= 'Код: ' . htmlspecialchars($e->getCode(), ENT_QUOTES, 'UTF-8') . "\n";
+                                $errormsg .= 'Файл: ' . htmlspecialchars($e->getFile(), ENT_QUOTES, 'UTF-8') . "\n";
+                                $errormsg .= 'Строка: ' . htmlspecialchars($e->getLine(), ENT_QUOTES, 'UTF-8') . "\n";
+                                if (method_exists($e, 'debuginfo')) {
+                                    $debuginfo = $e->debuginfo();
+                                    if (!empty($debuginfo)) {
+                                        $errormsg .= 'Debug info: ' . htmlspecialchars(print_r($debuginfo, true), ENT_QUOTES, 'UTF-8') . "\n";
+                                    }
+                                }
+                                $errormsg .= '</small>';
                             }
                         }
                         
