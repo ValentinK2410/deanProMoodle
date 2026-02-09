@@ -143,9 +143,164 @@ $studentperiod = optional_param('studentperiod', 'month', PARAM_ALPHA);
 $studentdatefrom = optional_param('studentdatefrom', '', PARAM_TEXT);
 $studentdateto = optional_param('studentdateto', '', PARAM_TEXT);
 // Параметры для предметов
-$action = optional_param('action', '', PARAM_ALPHA); // create, view, edit, delete
+$action = optional_param('action', '', PARAM_ALPHANUMEXT); // create, view, edit, delete, export_subjects
 $subjectid = optional_param('subjectid', 0, PARAM_INT);
 $programid = optional_param('programid', 0, PARAM_INT);
+
+// Обработка экспорта предметов программы в Excel (до любых настроек страницы)
+if ($tab == 'programs' && $action == 'export_subjects' && $programid > 0) {
+    // Отключаем буферизацию вывода для корректной отправки файла
+    while (ob_get_level()) {
+        ob_end_clean();
+    }
+    
+    try {
+        $program = $DB->get_record('local_deanpromoodle_programs', ['id' => $programid]);
+        if (!$program) {
+            // Если программа не найдена, выводим ошибку после заголовков
+            // Но сначала нужно настроить страницу
+            $PAGE->set_url(new moodle_url('/local/deanpromoodle/pages/admin.php', ['tab' => 'programs']));
+            $PAGE->set_context(context_system::instance());
+            $PAGE->set_title('Ошибка экспорта');
+            $PAGE->set_heading('Ошибка экспорта');
+            $PAGE->set_pagelayout('admin');
+            echo $OUTPUT->header();
+            echo html_writer::div('Программа не найдена.', 'alert alert-danger');
+            echo $OUTPUT->footer();
+            exit;
+        }
+        
+        // Получаем все предметы программы
+        $subjects = $DB->get_records_sql(
+            "SELECT s.id, s.name, s.code, s.shortdescription, s.description, s.credits, s.academic_hours, s.independent_hours, ps.sortorder
+             FROM {local_deanpromoodle_program_subjects} ps
+             JOIN {local_deanpromoodle_subjects} s ON s.id = ps.subjectid
+             WHERE ps.programid = ?
+             ORDER BY ps.sortorder ASC",
+            [$programid]
+        );
+        
+        // Проверяем доступность PhpSpreadsheet
+        $usePhpSpreadsheet = false;
+        $phpspreadsheetpath = $CFG->dirroot . '/vendor/phpoffice/phpspreadsheet/src/PhpSpreadsheet/IOFactory.php';
+        if (file_exists($phpspreadsheetpath)) {
+            require_once($phpspreadsheetpath);
+            $usePhpSpreadsheet = true;
+        }
+        
+        if (!$usePhpSpreadsheet) {
+            // Если PhpSpreadsheet недоступна, используем CSV
+            $filename = 'program_subjects_' . $programid . '_' . date('Y-m-d') . '.csv';
+            header('Content-Type: text/csv; charset=UTF-8');
+            header('Content-Disposition: attachment; filename="' . $filename . '"');
+            header('Cache-Control: must-revalidate, post-check=0, pre-check=0');
+            header('Pragma: public');
+            
+            // Добавляем BOM для правильного отображения кириллицы в Excel
+            echo "\xEF\xBB\xBF";
+            
+            $output = fopen('php://output', 'w');
+            
+            // Заголовки
+            fputcsv($output, [
+                'Порядок',
+                'Название',
+                'Код',
+                'Краткое описание',
+                'Описание',
+                'Кредиты',
+                'Академические часы',
+                'Часы самостоятельной работы'
+            ], ';');
+            
+            // Данные
+            foreach ($subjects as $subject) {
+                fputcsv($output, [
+                    $subject->sortorder,
+                    $subject->name ?? '',
+                    $subject->code ?? '',
+                    $subject->shortdescription ?? '',
+                    strip_tags($subject->description ?? ''),
+                    $subject->credits ?? '',
+                    $subject->academic_hours ?? '',
+                    $subject->independent_hours ?? ''
+                ], ';');
+            }
+            
+            fclose($output);
+            exit;
+        } else {
+            // Используем PhpSpreadsheet для создания Excel файла
+            $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+            
+            // Устанавливаем название листа
+            $sheet->setTitle('Предметы программы');
+            
+            // Заголовки
+            $headers = [
+                'Порядок',
+                'Название',
+                'Код',
+                'Краткое описание',
+                'Описание',
+                'Кредиты',
+                'Академические часы',
+                'Часы самостоятельной работы'
+            ];
+            
+            $col = 1;
+            foreach ($headers as $header) {
+                $sheet->setCellValueByColumnAndRow($col, 1, $header);
+                $sheet->getStyleByColumnAndRow($col, 1)->getFont()->setBold(true);
+                $sheet->getColumnDimensionByColumn($col)->setAutoSize(true);
+                $col++;
+            }
+            
+            // Данные
+            $row = 2;
+            foreach ($subjects as $subject) {
+                $col = 1;
+                $sheet->setCellValueByColumnAndRow($col++, $row, $subject->sortorder);
+                $sheet->setCellValueByColumnAndRow($col++, $row, $subject->name ?? '');
+                $sheet->setCellValueByColumnAndRow($col++, $row, $subject->code ?? '');
+                $sheet->setCellValueByColumnAndRow($col++, $row, $subject->shortdescription ?? '');
+                $sheet->setCellValueByColumnAndRow($col++, $row, strip_tags($subject->description ?? ''));
+                $sheet->setCellValueByColumnAndRow($col++, $row, $subject->credits ?? '');
+                $sheet->setCellValueByColumnAndRow($col++, $row, $subject->academic_hours ?? '');
+                $sheet->setCellValueByColumnAndRow($col++, $row, $subject->independent_hours ?? '');
+                $row++;
+            }
+            
+            // Автоподбор ширины колонок
+            foreach (range(1, count($headers)) as $col) {
+                $sheet->getColumnDimensionByColumn($col)->setAutoSize(true);
+            }
+            
+            // Сохранение файла
+            $filename = 'program_subjects_' . $programid . '_' . date('Y-m-d') . '.xlsx';
+            header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            header('Content-Disposition: attachment; filename="' . $filename . '"');
+            header('Cache-Control: must-revalidate, post-check=0, pre-check=0');
+            header('Pragma: public');
+            
+            $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+            $writer->save('php://output');
+            exit;
+        }
+    } catch (\Exception $e) {
+        // Если произошла ошибка, выводим её после заголовков
+        $PAGE->set_url(new moodle_url('/local/deanpromoodle/pages/admin.php', ['tab' => 'programs']));
+        $PAGE->set_context(context_system::instance());
+        $PAGE->set_title('Ошибка экспорта');
+        $PAGE->set_heading('Ошибка экспорта');
+        $PAGE->set_pagelayout('admin');
+        echo $OUTPUT->header();
+        echo html_writer::div('Ошибка при экспорте: ' . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8'), 'alert alert-danger');
+        echo $OUTPUT->footer();
+        exit;
+    }
+}
 
 // Настройка страницы
 $PAGE->set_url(new moodle_url('/local/deanpromoodle/pages/admin.php', [
@@ -170,9 +325,6 @@ $PAGE->set_pagelayout('admin');
 
 // Подключение CSS
 $PAGE->requires->css('/local/deanpromoodle/styles.css');
-
-// Обработка экспорта предметов программы в Excel (до вывода заголовков)
-if ($tab == 'programs' && $action == 'export_subjects' && $programid > 0) {
     // Отключаем буферизацию вывода для корректной отправки файла
     if (ob_get_level()) {
         ob_end_clean();
