@@ -4179,8 +4179,25 @@ switch ($tab) {
                     // Подсчет курсов
                     $coursescount = $DB->count_records('local_deanpromoodle_subject_courses', ['subjectid' => $subject->id]);
                     
-                    // Подсчет программ
+                    // Подсчет программ и получение их названий
                     $programscount = $DB->count_records('local_deanpromoodle_program_subjects', ['subjectid' => $subject->id]);
+                    
+                    // Получаем названия программ для поиска
+                    $programnames = [];
+                    if ($programscount > 0) {
+                        $programs = $DB->get_records_sql(
+                            "SELECT p.name 
+                             FROM {local_deanpromoodle_program_subjects} ps
+                             JOIN {local_deanpromoodle_programs} p ON p.id = ps.programid
+                             WHERE ps.subjectid = ?
+                             ORDER BY p.name ASC",
+                            [$subject->id]
+                        );
+                        foreach ($programs as $program) {
+                            $programnames[] = mb_strtolower($program->name);
+                        }
+                    }
+                    $programssearchtext = implode(' ', $programnames);
                     
                     $subjectsdata[] = (object)[
                         'id' => $subject->id,
@@ -4189,20 +4206,38 @@ switch ($tab) {
                         'sortorder' => $subject->sortorder,
                         'coursescount' => $coursescount,
                         'programscount' => $programscount,
-                        'visible' => $subject->visible
+                        'visible' => $subject->visible,
+                        'programssearchtext' => $programssearchtext
                     ];
                 }
                 
-                // Поле поиска
-                echo html_writer::start_div('form-group', ['style' => 'margin-bottom: 20px;']);
+                // Поля поиска
+                echo html_writer::start_div('form-group', ['style' => 'margin-bottom: 20px; display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-end;']);
+                
+                // Поиск по предметам
+                echo html_writer::start_div('', ['style' => 'flex: 1; min-width: 300px;']);
                 echo html_writer::label('Поиск предметов:', 'subject-search-input');
                 echo html_writer::empty_tag('input', [
                     'type' => 'text',
                     'id' => 'subject-search-input',
                     'class' => 'form-control',
-                    'placeholder' => 'Введите название, код или ID предмета для поиска...',
-                    'style' => 'max-width: 500px;'
+                    'placeholder' => 'Введите название, код или ID предмета...',
+                    'style' => 'max-width: 100%;'
                 ]);
+                echo html_writer::end_div();
+                
+                // Поиск по программам
+                echo html_writer::start_div('', ['style' => 'flex: 1; min-width: 300px;']);
+                echo html_writer::label('Поиск по программам:', 'program-search-input');
+                echo html_writer::empty_tag('input', [
+                    'type' => 'text',
+                    'id' => 'program-search-input',
+                    'class' => 'form-control',
+                    'placeholder' => 'Введите название программы...',
+                    'style' => 'max-width: 100%;'
+                ]);
+                echo html_writer::end_div();
+                
                 echo html_writer::end_div();
                 
                 // Таблица предметов с ID для JavaScript
@@ -4262,6 +4297,9 @@ switch ($tab) {
                     $searchText = mb_strtolower($subject->id . ' ' . $subjectname . ' ' . $subjectcode);
                     $searchText = htmlspecialchars($searchText, ENT_QUOTES, 'UTF-8');
                     
+                    // Текст для поиска по программам
+                    $programsSearchText = htmlspecialchars($subject->programssearchtext ?? '', ENT_QUOTES, 'UTF-8');
+                    
                     echo html_writer::start_tag('tr', [
                         'data-sortorder' => $subject->sortorder,
                         'data-id' => $subject->id,
@@ -4270,7 +4308,8 @@ switch ($tab) {
                         'data-coursescount' => $subject->coursescount,
                         'data-programscount' => $subject->programscount,
                         'data-visible' => $subject->visible,
-                        'data-search-text' => $searchText
+                        'data-search-text' => $searchText,
+                        'data-programs-search-text' => $programsSearchText
                     ]);
                     echo html_writer::tag('td', (string)$subject->sortorder);
                     echo html_writer::tag('td', (string)$subject->id);
@@ -4406,30 +4445,45 @@ switch ($tab) {
                         
                         // Функция поиска
                         function filterTable() {
-                            var searchText = (searchInput.value || '').toLowerCase().trim();
-                            
-                            if (!searchText) {
-                                // Показываем все строки
-                                rows.forEach(function(row) {
-                                    row.style.display = '';
-                                });
-                                return;
-                            }
+                            var subjectSearchText = (searchInput.value || '').toLowerCase().trim();
+                            var programSearchInput = document.getElementById('program-search-input');
+                            var programSearchText = (programSearchInput ? programSearchInput.value || '' : '').toLowerCase().trim();
                             
                             rows.forEach(function(row) {
-                                var searchData = row.getAttribute('data-search-text') || '';
-                                if (searchData.indexOf(searchText) !== -1) {
-                                    row.style.display = '';
-                                } else {
-                                    row.style.display = 'none';
+                                var showRow = true;
+                                
+                                // Фильтр по предметам
+                                if (subjectSearchText) {
+                                    var searchData = row.getAttribute('data-search-text') || '';
+                                    if (searchData.indexOf(subjectSearchText) === -1) {
+                                        showRow = false;
+                                    }
                                 }
+                                
+                                // Фильтр по программам
+                                if (showRow && programSearchText) {
+                                    var programsData = row.getAttribute('data-programs-search-text') || '';
+                                    if (programsData.indexOf(programSearchText) === -1) {
+                                        showRow = false;
+                                    }
+                                }
+                                
+                                row.style.display = showRow ? '' : 'none';
                             });
                         }
                         
-                        // Обработчик поиска
+                        // Обработчик поиска по предметам
                         searchInput.addEventListener('input', function() {
                             filterTable();
                         });
+                        
+                        // Обработчик поиска по программам
+                        var programSearchInput = document.getElementById('program-search-input');
+                        if (programSearchInput) {
+                            programSearchInput.addEventListener('input', function() {
+                                filterTable();
+                            });
+                        }
                         
                         // CSS для сортировки
                         var style = document.createElement('style');
