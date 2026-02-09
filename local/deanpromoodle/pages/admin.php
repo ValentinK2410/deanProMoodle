@@ -4145,27 +4145,81 @@ switch ($tab) {
                     ];
                 }
                 
-                // Таблица предметов
-                echo html_writer::start_tag('table', ['class' => 'table table-striped table-hover', 'style' => 'width: 100%;']);
+                // Поле поиска
+                echo html_writer::start_div('form-group', ['style' => 'margin-bottom: 20px;']);
+                echo html_writer::label('Поиск предметов:', 'subject-search-input');
+                echo html_writer::empty_tag('input', [
+                    'type' => 'text',
+                    'id' => 'subject-search-input',
+                    'class' => 'form-control',
+                    'placeholder' => 'Введите название, код или ID предмета для поиска...',
+                    'style' => 'max-width: 500px;'
+                ]);
+                echo html_writer::end_div();
+                
+                // Таблица предметов с ID для JavaScript
+                echo html_writer::start_tag('table', [
+                    'class' => 'table table-striped table-hover',
+                    'style' => 'width: 100%;',
+                    'id' => 'subjects-table'
+                ]);
                 echo html_writer::start_tag('thead');
                 echo html_writer::start_tag('tr');
-                echo html_writer::tag('th', 'Порядок');
-                echo html_writer::tag('th', 'ID');
-                echo html_writer::tag('th', 'Название');
-                echo html_writer::tag('th', 'Код');
-                echo html_writer::tag('th', 'Курсов');
-                echo html_writer::tag('th', 'Программ');
-                echo html_writer::tag('th', 'Статус');
-                echo html_writer::tag('th', 'Действия');
+                echo html_writer::tag('th', '<span class="sortable" data-column="sortorder">Порядок</span> <i class="fas fa-sort sort-icon"></i>', [
+                    'style' => 'cursor: pointer; user-select: none;',
+                    'class' => 'sortable-header',
+                    'data-column' => 'sortorder'
+                ]);
+                echo html_writer::tag('th', '<span class="sortable" data-column="id">ID</span> <i class="fas fa-sort sort-icon"></i>', [
+                    'style' => 'cursor: pointer; user-select: none;',
+                    'class' => 'sortable-header',
+                    'data-column' => 'id'
+                ]);
+                echo html_writer::tag('th', '<span class="sortable" data-column="name">Название</span> <i class="fas fa-sort sort-icon"></i>', [
+                    'style' => 'cursor: pointer; user-select: none;',
+                    'class' => 'sortable-header',
+                    'data-column' => 'name'
+                ]);
+                echo html_writer::tag('th', '<span class="sortable" data-column="code">Код</span> <i class="fas fa-sort sort-icon"></i>', [
+                    'style' => 'cursor: pointer; user-select: none;',
+                    'class' => 'sortable-header',
+                    'data-column' => 'code'
+                ]);
+                echo html_writer::tag('th', '<span class="sortable" data-column="coursescount">Курсов</span> <i class="fas fa-sort sort-icon"></i>', [
+                    'style' => 'cursor: pointer; user-select: none;',
+                    'class' => 'sortable-header',
+                    'data-column' => 'coursescount'
+                ]);
+                echo html_writer::tag('th', '<span class="sortable" data-column="programscount">Программ</span> <i class="fas fa-sort sort-icon"></i>', [
+                    'style' => 'cursor: pointer; user-select: none;',
+                    'class' => 'sortable-header',
+                    'data-column' => 'programscount'
+                ]);
+                echo html_writer::tag('th', '<span class="sortable" data-column="visible">Статус</span> <i class="fas fa-sort sort-icon"></i>', [
+                    'style' => 'cursor: pointer; user-select: none;',
+                    'class' => 'sortable-header',
+                    'data-column' => 'visible'
+                ]);
+                echo html_writer::tag('th', 'Действия', ['style' => 'width: 150px;']);
                 echo html_writer::end_tag('tr');
                 echo html_writer::end_tag('thead');
-                echo html_writer::start_tag('tbody');
+                echo html_writer::start_tag('tbody', ['id' => 'subjects-table-body']);
                 
                 foreach ($subjectsdata as $subject) {
                     $subjectname = is_string($subject->name) ? $subject->name : (string)$subject->name;
                     $subjectcode = is_string($subject->code) ? $subject->code : (string)$subject->code;
                     
-                    echo html_writer::start_tag('tr');
+                    // Добавляем data-атрибуты для поиска и сортировки
+                    echo html_writer::start_tag('tr', [
+                        'data-sortorder' => $subject->sortorder,
+                        'data-id' => $subject->id,
+                        'data-name' => mb_strtolower($subjectname),
+                        'data-code' => mb_strtolower($subjectcode),
+                        'data-coursescount' => $subject->coursescount,
+                        'data-programscount' => $subject->programscount,
+                        'data-visible' => $subject->visible,
+                        'data-search-text' => mb_strtolower($subject->id . ' ' . $subjectname . ' ' . $subjectcode)
+                    ]);
                     echo html_writer::tag('td', (string)$subject->sortorder);
                     echo html_writer::tag('td', (string)$subject->id);
                     echo html_writer::tag('td', htmlspecialchars($subjectname, ENT_QUOTES, 'UTF-8'));
@@ -4216,6 +4270,141 @@ switch ($tab) {
                 
                 echo html_writer::end_tag('tbody');
                 echo html_writer::end_tag('table');
+                
+                // JavaScript для сортировки и поиска
+                $PAGE->requires->js_init_code("
+                    (function() {
+                        var table = document.getElementById('subjects-table');
+                        var tbody = document.getElementById('subjects-table-body');
+                        var searchInput = document.getElementById('subject-search-input');
+                        var rows = Array.from(tbody.querySelectorAll('tr'));
+                        var currentSort = {
+                            column: null,
+                            direction: 'asc'
+                        };
+                        
+                        // Сохраняем исходные данные строк
+                        var originalRows = rows.map(function(row) {
+                            return row.cloneNode(true);
+                        });
+                        
+                        // Функция сортировки
+                        function sortTable(column) {
+                            var isNumeric = ['sortorder', 'id', 'coursescount', 'programscount', 'visible'].includes(column);
+                            var direction = currentSort.column === column && currentSort.direction === 'asc' ? 'desc' : 'asc';
+                            
+                            currentSort.column = column;
+                            currentSort.direction = direction;
+                            
+                            rows.sort(function(a, b) {
+                                var aVal, bVal;
+                                
+                                if (isNumeric) {
+                                    aVal = parseFloat(a.getAttribute('data-' + column)) || 0;
+                                    bVal = parseFloat(b.getAttribute('data-' + column)) || 0;
+                                } else {
+                                    aVal = (a.getAttribute('data-' + column) || '').toLowerCase();
+                                    bVal = (b.getAttribute('data-' + column) || '').toLowerCase();
+                                }
+                                
+                                if (isNumeric) {
+                                    return direction === 'asc' ? aVal - bVal : bVal - aVal;
+                                } else {
+                                    if (aVal < bVal) return direction === 'asc' ? -1 : 1;
+                                    if (aVal > bVal) return direction === 'asc' ? 1 : -1;
+                                    return 0;
+                                }
+                            });
+                            
+                            // Обновляем иконки сортировки
+                            var headers = table.querySelectorAll('.sortable-header');
+                            headers.forEach(function(header) {
+                                var icon = header.querySelector('.sort-icon');
+                                if (header.getAttribute('data-column') === column) {
+                                    icon.className = 'fas fa-sort-' + (direction === 'asc' ? 'up' : 'down') + ' sort-icon';
+                                    icon.style.color = '#007bff';
+                                } else {
+                                    icon.className = 'fas fa-sort sort-icon';
+                                    icon.style.color = '#999';
+                                }
+                            });
+                            
+                            // Перерисовываем таблицу
+                            rows.forEach(function(row) {
+                                tbody.appendChild(row);
+                            });
+                        }
+                        
+                        // Обработчики клика на заголовки
+                        var headers = table.querySelectorAll('.sortable-header');
+                        headers.forEach(function(header) {
+                            header.addEventListener('click', function() {
+                                var column = this.getAttribute('data-column');
+                                sortTable(column);
+                            });
+                            
+                            // Стили для hover
+                            header.addEventListener('mouseenter', function() {
+                                this.style.backgroundColor = '#f8f9fa';
+                            });
+                            header.addEventListener('mouseleave', function() {
+                                this.style.backgroundColor = '';
+                            });
+                        });
+                        
+                        // Функция поиска
+                        function filterTable() {
+                            var searchText = (searchInput.value || '').toLowerCase().trim();
+                            
+                            if (!searchText) {
+                                // Показываем все строки
+                                rows.forEach(function(row) {
+                                    row.style.display = '';
+                                });
+                                return;
+                            }
+                            
+                            rows.forEach(function(row) {
+                                var searchData = row.getAttribute('data-search-text') || '';
+                                if (searchData.indexOf(searchText) !== -1) {
+                                    row.style.display = '';
+                                } else {
+                                    row.style.display = 'none';
+                                }
+                            });
+                        }
+                        
+                        // Обработчик поиска
+                        searchInput.addEventListener('input', function() {
+                            filterTable();
+                        });
+                        
+                        // CSS для сортировки
+                        var style = document.createElement('style');
+                        style.textContent = '
+                            .sortable-header {
+                                position: relative;
+                                padding-right: 25px !important;
+                            }
+                            .sortable-header .sort-icon {
+                                position: absolute;
+                                right: 8px;
+                                top: 50%;
+                                transform: translateY(-50%);
+                                font-size: 12px;
+                                color: #999;
+                                transition: color 0.2s;
+                            }
+                            .sortable-header:hover {
+                                background-color: #f8f9fa !important;
+                            }
+                            .sortable-header:hover .sort-icon {
+                                color: #007bff;
+                            }
+                        ';
+                        document.head.appendChild(style);
+                    })();
+                ");
             }
             
             // Модальное окно для прикрепления предмета к программе
