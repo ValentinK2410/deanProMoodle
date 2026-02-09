@@ -49,25 +49,35 @@ if ($action == 'searchstudents' || $action == 'markforumpostnoreply') {
         has_capability('moodle/site:config', $context)) {
         $hasaccess = true;
     } else {
-        // Проверяем доступ преподавателя
-        global $USER;
-        $teacherroles = ['teacher', 'editingteacher', 'coursecreator'];
-        $roles = get_user_roles($context, $USER->id, false);
-        foreach ($roles as $role) {
-            if (in_array($role->shortname, $teacherroles)) {
-                $hasaccess = true;
-                break;
-            }
-        }
+        // Проверяем доступ преподавателя - используем тот же подход, что и в lib.php
+        // Проверяем роль teacher с id=3 в любом контексте курса
+        global $USER, $DB;
+        $teacherroleid = 3; // ID роли teacher
         
-        if (!$hasaccess) {
-            $systemcontext = context_system::instance();
-            $systemroles = get_user_roles($systemcontext, $USER->id, false);
-            foreach ($systemroles as $role) {
-                if (in_array($role->shortname, $teacherroles)) {
-                    $hasaccess = true;
-                    break;
-                }
+        // Сначала проверяем в системном контексте
+        $systemcontextid = $context->id;
+        $hasrole = $DB->record_exists('role_assignments', [
+            'userid' => $USER->id,
+            'roleid' => $teacherroleid,
+            'contextid' => $systemcontextid
+        ]);
+        
+        if ($hasrole) {
+            $hasaccess = true;
+        } else {
+            // Если не найдено в системном контексте, проверяем во ВСЕХ контекстах курсов
+            // Используем прямой SQL запрос для поиска роли teacher в любом контексте курса
+            $hasrole = $DB->record_exists_sql(
+                "SELECT 1 FROM {role_assignments} ra
+                 JOIN {context} ctx ON ctx.id = ra.contextid
+                 WHERE ra.userid = ? 
+                 AND ra.roleid = ? 
+                 AND ctx.contextlevel = 50",
+                [$USER->id, $teacherroleid]
+            );
+            
+            if ($hasrole) {
+                $hasaccess = true;
             }
         }
     }
