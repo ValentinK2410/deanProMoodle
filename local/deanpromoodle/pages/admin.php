@@ -4431,7 +4431,7 @@ switch ($tab) {
                     'class' => 'sortable-header',
                     'data-column' => 'coursescount'
                 ]);
-                echo html_writer::tag('th', '<span class="sortable" data-column="programscount">Программ</span> <i class="fas fa-sort sort-icon"></i>', [
+                echo html_writer::tag('th', '<span class="sortable" data-column="programscount">Кол-во программ</span> <i class="fas fa-sort sort-icon"></i>', [
                     'style' => 'cursor: pointer; user-select: none;',
                     'class' => 'sortable-header',
                     'data-column' => 'programscount'
