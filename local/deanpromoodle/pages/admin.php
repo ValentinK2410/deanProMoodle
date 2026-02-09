@@ -2742,6 +2742,18 @@ switch ($tab) {
                     ];
                 }
                 
+                // Поле поиска
+                echo html_writer::start_div('form-group', ['style' => 'margin-bottom: 20px;']);
+                echo html_writer::label('Поиск программ:', 'program-search-input');
+                echo html_writer::empty_tag('input', [
+                    'type' => 'text',
+                    'id' => 'program-search-input',
+                    'class' => 'form-control',
+                    'placeholder' => 'Введите ID, название или код программы для поиска...',
+                    'style' => 'max-width: 500px;'
+                ]);
+                echo html_writer::end_div();
+                
                 // Стили для таблицы
             echo html_writer::start_tag('style');
             echo "
@@ -2867,14 +2879,36 @@ switch ($tab) {
             
                 // Отображение таблицы
                 echo html_writer::start_div('programs-table');
-                echo html_writer::start_tag('table');
+                echo html_writer::start_tag('table', [
+                    'id' => 'programs-table'
+                ]);
                 echo html_writer::start_tag('thead');
                 echo html_writer::start_tag('tr');
-                echo html_writer::tag('th', 'ID');
-                echo html_writer::tag('th', 'Название курса');
-                echo html_writer::tag('th', 'Учебное заведение');
-                echo html_writer::tag('th', 'Связи');
-                echo html_writer::tag('th', 'Статус');
+                echo html_writer::tag('th', '<span class="sortable" data-column="id">ID</span> <i class="fas fa-sort sort-icon"></i>', [
+                    'style' => 'cursor: pointer; user-select: none;',
+                    'class' => 'sortable-header',
+                    'data-column' => 'id'
+                ]);
+                echo html_writer::tag('th', '<span class="sortable" data-column="name">Название курса</span> <i class="fas fa-sort sort-icon"></i>', [
+                    'style' => 'cursor: pointer; user-select: none;',
+                    'class' => 'sortable-header',
+                    'data-column' => 'name'
+                ]);
+                echo html_writer::tag('th', '<span class="sortable" data-column="categoryname">Учебное заведение</span> <i class="fas fa-sort sort-icon"></i>', [
+                    'style' => 'cursor: pointer; user-select: none;',
+                    'class' => 'sortable-header',
+                    'data-column' => 'categoryname'
+                ]);
+                echo html_writer::tag('th', '<span class="sortable" data-column="subjectscount">Связи</span> <i class="fas fa-sort sort-icon"></i>', [
+                    'style' => 'cursor: pointer; user-select: none;',
+                    'class' => 'sortable-header',
+                    'data-column' => 'subjectscount'
+                ]);
+                echo html_writer::tag('th', '<span class="sortable" data-column="visible">Статус</span> <i class="fas fa-sort sort-icon"></i>', [
+                    'style' => 'cursor: pointer; user-select: none;',
+                    'class' => 'sortable-header',
+                    'data-column' => 'visible'
+                ]);
                 echo html_writer::tag('th', 'Действия');
                 echo html_writer::end_tag('tr');
                 echo html_writer::end_tag('thead');
@@ -2891,7 +2925,20 @@ switch ($tab) {
                     $programsubjectslist = is_string($program->subjectslist) ? $program->subjectslist : '';
                     $programvisible = (bool)$program->visible;
                     
-                    echo html_writer::start_tag('tr');
+                    // Подготовка текста для поиска
+                    $searchText = mb_strtolower($programid . ' ' . $programname . ' ' . ($programcode ?? ''));
+                    $searchText = htmlspecialchars($searchText, ENT_QUOTES, 'UTF-8');
+                    
+                    echo html_writer::start_tag('tr', [
+                        'data-id' => $programid,
+                        'data-name' => htmlspecialchars(mb_strtolower($programname), ENT_QUOTES, 'UTF-8'),
+                        'data-code' => htmlspecialchars(mb_strtolower($programcode ?? ''), ENT_QUOTES, 'UTF-8'),
+                        'data-categoryname' => htmlspecialchars(mb_strtolower($institution), ENT_QUOTES, 'UTF-8'),
+                        'data-subjectscount' => $programsubjectscount,
+                        'data-cohortscount' => $programcohortscount,
+                        'data-visible' => $programvisible ? '1' : '0',
+                        'data-search-text' => $searchText
+                    ]);
                     
                     // ID
                     echo html_writer::start_tag('td');
@@ -2988,6 +3035,115 @@ switch ($tab) {
                 echo html_writer::end_tag('tbody');
                 echo html_writer::end_tag('table');
                 echo html_writer::end_div();
+                
+                // JavaScript для сортировки и поиска программ
+                $PAGE->requires->js_init_code("
+                    (function() {
+                        var table = document.getElementById('programs-table');
+                        if (!table) return;
+                        
+                        var tbody = table.querySelector('tbody');
+                        if (!tbody) return;
+                        
+                        var searchInput = document.getElementById('program-search-input');
+                        var rows = Array.from(tbody.querySelectorAll('tr'));
+                        var currentSort = {
+                            column: null,
+                            direction: 'asc'
+                        };
+                        
+                        // Функция сортировки
+                        function sortTable(column) {
+                            var isNumeric = ['id', 'subjectscount', 'cohortscount', 'visible'].includes(column);
+                            var direction = currentSort.column === column && currentSort.direction === 'asc' ? 'desc' : 'asc';
+                            
+                            currentSort.column = column;
+                            currentSort.direction = direction;
+                            
+                            rows.sort(function(a, b) {
+                                var aVal, bVal;
+                                
+                                if (isNumeric) {
+                                    aVal = parseFloat(a.getAttribute('data-' + column)) || 0;
+                                    bVal = parseFloat(b.getAttribute('data-' + column)) || 0;
+                                } else {
+                                    aVal = (a.getAttribute('data-' + column) || '').toLowerCase();
+                                    bVal = (b.getAttribute('data-' + column) || '').toLowerCase();
+                                }
+                                
+                                if (isNumeric) {
+                                    return direction === 'asc' ? aVal - bVal : bVal - aVal;
+                                } else {
+                                    if (aVal < bVal) return direction === 'asc' ? -1 : 1;
+                                    if (aVal > bVal) return direction === 'asc' ? 1 : -1;
+                                    return 0;
+                                }
+                            });
+                            
+                            // Обновляем иконки сортировки
+                            var headers = table.querySelectorAll('.sortable-header');
+                            headers.forEach(function(header) {
+                                var icon = header.querySelector('.sort-icon');
+                                if (icon) {
+                                    if (header.getAttribute('data-column') === column) {
+                                        icon.className = 'fas fa-sort-' + (direction === 'asc' ? 'up' : 'down') + ' sort-icon';
+                                        icon.style.color = '#007bff';
+                                    } else {
+                                        icon.className = 'fas fa-sort sort-icon';
+                                        icon.style.color = '#999';
+                                    }
+                                }
+                            });
+                            
+                            // Перерисовываем таблицу
+                            rows.forEach(function(row) {
+                                tbody.appendChild(row);
+                            });
+                        }
+                        
+                        // Функция поиска
+                        function filterTable() {
+                            var searchText = (searchInput.value || '').toLowerCase().trim();
+                            
+                            rows.forEach(function(row) {
+                                if (!searchText) {
+                                    row.style.display = '';
+                                    return;
+                                }
+                                
+                                var searchData = row.getAttribute('data-search-text') || '';
+                                if (searchData.indexOf(searchText) !== -1) {
+                                    row.style.display = '';
+                                } else {
+                                    row.style.display = 'none';
+                                }
+                            });
+                        }
+                        
+                        // Обработчики кликов на заголовки
+                        var headers = table.querySelectorAll('.sortable-header');
+                        headers.forEach(function(header) {
+                            header.addEventListener('click', function() {
+                                var column = header.getAttribute('data-column');
+                                if (column) {
+                                    sortTable(column);
+                                }
+                            });
+                        });
+                        
+                        // Обработчик поиска
+                        if (searchInput) {
+                            searchInput.addEventListener('input', function() {
+                                filterTable();
+                            });
+                        }
+                        
+                        // Стили для сортируемых заголовков
+                        var style = document.createElement('style');
+                        style.textContent = '.sortable-header { cursor: pointer; user-select: none; } .sortable-header:hover { background-color: #e9ecef !important; } .sort-icon { margin-left: 5px; color: #999; font-size: 12px; }';
+                        document.head.appendChild(style);
+                    })();
+                ");
             }
             
             // Модальное окно для прикрепления когорт к программе
