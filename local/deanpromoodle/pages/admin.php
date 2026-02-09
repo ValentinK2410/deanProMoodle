@@ -3646,6 +3646,9 @@ switch ($tab) {
                 $code = optional_param('code', '', PARAM_TEXT);
                 $shortdescription = optional_param('shortdescription', '', PARAM_RAW);
                 $description = optional_param('description', '', PARAM_RAW);
+                $credits = optional_param('credits', null, PARAM_INT);
+                $academichours = optional_param('academic_hours', null, PARAM_INT);
+                $independenthours = optional_param('independent_hours', null, PARAM_INT);
                 $sortorder = optional_param('sortorder', 0, PARAM_INT);
                 $visible = optional_param('visible', 1, PARAM_INT);
                 
@@ -3657,6 +3660,9 @@ switch ($tab) {
                     $data->code = $code;
                     $data->shortdescription = $shortdescription;
                     $data->description = $description;
+                    $data->credits = $credits !== null ? $credits : null;
+                    $data->academic_hours = $academichours !== null ? $academichours : null;
+                    $data->independent_hours = $independenthours !== null ? $independenthours : null;
                     $data->sortorder = $sortorder;
                     $data->visible = $visible;
                     $data->timemodified = time();
@@ -3738,6 +3744,48 @@ switch ($tab) {
             ]);
             echo $subject ? htmlspecialchars($subject->description ?? '', ENT_QUOTES, 'UTF-8') : '';
             echo html_writer::end_tag('textarea');
+            echo html_writer::end_div();
+            
+            // Количество кредитов
+            echo html_writer::start_div('form-group', ['style' => 'margin-bottom: 15px;']);
+            echo html_writer::label('Количество кредитов по предмету', 'credits');
+            echo html_writer::empty_tag('input', [
+                'type' => 'number',
+                'name' => 'credits',
+                'id' => 'credits',
+                'class' => 'form-control',
+                'value' => $subject && isset($subject->credits) ? (int)$subject->credits : '',
+                'min' => 0,
+                'step' => 1
+            ]);
+            echo html_writer::end_div();
+            
+            // Количество академических часов
+            echo html_writer::start_div('form-group', ['style' => 'margin-bottom: 15px;']);
+            echo html_writer::label('Количество академических часов', 'academic_hours');
+            echo html_writer::empty_tag('input', [
+                'type' => 'number',
+                'name' => 'academic_hours',
+                'id' => 'academic_hours',
+                'class' => 'form-control',
+                'value' => $subject && isset($subject->academic_hours) ? (int)$subject->academic_hours : '',
+                'min' => 0,
+                'step' => 1
+            ]);
+            echo html_writer::end_div();
+            
+            // Количество часов самостоятельной работы
+            echo html_writer::start_div('form-group', ['style' => 'margin-bottom: 15px;']);
+            echo html_writer::label('Количество часов самостоятельной работы', 'independent_hours');
+            echo html_writer::empty_tag('input', [
+                'type' => 'number',
+                'name' => 'independent_hours',
+                'id' => 'independent_hours',
+                'class' => 'form-control',
+                'value' => $subject && isset($subject->independent_hours) ? (int)$subject->independent_hours : '',
+                'min' => 0,
+                'step' => 1
+            ]);
             echo html_writer::end_div();
             
             // Порядок отображения

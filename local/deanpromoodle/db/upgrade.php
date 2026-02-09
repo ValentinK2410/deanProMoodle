@@ -175,5 +175,24 @@ function xmldb_local_deanpromoodle_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026013007, 'local', 'deanpromoodle');
     }
     
+    // Добавляем поля academic_hours и independent_hours в таблицу local_deanpromoodle_subjects
+    if ($oldversion < 2026013008) {
+        $table = new xmldb_table('local_deanpromoodle_subjects');
+        
+        // Поле academic_hours (количество академических часов)
+        $field = new xmldb_field('academic_hours', XMLDB_TYPE_INTEGER, '10', null, null, null, null, 'credits');
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+        
+        // Поле independent_hours (количество часов самостоятельной работы)
+        $field = new xmldb_field('independent_hours', XMLDB_TYPE_INTEGER, '10', null, null, null, null, 'academic_hours');
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+        
+        upgrade_plugin_savepoint(true, 2026013008, 'local', 'deanpromoodle');
+    }
+    
     return true;
 }
