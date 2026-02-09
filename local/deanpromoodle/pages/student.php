@@ -3822,7 +3822,12 @@ if ($action == 'viewprogram' && $programid > 0) {
             $externalcreditid = optional_param('externalcreditid', 0, PARAM_INT);
             
             // Добавление/редактирование внешнего зачета
-            if (($action == 'add_external_credit' || $action == 'edit_external_credit') && $externalcreditid >= 0) {
+            // Проверяем, что это POST-запрос с данными формы (не просто открытие формы)
+            $formsubmitted = optional_param('sesskey', '', PARAM_RAW);
+            if (($action == 'add_external_credit' || $action == 'edit_external_credit') && $externalcreditid >= 0 && !empty($formsubmitted)) {
+                // Проверяем sesskey для безопасности
+                require_sesskey();
+                
                 $subjectid = optional_param('subjectid', 0, PARAM_INT);
                 $grade = optional_param('grade', '', PARAM_TEXT);
                 $grade_percent = optional_param('grade_percent', null, PARAM_FLOAT);
@@ -3836,9 +3841,19 @@ if ($action == 'viewprogram' && $programid > 0) {
                 $credited_date = 0;
                 if (!empty($credited_date_str)) {
                     $credited_date = strtotime($credited_date_str . ' 00:00:00');
+                    if ($credited_date === false) {
+                        $credited_date = 0;
+                    }
                 }
                 
-                if ($subjectid > 0 && !empty($institution_name)) {
+                // Проверяем обязательные поля
+                if ($subjectid <= 0) {
+                    echo html_writer::div('Ошибка: не выбран предмет', 'alert alert-danger');
+                } else if (empty(trim($institution_name))) {
+                    echo html_writer::div('Ошибка: не указано название учебного заведения', 'alert alert-danger');
+                } else if (!$viewingstudent || !isset($viewingstudent->id)) {
+                    echo html_writer::div('Ошибка: студент не найден', 'alert alert-danger');
+                } else {
                     try {
                         // Проверяем существование предмета
                         $subject = $DB->get_record('local_deanpromoodle_subjects', ['id' => $subjectid]);
@@ -3986,6 +4001,11 @@ if ($action == 'viewprogram' && $programid > 0) {
                         $errormsg = '';
                         $errordetails = $e->getMessage();
                         
+                        // Логируем детали ошибки для отладки (только для админов)
+                        if ($isadmin && !empty($errordetails)) {
+                            debugging('DML Exception при сохранении внешнего зачета: ' . $errordetails, DEBUG_DEVELOPER);
+                        }
+                        
                         // Проверяем тип ошибки для более понятного сообщения
                         if (strpos($errordetails, 'foreign key constraint') !== false || strpos($errordetails, 'FOREIGN KEY') !== false) {
                             if (strpos($errordetails, 'subjectid') !== false || strpos($errordetails, 'local_deanpromoodle_subjects') !== false) {
@@ -4004,8 +4024,11 @@ if ($action == 'viewprogram' && $programid > 0) {
                         } else {
                             // Общая ошибка базы данных
                             $errormsg = 'Ошибка при сохранении данных в базу данных';
-                            if (!empty($errordetails) && $errordetails !== 'Ошибка записи в базу данных') {
-                                $errormsg .= '. ' . htmlspecialchars($errordetails, ENT_QUOTES, 'UTF-8');
+                            if (!empty($errordetails) && $errordetails !== 'Ошибка записи в базу данных' && $errordetails !== 'Ошибка при сохранении данных в базу данных') {
+                                // Показываем детали ошибки только админам
+                                if ($isadmin) {
+                                    $errormsg .= '. Детали: ' . htmlspecialchars(substr($errordetails, 0, 200), ENT_QUOTES, 'UTF-8');
+                                }
                             }
                         }
                         
@@ -4021,10 +4044,12 @@ if ($action == 'viewprogram' && $programid > 0) {
                         if (empty($errormsg)) {
                             $errormsg = 'Произошла неизвестная ошибка';
                         }
+                        // Логируем для админов
+                        if ($isadmin) {
+                            debugging('Exception при сохранении внешнего зачета: ' . $errormsg, DEBUG_DEVELOPER);
+                        }
                         echo html_writer::div('Ошибка: ' . htmlspecialchars($errormsg, ENT_QUOTES, 'UTF-8'), 'alert alert-danger');
                     }
-                } else {
-                    echo html_writer::div('Пожалуйста, заполните все обязательные поля: предмет и название учебного заведения', 'alert alert-warning');
                 }
             }
             
