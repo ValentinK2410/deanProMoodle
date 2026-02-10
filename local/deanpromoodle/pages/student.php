@@ -1646,9 +1646,14 @@ if ($action == 'viewprogram' && $programid > 0) {
                             // Используем функцию для проверки оценки (включая принудительно проставленные)
                             $hasgrade = $checkAssignmentGrade($assignment->id, $viewingstudent->id);
                             
-                            // Определяем текст для отображения
-                            if (mb_strtolower(trim($assignment->name)) == 'сдача письменной работы') {
+                            // Определяем текст для отображения (сокращаем длинные названия)
+                            $assignmentname_lower = mb_strtolower(trim($assignment->name));
+                            if ($assignmentname_lower == 'сдача письменной работы') {
                                 $basename = 'Письменная работа';
+                            } else if (strpos($assignmentname_lower, 'итоговая письменная работа по курсу') !== false) {
+                                $basename = 'Итоговая работа';
+                            } else if (strpos($assignmentname_lower, 'итоговая письменная работа') !== false) {
+                                $basename = 'Итоговая работа';
                             } else {
                                 $basename = htmlspecialchars($assignment->name, ENT_QUOTES, 'UTF-8');
                             }
