@@ -109,21 +109,21 @@ if ($studentid > 0) {
     
     $isteacher = false;
     if (!$isadmin) {
-        $teacherroles = ['teacher', 'editingteacher', 'coursecreator'];
-        $roles = get_user_roles($context, $USER->id, false);
-        foreach ($roles as $role) {
-            if (in_array($role->shortname, $teacherroles)) {
-                $isteacher = true;
-                break;
-            }
-        }
-        if (!$isteacher) {
-            $systemcontext = context_system::instance();
-            $systemroles = get_user_roles($systemcontext, $USER->id, false);
-            foreach ($systemroles as $role) {
-                if (in_array($role->shortname, $teacherroles)) {
-                    $isteacher = true;
-                    break;
+$teacherroles = ['teacher', 'editingteacher', 'coursecreator'];
+$roles = get_user_roles($context, $USER->id, false);
+foreach ($roles as $role) {
+    if (in_array($role->shortname, $teacherroles)) {
+        $isteacher = true;
+        break;
+    }
+}
+if (!$isteacher) {
+    $systemcontext = context_system::instance();
+    $systemroles = get_user_roles($systemcontext, $USER->id, false);
+    foreach ($systemroles as $role) {
+        if (in_array($role->shortname, $teacherroles)) {
+            $isteacher = true;
+            break;
                 }
             }
         }
@@ -167,28 +167,28 @@ if ($studentid > 0) {
                 break;
             }
         }
-    }
-    
-    // Проверяем, является ли пользователь студентом
+}
+
+// Проверяем, является ли пользователь студентом
     $isstudent = false;
-    $studentroles = ['student'];
-    foreach ($roles as $role) {
+$studentroles = ['student'];
+foreach ($roles as $role) {
+    if (in_array($role->shortname, $studentroles)) {
+        $isstudent = true;
+        break;
+    }
+}
+if (!$isstudent) {
+    $systemcontext = context_system::instance();
+    $systemroles = get_user_roles($systemcontext, $USER->id, false);
+    foreach ($systemroles as $role) {
         if (in_array($role->shortname, $studentroles)) {
             $isstudent = true;
             break;
         }
     }
-    if (!$isstudent) {
-        $systemcontext = context_system::instance();
-        $systemroles = get_user_roles($systemcontext, $USER->id, false);
-        foreach ($systemroles as $role) {
-            if (in_array($role->shortname, $studentroles)) {
-                $isstudent = true;
-                break;
-            }
-        }
-    }
-    
+}
+
     // Разрешаем админам и преподавателям просматривать страницу студента без редиректа
     // Они будут видеть свою собственную информацию (если она есть) или пустую страницу
     // Редирект убран по запросу пользователя
@@ -1385,13 +1385,13 @@ if ($action == 'viewprogram' && $programid > 0) {
                     // Используем SQL запрос для получения преподавателей с ролью teacher
                     // DISTINCT гарантирует, что каждый пользователь показывается только один раз,
                     // даже если у него несколько ролей (например, teacher и editingteacher)
-                    $teacherusers = $DB->get_records_sql(
+                        $teacherusers = $DB->get_records_sql(
                         "SELECT DISTINCT u.id, u.firstname, u.lastname, u.email
-                         FROM {user} u
-                         JOIN {role_assignments} ra ON ra.userid = u.id
+                             FROM {user} u
+                             JOIN {role_assignments} ra ON ra.userid = u.id
                          WHERE ra.contextid = ? AND ra.roleid = ?
                          AND u.deleted = 0 AND u.suspended = 0
-                         ORDER BY u.lastname, u.firstname",
+                             ORDER BY u.lastname, u.firstname",
                         [$coursecontext->id, $teacherroleid]
                     );
                     
@@ -1589,7 +1589,7 @@ if ($action == 'viewprogram' && $programid > 0) {
                                     'target' => '_blank'
                                 ]);
                                 $statusitems[] = '<span class="badge assignment-status-item assignment-status-yellow">' . $badgecontent . '</span>';
-                            } else {
+                                } else {
                                 // Нет файлов и нет оценки - красный "Чтение – не сдано"
                                 $badgecontent = html_writer::link($assignmenturl, 'Чтение – не сдано', [
                                     'class' => 'assignment-status-link',
@@ -1679,8 +1679,8 @@ if ($action == 'viewprogram' && $programid > 0) {
                     
                     foreach ($quizzes as $quiz) {
                         // Получаем cmid для проверки видимости
-                        $cm = get_coursemodule_from_instance('quiz', $quiz->id, $course->id);
-                        if (!$cm) {
+                            $cm = get_coursemodule_from_instance('quiz', $quiz->id, $course->id);
+                            if (!$cm) {
                             continue;
                         }
                         
@@ -2075,8 +2075,8 @@ if ($action == 'viewprogram' && $programid > 0) {
         switch ($subtab) {
         case 'programs':
             // Подвкладка "Программы"
-            try {
-                // Получаем когорты, к которым принадлежит студент
+        try {
+            // Получаем когорты, к которым принадлежит студент
             $studentcohorts = $DB->get_records_sql(
                 "SELECT c.id, c.name, c.idnumber, c.description
                  FROM {cohort_members} cm
@@ -2239,8 +2239,8 @@ if ($action == 'viewprogram' && $programid > 0) {
                     echo html_writer::end_div();
                 }
             }
-            } catch (\Exception $e) {
-                echo html_writer::div('Ошибка: ' . $e->getMessage(), 'alert alert-danger');
+        } catch (\Exception $e) {
+            echo html_writer::div('Ошибка: ' . $e->getMessage(), 'alert alert-danger');
             }
             break;
             
@@ -4792,6 +4792,16 @@ function toggleFullscreen() {
         if (btn) btn.innerHTML = '<i class=\"fas fa-compress\"></i> Вернуть как было';
     }
 }
+
+// Добавление стиля к элементу page-content
+require(['jquery'], function($) {
+    $(document).ready(function() {
+        var pageContent = document.getElementById('page-content');
+        if (pageContent) {
+            pageContent.style.width = '105%';
+        }
+    });
+});
 ");
 
 echo $OUTPUT->footer();
