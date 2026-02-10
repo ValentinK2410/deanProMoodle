@@ -993,11 +993,28 @@ if ($action == 'viewprogram' && $programid > 0) {
                         // Статус завершения
                         $completionHtml = '<span class="' . $displayCompletion['completionclass'] . '">' . 
                             htmlspecialchars($displayCompletion['completionstatus'], ENT_QUOTES, 'UTF-8') . '</span>';
+                        
+                        // Добавляем индикатор внешнего зачета, если он есть
+                        if ($externalcredit) {
+                            $externalInfo = ' <span class="badge badge-info" style="background-color: #17a2b8; color: white; font-size: 0.85em; margin-left: 5px;" title="Завершен в другом учебном заведении: ' . htmlspecialchars($externalcredit->institution_name, ENT_QUOTES, 'UTF-8') . '">
+                                <i class="fas fa-university"></i> Внешний зачет
+                            </span>';
+                            $completionHtml .= $externalInfo;
+                        }
+                        
                         echo html_writer::tag('td', $completionHtml);
                         
                         // Оценка
                         $gradeBadgeContent = $displayGrade['gradeicon'] . htmlspecialchars($displayGrade['gradetext'], ENT_QUOTES, 'UTF-8');
                         $gradeBadge = '<span class="grade-badge ' . $displayGrade['gradeclass'] . '">' . $gradeBadgeContent . '</span>';
+                        
+                        // Добавляем индикатор внешнего зачета к оценке, если он есть
+                        if ($externalcredit) {
+                            $gradeBadge .= ' <span class="badge badge-info" style="background-color: #17a2b8; color: white; font-size: 0.85em; margin-left: 5px;" title="Оценка из другого учебного заведения: ' . htmlspecialchars($externalcredit->institution_name, ENT_QUOTES, 'UTF-8') . '">
+                                <i class="fas fa-university"></i>
+                            </span>';
+                        }
+                        
                         echo html_writer::tag('td', $gradeBadge);
                         
                         echo html_writer::end_tag('tr');
