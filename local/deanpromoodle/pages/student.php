@@ -1051,7 +1051,7 @@ if ($action == 'viewprogram' && $programid > 0) {
                      JOIN {context} ctx ON ctx.instanceid = c.id AND ctx.contextlevel = 50
                      JOIN {role_assignments} ra ON ra.userid = ue.userid AND ra.contextid = ctx.id
                      WHERE ue.userid = ? AND ra.roleid = ? AND ue.status = 0 AND e.status = 0
-                     ORDER BY c.fullname",
+                     ORDER BY c.startdate ASC, c.fullname ASC",
                     [$viewingstudent->id, $studentroleid]
                 );
             } else {
@@ -1324,6 +1324,7 @@ if ($action == 'viewprogram' && $programid > 0) {
                 echo html_writer::start_tag('tr');
                 echo html_writer::tag('th', 'Название курса', ['style' => 'width: 250px; text-align: center;']);
                 echo html_writer::tag('th', 'Кол-во<br>кредитов', ['style' => 'width: 150px; text-align: center;']);
+                echo html_writer::tag('th', 'Дата курса', ['style' => 'width: 150px; text-align: center;']);
                 echo html_writer::tag('th', 'Преподаватели', ['style' => 'width: 200px; text-align: center;']);
                 echo html_writer::tag('th', 'Задолженности по курсу', ['style' => 'width: 300px; text-align: center;']);
                 echo html_writer::tag('th', 'Статус<br>завершения', ['style' => 'width: 150px; text-align: center;']);
