@@ -3880,19 +3880,19 @@ if ($action == 'viewprogram' && $programid > 0) {
                                             $record = new stdClass();
                                             $record->studentid = (int)$viewingstudent->id;
                                             $record->subjectid = (int)$subjectid;
-                                            $record->grade = (!empty($grade) && is_string($grade)) ? trim($grade) : (!empty($grade) ? $grade : null);
-                                            $record->grade_percent = ($grade_percent !== null && $grade_percent !== '') ? (float)$grade_percent : null;
-                                            // Убеждаемся, что institution_name не пустая строка
-                                            $record->institution_name = (!empty($institution_name) && is_string($institution_name)) ? trim($institution_name) : (!empty($institution_name) ? $institution_name : null);
-                                            // Если institution_id не указан или равен 0, не устанавливаем поле вообще
-                                            // чтобы избежать проблем с внешним ключом
-                                            if ($institution_id > 0) {
-                                                $record->institution_id = (int)$institution_id;
-                                            }
-                                            // Если institution_id <= 0, поле не устанавливается (будет NULL в БД)
+                                            // В БД поле grade имеет NOT NULL, поэтому передаем пустую строку вместо null
+                                            $record->grade = (!empty($grade) && is_string($grade)) ? trim($grade) : (!empty($grade) ? (string)$grade : '');
+                                            // В БД поле grade_percent имеет NOT NULL, поэтому передаем 0 вместо null
+                                            $record->grade_percent = ($grade_percent !== null && $grade_percent !== '') ? (float)$grade_percent : 0.00;
+                                            // Убеждаемся, что institution_name не пустая строка (обязательное поле)
+                                            $record->institution_name = (!empty($institution_name) && is_string($institution_name)) ? trim($institution_name) : (!empty($institution_name) ? (string)$institution_name : '');
+                                            // В БД поле institution_id имеет NOT NULL, поэтому передаем 0 вместо null
+                                            $record->institution_id = ($institution_id > 0) ? (int)$institution_id : 0;
                                             $record->credited_date = ($credited_date > 0) ? (int)$credited_date : time();
-                                            $record->document_number = (!empty($document_number) && is_string($document_number)) ? trim($document_number) : (!empty($document_number) ? $document_number : null);
-                                            $record->notes = (!empty($notes) && is_string($notes)) ? trim($notes) : (!empty($notes) ? $notes : null);
+                                            // В БД поле document_number имеет NOT NULL, поэтому передаем пустую строку вместо null
+                                            $record->document_number = (!empty($document_number) && is_string($document_number)) ? trim($document_number) : (!empty($document_number) ? (string)$document_number : '');
+                                            // В БД поле notes имеет NOT NULL, поэтому передаем пустую строку вместо null
+                                            $record->notes = (!empty($notes) && is_string($notes)) ? trim($notes) : (!empty($notes) ? (string)$notes : '');
                                             $record->createdby = (int)$USER->id;
                                             $record->timecreated = time();
                                             $record->timemodified = time();
@@ -3954,20 +3954,19 @@ if ($action == 'viewprogram' && $programid > 0) {
                                         ]);
                                         
                                         if ($record) {
-                                            $record->subjectid = $subjectid;
-                                            $record->grade = !empty($grade) ? $grade : null;
-                                            $record->grade_percent = $grade_percent !== null ? $grade_percent : null;
-                                            $record->institution_name = (!empty($institution_name) && is_string($institution_name)) ? trim($institution_name) : (!empty($institution_name) ? $institution_name : null);
-                                            // Если institution_id не указан или равен 0, не устанавливаем поле вообще
-                                            if ($institution_id > 0) {
-                                                $record->institution_id = (int)$institution_id;
-                                            } else {
-                                                // Если institution_id <= 0, устанавливаем в null
-                                                $record->institution_id = null;
-                                            }
+                                            $record->subjectid = (int)$subjectid;
+                                            // В БД поле grade имеет NOT NULL, поэтому передаем пустую строку вместо null
+                                            $record->grade = (!empty($grade) && is_string($grade)) ? trim($grade) : (!empty($grade) ? (string)$grade : '');
+                                            // В БД поле grade_percent имеет NOT NULL, поэтому передаем 0 вместо null
+                                            $record->grade_percent = ($grade_percent !== null && $grade_percent !== '') ? (float)$grade_percent : 0.00;
+                                            $record->institution_name = (!empty($institution_name) && is_string($institution_name)) ? trim($institution_name) : (!empty($institution_name) ? (string)$institution_name : '');
+                                            // В БД поле institution_id имеет NOT NULL, поэтому передаем 0 вместо null
+                                            $record->institution_id = ($institution_id > 0) ? (int)$institution_id : 0;
                                             $record->credited_date = ($credited_date > 0) ? (int)$credited_date : $record->credited_date;
-                                            $record->document_number = !empty($document_number) ? $document_number : null;
-                                            $record->notes = !empty($notes) ? $notes : null;
+                                            // В БД поле document_number имеет NOT NULL, поэтому передаем пустую строку вместо null
+                                            $record->document_number = (!empty($document_number) && is_string($document_number)) ? trim($document_number) : (!empty($document_number) ? (string)$document_number : '');
+                                            // В БД поле notes имеет NOT NULL, поэтому передаем пустую строку вместо null
+                                            $record->notes = (!empty($notes) && is_string($notes)) ? trim($notes) : (!empty($notes) ? (string)$notes : '');
                                             $record->timemodified = time();
                                             
                                             $DB->update_record('local_deanpromoodle_student_external_credits', $record);
@@ -3998,14 +3997,19 @@ if ($action == 'viewprogram' && $programid > 0) {
                                         $record = new stdClass();
                                         $record->studentid = (int)$viewingstudent->id;
                                         $record->subjectid = (int)$subjectid;
-                                        $record->grade = (!empty($grade) && is_string($grade)) ? trim($grade) : (!empty($grade) ? $grade : null);
-                                        $record->grade_percent = ($grade_percent !== null && $grade_percent !== '') ? (float)$grade_percent : null;
-                                        // Убеждаемся, что institution_name не пустая строка
-                                        $record->institution_name = (!empty($institution_name) && is_string($institution_name)) ? trim($institution_name) : (!empty($institution_name) ? $institution_name : null);
-                                        // institution_id не устанавливаем, если не указан (будет NULL в БД)
+                                        // В БД поле grade имеет NOT NULL, поэтому передаем пустую строку вместо null
+                                        $record->grade = (!empty($grade) && is_string($grade)) ? trim($grade) : (!empty($grade) ? (string)$grade : '');
+                                        // В БД поле grade_percent имеет NOT NULL, поэтому передаем 0 вместо null
+                                        $record->grade_percent = ($grade_percent !== null && $grade_percent !== '') ? (float)$grade_percent : 0.00;
+                                        // Убеждаемся, что institution_name не пустая строка (обязательное поле)
+                                        $record->institution_name = (!empty($institution_name) && is_string($institution_name)) ? trim($institution_name) : (!empty($institution_name) ? (string)$institution_name : '');
+                                        // В БД поле institution_id имеет NOT NULL, поэтому передаем 0 вместо null
+                                        $record->institution_id = 0;
                                         $record->credited_date = ($credited_date > 0) ? (int)$credited_date : time();
-                                        $record->document_number = (!empty($document_number) && is_string($document_number)) ? trim($document_number) : (!empty($document_number) ? $document_number : null);
-                                        $record->notes = (!empty($notes) && is_string($notes)) ? trim($notes) : (!empty($notes) ? $notes : null);
+                                        // В БД поле document_number имеет NOT NULL, поэтому передаем пустую строку вместо null
+                                        $record->document_number = (!empty($document_number) && is_string($document_number)) ? trim($document_number) : (!empty($document_number) ? (string)$document_number : '');
+                                        // В БД поле notes имеет NOT NULL, поэтому передаем пустую строку вместо null
+                                        $record->notes = (!empty($notes) && is_string($notes)) ? trim($notes) : (!empty($notes) ? (string)$notes : '');
                                         $record->createdby = (int)$USER->id;
                                         $record->timecreated = time();
                                         $record->timemodified = time();
@@ -4068,13 +4072,18 @@ if ($action == 'viewprogram' && $programid > 0) {
                                         
                                         if ($record) {
                                             $record->subjectid = (int)$subjectid;
-                                            $record->grade = (!empty($grade) && is_string($grade)) ? trim($grade) : (!empty($grade) ? $grade : null);
-                                            $record->grade_percent = ($grade_percent !== null && $grade_percent !== '') ? (float)$grade_percent : null;
-                                            $record->institution_name = (!empty($institution_name) && is_string($institution_name)) ? trim($institution_name) : (!empty($institution_name) ? $institution_name : null);
-                                            // institution_id не устанавливаем, если не указан (будет NULL в БД)
+                                            // В БД поле grade имеет NOT NULL, поэтому передаем пустую строку вместо null
+                                            $record->grade = (!empty($grade) && is_string($grade)) ? trim($grade) : (!empty($grade) ? (string)$grade : '');
+                                            // В БД поле grade_percent имеет NOT NULL, поэтому передаем 0 вместо null
+                                            $record->grade_percent = ($grade_percent !== null && $grade_percent !== '') ? (float)$grade_percent : 0.00;
+                                            $record->institution_name = (!empty($institution_name) && is_string($institution_name)) ? trim($institution_name) : (!empty($institution_name) ? (string)$institution_name : '');
+                                            // В БД поле institution_id имеет NOT NULL, поэтому передаем 0 вместо null
+                                            $record->institution_id = 0;
                                             $record->credited_date = ($credited_date > 0) ? (int)$credited_date : $record->credited_date;
-                                            $record->document_number = (!empty($document_number) && is_string($document_number)) ? trim($document_number) : (!empty($document_number) ? $document_number : null);
-                                            $record->notes = (!empty($notes) && is_string($notes)) ? trim($notes) : (!empty($notes) ? $notes : null);
+                                            // В БД поле document_number имеет NOT NULL, поэтому передаем пустую строку вместо null
+                                            $record->document_number = (!empty($document_number) && is_string($document_number)) ? trim($document_number) : (!empty($document_number) ? (string)$document_number : '');
+                                            // В БД поле notes имеет NOT NULL, поэтому передаем пустую строку вместо null
+                                            $record->notes = (!empty($notes) && is_string($notes)) ? trim($notes) : (!empty($notes) ? (string)$notes : '');
                                             $record->timemodified = time();
                                             
                                             $DB->update_record('local_deanpromoodle_student_external_credits', $record);
