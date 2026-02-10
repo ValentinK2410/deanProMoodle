@@ -2008,15 +2008,6 @@ if ($action == 'viewprogram' && $programid > 0) {
                     $gradeBadge = '<span class="grade-badge ' . $gradeClass . '">' . $gradeBadgeContent . '</span>';
                     echo html_writer::tag('td', $gradeBadge);
                     
-                    // Перейти к курсу
-                    echo html_writer::start_tag('td', ['style' => 'text-align: center;']);
-                    echo html_writer::link($courseurl, '<i class="fas fa-external-link-alt"></i>', [
-                        'class' => 'btn btn-sm btn-primary',
-                        'title' => 'Перейти к курсу',
-                        'target' => '_blank'
-                    ]);
-                    echo html_writer::end_tag('td');
-                    
                     echo html_writer::end_tag('tr');
                 }
                 
