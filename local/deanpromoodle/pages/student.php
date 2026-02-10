@@ -1379,6 +1379,23 @@ if ($action == 'viewprogram' && $programid > 0) {
                     }
                     echo html_writer::tag('td', htmlspecialchars($credits, ENT_QUOTES, 'UTF-8'));
                     
+                    // Дата курса
+                    $coursedate = '-';
+                    // Используем startdate из исходного объекта, так как он уже получен из SQL запроса
+                    $startdate = isset($courseobj->startdate) ? $courseobj->startdate : (isset($course->startdate) ? $course->startdate : 0);
+                    if (!empty($startdate) && $startdate > 0) {
+                        $currenttime = time();
+                        if ($startdate > $currenttime) {
+                            // Курс еще не начался
+                            $coursedate = '<span style="color: #ff9800; font-weight: 500;">Курс еще не начался</span><br><small style="color: #666;">' . 
+                                         userdate($startdate, '%d.%m.%Y', 99, false) . '</small>';
+                        } else {
+                            // Курс уже начался
+                            $coursedate = userdate($startdate, '%d.%m.%Y', 99, false);
+                        }
+                    }
+                    echo html_writer::tag('td', $coursedate, ['style' => 'text-align: center;']);
+                    
                     // Преподаватели с email-ссылками (только роль teacher)
                     // Показываем пользователей, у которых есть роль teacher, даже если у них есть и другие роли
                     $coursecontext = context_course::instance($course->id);
