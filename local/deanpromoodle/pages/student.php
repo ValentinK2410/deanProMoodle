@@ -1323,7 +1323,6 @@ if ($action == 'viewprogram' && $programid > 0) {
                 echo html_writer::start_tag('thead');
                 echo html_writer::start_tag('tr');
                 echo html_writer::tag('th', 'Название курса', ['style' => 'width: 250px; text-align: center;']);
-                echo html_writer::tag('th', 'Крд.', ['style' => 'width: 150px; text-align: center;']);
                 echo html_writer::tag('th', 'Дата курса', ['style' => 'width: 150px; text-align: center;']);
                 echo html_writer::tag('th', 'Преподаватели', ['style' => 'width: 200px; text-align: center;']);
                 echo html_writer::tag('th', 'Задолженности по курсу', ['style' => 'width: 300px; text-align: center;']);
@@ -1358,25 +1357,6 @@ if ($action == 'viewprogram' && $programid > 0) {
                             'target' => '_blank'
                         ])
                     );
-                    
-                    // Количество академических кредитов
-                    $credits = '-';
-                    try {
-                        $subject = $DB->get_record_sql(
-                            "SELECT s.credits
-                             FROM {local_deanpromoodle_subject_courses} sc
-                             JOIN {local_deanpromoodle_subjects} s ON s.id = sc.subjectid
-                             WHERE sc.courseid = ?
-                             LIMIT 1",
-                            [$course->id]
-                        );
-                        if ($subject && $subject->credits !== null && $subject->credits > 0) {
-                            $credits = (string)$subject->credits;
-                        }
-                    } catch (\Exception $e) {
-                        // Игнорируем ошибки
-                    }
-                    echo html_writer::tag('td', htmlspecialchars($credits, ENT_QUOTES, 'UTF-8'));
                     
                     // Дата курса
                     $coursedate = '-';
