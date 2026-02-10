@@ -1323,13 +1323,12 @@ if ($action == 'viewprogram' && $programid > 0) {
                 echo html_writer::start_tag('thead');
                 echo html_writer::start_tag('tr');
                 echo html_writer::tag('th', 'Название курса', ['style' => 'width: 250px; text-align: center;']);
-                echo html_writer::tag('th', 'Кол-во<br>кредитов', ['style' => 'width: 150px; text-align: center;']);
+                echo html_writer::tag('th', 'Крд.', ['style' => 'width: 150px; text-align: center;']);
                 echo html_writer::tag('th', 'Дата курса', ['style' => 'width: 150px; text-align: center;']);
                 echo html_writer::tag('th', 'Преподаватели', ['style' => 'width: 200px; text-align: center;']);
                 echo html_writer::tag('th', 'Задолженности по курсу', ['style' => 'width: 300px; text-align: center;']);
                 echo html_writer::tag('th', 'Статус<br>завершения', ['style' => 'width: 150px; text-align: center;']);
                 echo html_writer::tag('th', 'Итоговая<br>оценка', ['style' => 'width: 150px; text-align: center;']);
-                echo html_writer::tag('th', 'Перейти к курсу', ['style' => 'width: 100px; text-align: center;']);
                 echo html_writer::end_tag('tr');
                 echo html_writer::end_tag('thead');
                 echo html_writer::start_tag('tbody');
