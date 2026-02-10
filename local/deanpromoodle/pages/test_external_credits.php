@@ -238,16 +238,23 @@ if ($action == 'insert' && $studentid > 0) {
     }
     
     // Формируем запись
+    // ВАЖНО: В БД многие поля имеют NOT NULL, поэтому передаем пустые строки/0 вместо null
     $record = new stdClass();
     $record->studentid = (int)$studentid;
     $record->subjectid = (int)$subjectid;
-    $record->grade = (!empty($grade) && is_string($grade)) ? trim($grade) : null;
-    $record->grade_percent = ($grade_percent !== null && $grade_percent !== '') ? (float)$grade_percent : null;
-    $record->institution_name = (!empty($institution_name) && is_string($institution_name)) ? trim($institution_name) : null;
-    // institution_id не устанавливаем, если не указан
+    // В БД поле grade имеет NOT NULL, поэтому передаем пустую строку вместо null
+    $record->grade = (!empty($grade) && is_string($grade)) ? trim($grade) : (!empty($grade) ? (string)$grade : '');
+    // В БД поле grade_percent имеет NOT NULL, поэтому передаем 0 вместо null
+    $record->grade_percent = ($grade_percent !== null && $grade_percent !== '') ? (float)$grade_percent : 0.00;
+    // Убеждаемся, что institution_name не пустая строка (обязательное поле)
+    $record->institution_name = (!empty($institution_name) && is_string($institution_name)) ? trim($institution_name) : (!empty($institution_name) ? (string)$institution_name : '');
+    // В БД поле institution_id имеет NOT NULL, поэтому передаем 0 вместо null
+    $record->institution_id = 0;
     $record->credited_date = ($credited_date > 0) ? (int)$credited_date : time();
-    $record->document_number = (!empty($document_number) && is_string($document_number)) ? trim($document_number) : null;
-    $record->notes = (!empty($notes) && is_string($notes)) ? trim($notes) : null;
+    // В БД поле document_number имеет NOT NULL, поэтому передаем пустую строку вместо null
+    $record->document_number = (!empty($document_number) && is_string($document_number)) ? trim($document_number) : (!empty($document_number) ? (string)$document_number : '');
+    // В БД поле notes имеет NOT NULL, поэтому передаем пустую строку вместо null
+    $record->notes = (!empty($notes) && is_string($notes)) ? trim($notes) : (!empty($notes) ? (string)$notes : '');
     $record->createdby = (int)$USER->id;
     $record->timecreated = time();
     $record->timemodified = time();
