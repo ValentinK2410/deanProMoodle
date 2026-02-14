@@ -1041,6 +1041,84 @@ switch ($tab) {
         $offset = $page * $perpage;
         $paginated = array_slice($unrepliedposts, $offset, $perpage);
         
+        // JavaScript функция для обработки кнопки "Не требует ответа"
+        // Определяем в глобальной области видимости перед выводом таблицы
+        global $CFG;
+        $ajaxurl = $CFG->wwwroot . '/local/deanpromoodle/pages/admin_ajax.php';
+        echo '<script type="text/javascript">
+            window.markForumNoReply = function(btn) {
+                if (!btn) {
+                    alert(\'Ошибка: кнопка не найдена\');
+                    return false;
+                }
+                
+                var postid = btn.getAttribute(\'data-postid\');
+                var ajaxurl = btn.getAttribute(\'data-ajaxurl\');
+                var row = btn.closest(\'tr\');
+                
+                if (!postid) {
+                    alert(\'Ошибка: не указан ID сообщения\');
+                    return false;
+                }
+                
+                if (!ajaxurl) {
+                    alert(\'Ошибка: не указан URL для AJAX запроса\');
+                    return false;
+                }
+                
+                // Блокируем кнопку на время запроса
+                btn.disabled = true;
+                var originalText = btn.textContent || btn.innerText;
+                btn.textContent = \'Обработка...\';
+                
+                // Отправляем AJAX-запрос
+                var xhr = new XMLHttpRequest();
+                var url = ajaxurl + \'?action=markforumpostnoreply&postid=\' + encodeURIComponent(postid);
+                
+                xhr.open(\'GET\', url, true);
+                xhr.onreadystatechange = function() {
+                    if (xhr.readyState === 4) {
+                        btn.disabled = false;
+                        btn.textContent = originalText;
+                        
+                        if (xhr.status === 200) {
+                            try {
+                                var response = JSON.parse(xhr.responseText);
+                                if (response.success) {
+                                    // Скрываем строку таблицы
+                                    if (row) {
+                                        row.style.display = \'none\';
+                                    }
+                                    // Перезагружаем страницу для обновления счетчиков
+                                    setTimeout(function() {
+                                        window.location.reload();
+                                    }, 500);
+                                } else {
+                                    alert(\'Ошибка: \' + (response.error || \'Неизвестная ошибка\'));
+                                }
+                            } catch (e) {
+                                console.error(\'Ошибка парсинга ответа:\', e);
+                                console.error(\'Ответ сервера:\', xhr.responseText);
+                                alert(\'Ошибка при обработке ответа сервера. Проверьте консоль для деталей.\');
+                            }
+                        } else {
+                            console.error(\'HTTP ошибка:\', xhr.status, xhr.statusText);
+                            console.error(\'Ответ сервера:\', xhr.responseText);
+                            alert(\'Ошибка сети: \' + xhr.status + \' \' + xhr.statusText);
+                        }
+                    }
+                };
+                xhr.onerror = function() {
+                    btn.disabled = false;
+                    btn.textContent = originalText;
+                    alert(\'Ошибка сети при отправке запроса\');
+                };
+                xhr.send();
+                
+                return false;
+            };
+        </script>';
+        
         // Отображение таблицы
         if (empty($paginated)) {
             echo html_writer::div(get_string('noforumspostsfound', 'local_deanpromoodle'), 'alert alert-info');
@@ -1548,82 +1626,6 @@ switch ($tab) {
         ");
         
         echo html_writer::end_div();
-        
-        // JavaScript для обработки кнопки "Не требует ответа"
-        // Используем глобальную функцию для надежности
-        $PAGE->requires->js_init_code("
-            function markForumNoReply(btn) {
-                if (!btn) {
-                    alert('Ошибка: кнопка не найдена');
-                    return false;
-                }
-                
-                var postid = btn.getAttribute('data-postid');
-                var ajaxurl = btn.getAttribute('data-ajaxurl');
-                var row = btn.closest('tr');
-                
-                if (!postid) {
-                    alert('Ошибка: не указан ID сообщения');
-                    return false;
-                }
-                
-                if (!ajaxurl) {
-                    alert('Ошибка: не указан URL для AJAX запроса');
-                    return false;
-                }
-                
-                // Блокируем кнопку на время запроса
-                btn.disabled = true;
-                var originalText = btn.textContent || btn.innerText;
-                btn.textContent = 'Обработка...';
-                
-                // Отправляем AJAX-запрос
-                var xhr = new XMLHttpRequest();
-                var url = ajaxurl + '?action=markforumpostnoreply&postid=' + encodeURIComponent(postid);
-                
-                xhr.open('GET', url, true);
-                xhr.onreadystatechange = function() {
-                    if (xhr.readyState === 4) {
-                        btn.disabled = false;
-                        btn.textContent = originalText;
-                        
-                        if (xhr.status === 200) {
-                            try {
-                                var response = JSON.parse(xhr.responseText);
-                                if (response.success) {
-                                    // Скрываем строку таблицы
-                                    if (row) {
-                                        row.style.display = 'none';
-                                    }
-                                    // Перезагружаем страницу для обновления счетчиков
-                                    setTimeout(function() {
-                                        window.location.reload();
-                                    }, 500);
-                                } else {
-                                    alert('Ошибка: ' + (response.error || 'Неизвестная ошибка'));
-                                }
-                            } catch (e) {
-                                console.error('Ошибка парсинга ответа:', e);
-                                console.error('Ответ сервера:', xhr.responseText);
-                                alert('Ошибка при обработке ответа сервера. Проверьте консоль для деталей.');
-                            }
-                        } else {
-                            console.error('HTTP ошибка:', xhr.status, xhr.statusText);
-                            console.error('Ответ сервера:', xhr.responseText);
-                            alert('Ошибка сети: ' + xhr.status + ' ' + xhr.statusText);
-                        }
-                    }
-                };
-                xhr.onerror = function() {
-                    btn.disabled = false;
-                    btn.textContent = originalText;
-                    alert('Ошибка сети при отправке запроса');
-                };
-                xhr.send();
-                
-                return false;
-            }
-        ");
         break;
 }
 
