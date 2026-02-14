@@ -969,43 +969,23 @@ switch ($tab) {
                 break;
             }
             
-            $noreplyjoin = "INNER JOIN {local_deanpromoodle_forum_no_reply} fnr ON fnr.postid = p.id";
-            $noreplywhere = "AND fnr.userid = ?"; // Показываем только те, что пометил текущий преподаватель
-            $sqlparams = array_merge(
-                $forumids,
-                $allstudentuserids,
-                [$USER->id]
-            );
-            
-            // Исключаем сообщения от преподавателей
-            $excludeteachers = "AND NOT EXISTS (
-                 SELECT 1 FROM {role_assignments} ra3
-                 JOIN {context} ctx3 ON ctx3.id = ra3.contextid
-                 WHERE ra3.userid = p.userid
-                 AND ra3.roleid = ?
-                 AND (ctx3.contextlevel = 50 OR ctx3.id = ?)
-             )";
-            
-            $sqlparams = array_merge($sqlparams, [$teacherroleid, $systemcontext->id]);
-            
+            // Упрощенный запрос: показываем все сообщения, помеченные текущим преподавателем
+            // Без фильтрации по форумам/студентам курсов, чтобы показать все пометки
             $posts = $DB->get_records_sql(
                 "SELECT p.id, p.discussion, p.userid, p.subject, p.message, p.created,
                         u.firstname, u.lastname, u.email,
                         d.name as discussionname, d.forum,
                         f.name as forumname, f.course as courseid,
                         fnr.id as noreplyid, fnr.timecreated as noreplytime
-                 FROM {forum_posts} p
+                 FROM {local_deanpromoodle_forum_no_reply} fnr
+                 JOIN {forum_posts} p ON p.id = fnr.postid
                  JOIN {user} u ON u.id = p.userid
                  JOIN {forum_discussions} d ON d.id = p.discussion
                  JOIN {forum} f ON f.id = d.forum
-                 $noreplyjoin
-                 WHERE d.forum IN ($forumplaceholders)
-                 AND p.userid IN ($studentplaceholders)
-                 $excludeteachers
-                 $noreplywhere
+                 WHERE fnr.userid = ?
                  ORDER BY fnr.timecreated DESC
                  LIMIT 1000",
-                $sqlparams
+                [$USER->id]
             );
         } else {
             // Показываем неотвеченные сообщения (исключая помеченные как "не требует ответа")
@@ -1069,7 +1049,31 @@ switch ($tab) {
         
         // Обрабатываем результаты
         foreach ($posts as $post) {
-            $course = $courseforums[$post->forum];
+            // Получаем курс из базы данных, так как в режиме noreply форум может быть не в списке курсов преподавателя
+            if ($forumfilter == 'noreply') {
+                $course = $DB->get_record('course', ['id' => $post->courseid], 'id, fullname, shortname');
+                if (!$course) {
+                    // Если курс не найден, создаем объект с минимальными данными
+                    $course = (object)[
+                        'id' => $post->courseid,
+                        'fullname' => 'Неизвестный курс',
+                        'shortname' => ''
+                    ];
+                }
+            } else {
+                $course = isset($courseforums[$post->forum]) ? $courseforums[$post->forum] : null;
+                if (!$course) {
+                    // Если курс не найден в маппинге, получаем из БД
+                    $course = $DB->get_record('course', ['id' => $post->courseid], 'id, fullname, shortname');
+                    if (!$course) {
+                        $course = (object)[
+                            'id' => $post->courseid,
+                            'fullname' => 'Неизвестный курс',
+                            'shortname' => ''
+                        ];
+                    }
+                }
+            }
             
             // Обрезаем текст сообщения для отображения (только первые 10 слов)
             $fullmessage = strip_tags($post->message);
