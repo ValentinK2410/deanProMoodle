@@ -149,6 +149,7 @@ $courseid = optional_param('courseid', 0, PARAM_INT);
 $page = optional_param('page', 0, PARAM_INT);
 $perpage = optional_param('perpage', 25, PARAM_INT);
 $selectedmonth = optional_param('statmonth', date('n'), PARAM_INT); // Месяц для статистики (1-12)
+$forumfilter = optional_param('forumfilter', 'unreplied', PARAM_ALPHA); // unreplied, noreply
 $selectedyear = optional_param('statyear', date('Y'), PARAM_INT); // Год для статистики
 
 // Настройка страницы
@@ -857,7 +858,7 @@ switch ($tab) {
         
     case 'forums':
         // Оптимизированное получение сообщений форумов без ответов преподавателя
-        global $CFG;
+        global $CFG, $USER;
         $unrepliedposts = [];
         
         // Получаем роли один раз перед циклом
@@ -924,73 +925,147 @@ switch ($tab) {
             break;
         }
         
-        // Оптимизированный запрос: получаем все сообщения одним запросом
-        $forumplaceholders = implode(',', array_fill(0, count($forumids), '?'));
-        $studentplaceholders = implode(',', array_fill(0, count($allstudentuserids), '?'));
-        
         // Проверяем существование таблицы local_deanpromoodle_forum_no_reply
         $dbman = $DB->get_manager();
         $tableexists = $dbman->table_exists('local_deanpromoodle_forum_no_reply');
         
-        // Используем LEFT JOIN вместо NOT EXISTS для лучшей производительности
-        // Исключаем сообщения, которые помечены как "не требует ответа"
-        $noreplyjoin = '';
-        $noreplywhere = '';
-        if ($tableexists) {
-            $noreplyjoin = "LEFT JOIN {local_deanpromoodle_forum_no_reply} fnr ON fnr.postid = p.id";
-            $noreplywhere = "AND fnr.id IS NULL";
+        // Переключатель фильтра
+        echo html_writer::start_div('forum-filter-switcher', ['style' => 'margin-bottom: 20px; padding: 15px; background-color: #f8f9fa; border-radius: 5px;']);
+        $unrepliedurl = new moodle_url('/local/deanpromoodle/pages/teacher.php', [
+            'tab' => 'forums',
+            'courseid' => $courseid,
+            'forumfilter' => 'unreplied',
+            'page' => 0
+        ]);
+        $noreplyurl = new moodle_url('/local/deanpromoodle/pages/teacher.php', [
+            'tab' => 'forums',
+            'courseid' => $courseid,
+            'forumfilter' => 'noreply',
+            'page' => 0
+        ]);
+        
+        $unrepliedclass = $forumfilter == 'unreplied' ? 'btn-primary' : 'btn-outline-primary';
+        $noreplyclass = $forumfilter == 'noreply' ? 'btn-primary' : 'btn-outline-primary';
+        
+        echo html_writer::tag('span', 'Показать: ', ['style' => 'margin-right: 10px; font-weight: bold;']);
+        echo html_writer::link($unrepliedurl, 'Неотвеченные сообщения', [
+            'class' => 'btn btn-sm ' . $unrepliedclass,
+            'style' => 'margin-right: 10px;'
+        ]);
+        echo html_writer::link($noreplyurl, 'Не требуют ответа', [
+            'class' => 'btn btn-sm ' . $noreplyclass
+        ]);
+        echo html_writer::end_div();
+        
+        // Оптимизированный запрос: получаем все сообщения одним запросом
+        $forumplaceholders = implode(',', array_fill(0, count($forumids), '?'));
+        $studentplaceholders = implode(',', array_fill(0, count($allstudentuserids), '?'));
+        
+        // В зависимости от фильтра формируем разные запросы
+        if ($forumfilter == 'noreply') {
+            // Показываем только сообщения, помеченные как "не требует ответа"
+            if (!$tableexists) {
+                echo html_writer::div('Таблица для хранения пометок не существует. Необходимо обновить базу данных.', 'alert alert-warning');
+                break;
+            }
+            
+            $noreplyjoin = "INNER JOIN {local_deanpromoodle_forum_no_reply} fnr ON fnr.postid = p.id";
+            $noreplywhere = "AND fnr.userid = ?"; // Показываем только те, что пометил текущий преподаватель
+            $sqlparams = array_merge(
+                $forumids,
+                $allstudentuserids,
+                [$USER->id]
+            );
+            
+            // Исключаем сообщения от преподавателей
+            $excludeteachers = "AND NOT EXISTS (
+                 SELECT 1 FROM {role_assignments} ra3
+                 JOIN {context} ctx3 ON ctx3.id = ra3.contextid
+                 WHERE ra3.userid = p.userid
+                 AND ra3.roleid = ?
+                 AND (ctx3.contextlevel = 50 OR ctx3.id = ?)
+             )";
+            
+            $sqlparams = array_merge($sqlparams, [$teacherroleid, $systemcontext->id]);
+            
+            $posts = $DB->get_records_sql(
+                "SELECT p.id, p.discussion, p.userid, p.subject, p.message, p.created,
+                        u.firstname, u.lastname, u.email,
+                        d.name as discussionname, d.forum,
+                        f.name as forumname, f.course as courseid,
+                        fnr.id as noreplyid, fnr.timecreated as noreplytime
+                 FROM {forum_posts} p
+                 JOIN {user} u ON u.id = p.userid
+                 JOIN {forum_discussions} d ON d.id = p.discussion
+                 JOIN {forum} f ON f.id = d.forum
+                 $noreplyjoin
+                 WHERE d.forum IN ($forumplaceholders)
+                 AND p.userid IN ($studentplaceholders)
+                 $excludeteachers
+                 $noreplywhere
+                 ORDER BY fnr.timecreated DESC
+                 LIMIT 1000",
+                $sqlparams
+            );
+        } else {
+            // Показываем неотвеченные сообщения (исключая помеченные как "не требует ответа")
+            $noreplyjoin = '';
+            $noreplywhere = '';
+            if ($tableexists) {
+                $noreplyjoin = "LEFT JOIN {local_deanpromoodle_forum_no_reply} fnr ON fnr.postid = p.id";
+                $noreplywhere = "AND fnr.id IS NULL";
+            }
+            
+            // Исключаем сообщения от преподавателей (включая текущего пользователя)
+            // Проверяем, что автор сообщения НЕ является преподавателем с roleid = 3
+            $excludeteachers = "AND NOT EXISTS (
+                 SELECT 1 FROM {role_assignments} ra3
+                 JOIN {context} ctx3 ON ctx3.id = ra3.contextid
+                 WHERE ra3.userid = p.userid
+                 AND ra3.roleid = ?
+                 AND (ctx3.contextlevel = 50 OR ctx3.id = ?)
+             )";
+            
+            // Проверяем, что НЕТ ответов от преподавателей с roleid = 3 после сообщения студента
+            // Используем NOT EXISTS для более надежной проверки
+            $noanswerfromteacher = "AND NOT EXISTS (
+                 SELECT 1 FROM {forum_posts} p2
+                 JOIN {role_assignments} ra2 ON ra2.userid = p2.userid
+                 JOIN {context} ctx2 ON ctx2.id = ra2.contextid
+                 WHERE p2.discussion = p.discussion
+                 AND p2.created > p.created
+                 AND ra2.roleid = ?
+                 AND (ctx2.contextlevel = 50 OR ctx2.id = ?)
+             )";
+            
+            // Собираем параметры в правильном порядке для SQL запроса
+            $sqlparams = array_merge(
+                $forumids, 
+                $allstudentuserids, 
+                [$teacherroleid, $systemcontext->id], // для excludeteachers NOT EXISTS
+                [$teacherroleid, $systemcontext->id]  // для noanswerfromteacher NOT EXISTS
+            );
+            
+            $posts = $DB->get_records_sql(
+                "SELECT p.id, p.discussion, p.userid, p.subject, p.message, p.created,
+                        u.firstname, u.lastname, u.email,
+                        d.name as discussionname, d.forum,
+                        f.name as forumname, f.course as courseid
+                 FROM {forum_posts} p
+                 JOIN {user} u ON u.id = p.userid
+                 JOIN {forum_discussions} d ON d.id = p.discussion
+                 JOIN {forum} f ON f.id = d.forum
+                 $noreplyjoin
+                 WHERE d.forum IN ($forumplaceholders)
+                 AND p.userid IN ($studentplaceholders)
+                 $excludeteachers
+                 $noanswerfromteacher
+                 $noreplywhere
+                 ORDER BY p.created DESC
+                 LIMIT 1000",
+                $sqlparams
+            );
         }
-        
-        // Исключаем сообщения от преподавателей (включая текущего пользователя)
-        // Проверяем, что автор сообщения НЕ является преподавателем с roleid = 3
-        $excludeteachers = "AND NOT EXISTS (
-             SELECT 1 FROM {role_assignments} ra3
-             JOIN {context} ctx3 ON ctx3.id = ra3.contextid
-             WHERE ra3.userid = p.userid
-             AND ra3.roleid = ?
-             AND (ctx3.contextlevel = 50 OR ctx3.id = ?)
-         )";
-        
-        // Проверяем, что НЕТ ответов от преподавателей с roleid = 3 после сообщения студента
-        // Используем NOT EXISTS для более надежной проверки
-        $noanswerfromteacher = "AND NOT EXISTS (
-             SELECT 1 FROM {forum_posts} p2
-             JOIN {role_assignments} ra2 ON ra2.userid = p2.userid
-             JOIN {context} ctx2 ON ctx2.id = ra2.contextid
-             WHERE p2.discussion = p.discussion
-             AND p2.created > p.created
-             AND ra2.roleid = ?
-             AND (ctx2.contextlevel = 50 OR ctx2.id = ?)
-         )";
-        
-        // Собираем параметры в правильном порядке для SQL запроса
-        // Порядок: forumids, studentuserids, teacherroleid (для excludeteachers), systemcontextid (для excludeteachers), teacherroleid (для noanswerfromteacher), systemcontextid (для noanswerfromteacher)
-        $sqlparams = array_merge(
-            $forumids, 
-            $allstudentuserids, 
-            [$teacherroleid, $systemcontext->id], // для excludeteachers NOT EXISTS
-            [$teacherroleid, $systemcontext->id]  // для noanswerfromteacher NOT EXISTS
-        );
-        
-        $posts = $DB->get_records_sql(
-            "SELECT p.id, p.discussion, p.userid, p.subject, p.message, p.created,
-                    u.firstname, u.lastname, u.email,
-                    d.name as discussionname, d.forum,
-                    f.name as forumname, f.course as courseid
-             FROM {forum_posts} p
-             JOIN {user} u ON u.id = p.userid
-             JOIN {forum_discussions} d ON d.id = p.discussion
-             JOIN {forum} f ON f.id = d.forum
-             $noreplyjoin
-             WHERE d.forum IN ($forumplaceholders)
-             AND p.userid IN ($studentplaceholders)
-             $excludeteachers
-             $noanswerfromteacher
-             $noreplywhere
-             ORDER BY p.created DESC
-             LIMIT 1000",
-            $sqlparams
-        );
         
         // Обрабатываем результаты
         foreach ($posts as $post) {
@@ -1015,7 +1090,7 @@ switch ($tab) {
                     : '';
             }
             
-            $unrepliedposts[] = (object)[
+            $postdata = [
                 'id' => isset($post->id) ? (int)$post->id : 0,
                 'forumid' => isset($post->forum) ? (int)$post->forum : 0,
                 'forumname' => isset($post->forumname) && !is_array($post->forumname) ? (string)$post->forumname : '',
@@ -1033,6 +1108,13 @@ switch ($tab) {
                 'posted' => isset($post->created) ? userdate($post->created) : '',
                 'created' => isset($post->created) ? (int)$post->created : 0
             ];
+            
+            // В режиме просмотра "не требует ответа" добавляем ID пометки
+            if ($forumfilter == 'noreply' && isset($post->noreplyid)) {
+                $postdata['noreplyid'] = (int)$post->noreplyid;
+            }
+            
+            $unrepliedposts[] = (object)$postdata;
         }
         
         // Pagination
@@ -1041,7 +1123,7 @@ switch ($tab) {
         $offset = $page * $perpage;
         $paginated = array_slice($unrepliedposts, $offset, $perpage);
         
-        // JavaScript функция для обработки кнопки "Не требует ответа"
+        // JavaScript функции для обработки кнопок "Не требует ответа" и "Снять пометку"
         // Определяем в глобальной области видимости перед выводом таблицы
         global $CFG;
         $ajaxurl = $CFG->wwwroot . '/local/deanpromoodle/pages/admin_ajax.php';
@@ -1074,6 +1156,78 @@ switch ($tab) {
                 // Отправляем AJAX-запрос
                 var xhr = new XMLHttpRequest();
                 var url = ajaxurl + \'?action=markforumpostnoreply&postid=\' + encodeURIComponent(postid);
+                
+                xhr.open(\'GET\', url, true);
+                xhr.onreadystatechange = function() {
+                    if (xhr.readyState === 4) {
+                        btn.disabled = false;
+                        btn.textContent = originalText;
+                        
+                        if (xhr.status === 200) {
+                            try {
+                                var response = JSON.parse(xhr.responseText);
+                                if (response.success) {
+                                    // Скрываем строку таблицы
+                                    if (row) {
+                                        row.style.display = \'none\';
+                                    }
+                                    // Перезагружаем страницу для обновления счетчиков
+                                    setTimeout(function() {
+                                        window.location.reload();
+                                    }, 500);
+                                } else {
+                                    alert(\'Ошибка: \' + (response.error || \'Неизвестная ошибка\'));
+                                }
+                            } catch (e) {
+                                console.error(\'Ошибка парсинга ответа:\', e);
+                                console.error(\'Ответ сервера:\', xhr.responseText);
+                                alert(\'Ошибка при обработке ответа сервера. Проверьте консоль для деталей.\');
+                            }
+                        } else {
+                            console.error(\'HTTP ошибка:\', xhr.status, xhr.statusText);
+                            console.error(\'Ответ сервера:\', xhr.responseText);
+                            alert(\'Ошибка сети: \' + xhr.status + \' \' + xhr.statusText);
+                        }
+                    }
+                };
+                xhr.onerror = function() {
+                    btn.disabled = false;
+                    btn.textContent = originalText;
+                    alert(\'Ошибка сети при отправке запроса\');
+                };
+                xhr.send();
+                
+                return false;
+            };
+            
+            window.unmarkForumNoReply = function(btn) {
+                if (!btn) {
+                    alert(\'Ошибка: кнопка не найдена\');
+                    return false;
+                }
+                
+                var noreplyid = btn.getAttribute(\'data-noreplyid\');
+                var ajaxurl = btn.getAttribute(\'data-ajaxurl\');
+                var row = btn.closest(\'tr\');
+                
+                if (!noreplyid) {
+                    alert(\'Ошибка: не указан ID пометки\');
+                    return false;
+                }
+                
+                if (!ajaxurl) {
+                    alert(\'Ошибка: не указан URL для AJAX запроса\');
+                    return false;
+                }
+                
+                // Блокируем кнопку на время запроса
+                btn.disabled = true;
+                var originalText = btn.textContent || btn.innerText;
+                btn.textContent = \'Обработка...\';
+                
+                // Отправляем AJAX-запрос
+                var xhr = new XMLHttpRequest();
+                var url = ajaxurl + \'?action=unmarkforumpostnoreply&noreplyid=\' + encodeURIComponent(noreplyid);
                 
                 xhr.open(\'GET\', url, true);
                 xhr.onreadystatechange = function() {
@@ -1190,17 +1344,36 @@ switch ($tab) {
                 ]);
                 $posturl->set_anchor('p' . $postid); // Якорь для прокрутки к сообщению
                 $replystr = 'Ответить';
-                $noreplystr = 'Не требует ответа';
                 $ajaxurl = $CFG->wwwroot . '/local/deanpromoodle/pages/admin_ajax.php';
                 $actions = html_writer::link($posturl, $replystr, ['class' => 'btn btn-sm btn-primary', 'target' => '_blank', 'style' => 'margin-right: 8px; margin-top: 5px;']);
-                $actions .= html_writer::tag('button', $noreplystr, [
-                    'type' => 'button',
-                    'class' => 'btn btn-sm btn-secondary forum-no-reply-btn',
-                    'data-postid' => $postid,
-                    'data-ajaxurl' => $ajaxurl,
-                    'onclick' => 'markForumNoReply(this); return false;',
-                    'style' => 'margin-top: 5px;'
-                ]);
+                
+                // В зависимости от режима показываем разные кнопки
+                if ($forumfilter == 'noreply') {
+                    // В режиме просмотра "не требует ответа" показываем кнопку для снятия пометки
+                    $noreplyid = isset($item->noreplyid) ? (int)$item->noreplyid : 0;
+                    if ($noreplyid > 0) {
+                        $unmarkstr = 'Снять пометку';
+                        $actions .= html_writer::tag('button', $unmarkstr, [
+                            'type' => 'button',
+                            'class' => 'btn btn-sm btn-warning forum-unmark-no-reply-btn',
+                            'data-noreplyid' => $noreplyid,
+                            'data-ajaxurl' => $ajaxurl,
+                            'onclick' => 'unmarkForumNoReply(this); return false;',
+                            'style' => 'margin-top: 5px;'
+                        ]);
+                    }
+                } else {
+                    // В режиме просмотра неотвеченных показываем кнопку "Не требует ответа"
+                    $noreplystr = 'Не требует ответа';
+                    $actions .= html_writer::tag('button', $noreplystr, [
+                        'type' => 'button',
+                        'class' => 'btn btn-sm btn-secondary forum-no-reply-btn',
+                        'data-postid' => $postid,
+                        'data-ajaxurl' => $ajaxurl,
+                        'onclick' => 'markForumNoReply(this); return false;',
+                        'style' => 'margin-top: 5px;'
+                    ]);
+                }
                 echo html_writer::tag('td', $actions);
                 echo html_writer::end_tag('tr');
             }

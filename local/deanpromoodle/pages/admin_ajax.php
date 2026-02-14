@@ -39,8 +39,8 @@ require_login();
 $action = optional_param('action', '', PARAM_ALPHA);
 $programid = optional_param('programid', 0, PARAM_INT);
 
-// Для действий searchstudents и markforumpostnoreply разрешаем доступ администраторам и преподавателям
-if ($action == 'searchstudents' || $action == 'markforumpostnoreply') {
+// Для действий searchstudents, markforumpostnoreply и unmarkforumpostnoreply разрешаем доступ администраторам и преподавателям
+if ($action == 'searchstudents' || $action == 'markforumpostnoreply' || $action == 'unmarkforumpostnoreply') {
     $context = context_system::instance();
     $hasaccess = false;
     
@@ -1239,6 +1239,43 @@ if ($action == 'getteachercourses' && $teacherid > 0) {
         echo json_encode(['success' => true, 'id' => $id]);
     } else {
         echo json_encode(['success' => false, 'error' => 'Ошибка при сохранении']);
+    }
+} elseif ($action == 'unmarkforumpostnoreply') {
+    // Снять пометку "не требует ответа" с сообщения форума
+    global $DB, $USER;
+    
+    $noreplyid = optional_param('noreplyid', 0, PARAM_INT);
+    
+    if ($noreplyid <= 0) {
+        echo json_encode(['success' => false, 'error' => 'Неверный ID пометки']);
+        exit;
+    }
+    
+    // Проверяем существование таблицы
+    $dbman = $DB->get_manager();
+    if (!$dbman->table_exists('local_deanpromoodle_forum_no_reply')) {
+        echo json_encode(['success' => false, 'error' => 'Таблица не существует. Необходимо обновить базу данных через админ-панель Moodle.']);
+        exit;
+    }
+    
+    // Проверяем существование записи и что она принадлежит текущему пользователю
+    $record = $DB->get_record('local_deanpromoodle_forum_no_reply', [
+        'id' => $noreplyid,
+        'userid' => $USER->id
+    ]);
+    
+    if (!$record) {
+        echo json_encode(['success' => false, 'error' => 'Пометка не найдена или вы не имеете права её удалить']);
+        exit;
+    }
+    
+    // Удаляем запись
+    $deleted = $DB->delete_records('local_deanpromoodle_forum_no_reply', ['id' => $noreplyid]);
+    
+    if ($deleted) {
+        echo json_encode(['success' => true]);
+    } else {
+        echo json_encode(['success' => false, 'error' => 'Ошибка при удалении пометки']);
     }
 } else {
     echo json_encode(['success' => false, 'error' => 'Invalid action or parameters']);
