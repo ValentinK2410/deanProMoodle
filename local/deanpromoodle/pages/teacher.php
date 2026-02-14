@@ -1551,21 +1551,33 @@ switch ($tab) {
         $PAGE->requires->js_init_code("
             (function() {
                 document.addEventListener('click', function(e) {
-                    if (e.target && e.target.classList.contains('forum-no-reply-btn')) {
+                    // Проверяем, что клик произошел на кнопке или внутри неё
+                    var btn = e.target.closest('.forum-no-reply-btn');
+                    if (btn) {
                         e.preventDefault();
-                        var postid = e.target.getAttribute('data-postid');
-                        var row = e.target.closest('tr');
+                        e.stopPropagation();
+                        
+                        var postid = btn.getAttribute('data-postid');
+                        var row = btn.closest('tr');
                         
                         if (!postid) {
                             alert('Ошибка: не указан ID сообщения');
-                            return;
+                            return false;
                         }
+                        
+                        // Блокируем кнопку на время запроса
+                        btn.disabled = true;
+                        var originalText = btn.textContent || btn.innerText;
+                        btn.textContent = 'Обработка...';
                         
                         // Отправляем AJAX-запрос
                         var xhr = new XMLHttpRequest();
-                        xhr.open('GET', '" . $ajaxurl . "?action=markforumpostnoreply&postid=' + postid, true);
+                        xhr.open('GET', '" . $ajaxurl . "?action=markforumpostnoreply&postid=' + encodeURIComponent(postid), true);
                         xhr.onreadystatechange = function() {
                             if (xhr.readyState === 4) {
+                                btn.disabled = false;
+                                btn.textContent = originalText;
+                                
                                 if (xhr.status === 200) {
                                     try {
                                         var response = JSON.parse(xhr.responseText);
@@ -1574,18 +1586,32 @@ switch ($tab) {
                                             if (row) {
                                                 row.style.display = 'none';
                                             }
+                                            // Перезагружаем страницу для обновления счетчиков
+                                            setTimeout(function() {
+                                                window.location.reload();
+                                            }, 500);
                                         } else {
                                             alert('Ошибка: ' + (response.error || 'Неизвестная ошибка'));
                                         }
                                     } catch (e) {
-                                        alert('Ошибка при обработке ответа сервера');
+                                        console.error('Ошибка парсинга ответа:', e);
+                                        console.error('Ответ сервера:', xhr.responseText);
+                                        alert('Ошибка при обработке ответа сервера: ' + e.message);
                                     }
                                 } else {
-                                    alert('Ошибка сети: ' + xhr.status);
+                                    console.error('HTTP ошибка:', xhr.status, xhr.statusText);
+                                    console.error('Ответ сервера:', xhr.responseText);
+                                    alert('Ошибка сети: ' + xhr.status + ' ' + xhr.statusText);
                                 }
                             }
                         };
+                        xhr.onerror = function() {
+                            btn.disabled = false;
+                            btn.textContent = originalText;
+                            alert('Ошибка сети при отправке запроса');
+                        };
                         xhr.send();
+                        return false;
                     }
                 });
             })();
