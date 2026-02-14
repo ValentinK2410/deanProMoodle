@@ -1541,92 +1541,57 @@ if ($action == 'viewprogram' && $programid > 0) {
                             $assignmenttype = 'reading_report';
                         } elseif (strpos($assignmentname, 'письменн') !== false) {
                             $assignmenttype = 'written_work';
+                        } else {
+                            // Любое другое задание
+                            $assignmenttype = 'other';
                         }
                         
+                        // Получаем cmid для ссылки
+                        $assignmenturl = new moodle_url('/mod/assign/view.php', ['id' => $cm->id]);
+                        
+                        // Проверяем статус задания для студента
+                        // Получаем любую submission (не только submitted, но и draft и другие статусы)
+                        $submission = $DB->get_record('assign_submission', [
+                            'assignment' => $assignment->id,
+                            'userid' => $viewingstudent->id
+                        ]);
+                        
+                        // Проверяем, есть ли файлы или текст в submission
+                        $hasfiles = false;
+                        if ($submission) {
+                            // Проверяем наличие файлов через assignsubmission_file (плагин file)
+                            $filecount = $DB->count_records_sql(
+                                "SELECT COUNT(*) FROM {assignsubmission_file} WHERE submission = ?",
+                                [$submission->id]
+                            );
+                            
+                            // Проверяем наличие текста через assignsubmission_onlinetext (плагин onlinetext)
+                            $textcount = $DB->count_records_sql(
+                                "SELECT COUNT(*) FROM {assignsubmission_onlinetext} WHERE submission = ? AND onlinetext IS NOT NULL AND onlinetext != ''",
+                                [$submission->id]
+                            );
+                            
+                            $hasfiles = ($filecount > 0 || $textcount > 0);
+                        }
+                        
+                        // Используем функцию для проверки оценки (включая принудительно проставленные)
+                        $hasgrade = $checkAssignmentGrade($assignment->id, $viewingstudent->id);
+                        
+                        // Определяем текст для отображения в зависимости от типа задания
                         if ($assignmenttype == 'reading_report') {
-                            // Получаем cmid для ссылки (уже получен выше)
-                            $assignmenturl = new moodle_url('/mod/assign/view.php', ['id' => $cm->id]);
-                            
-                            // Проверяем статус задания для студента
-                            // Получаем любую submission (не только submitted, но и draft и другие статусы)
-                            $submission = $DB->get_record('assign_submission', [
-                                'assignment' => $assignment->id,
-                                'userid' => $viewingstudent->id
-                            ]);
-                            
-                            // Проверяем, есть ли файлы или текст в submission
-                            $hasfiles = false;
-                            if ($submission) {
-                                // Проверяем наличие файлов через assignsubmission_file (плагин file)
-                                $filecount = $DB->count_records_sql(
-                                    "SELECT COUNT(*) FROM {assignsubmission_file} WHERE submission = ?",
-                                    [$submission->id]
-                                );
-                                
-                                // Проверяем наличие текста через assignsubmission_onlinetext (плагин onlinetext)
-                                $textcount = $DB->count_records_sql(
-                                    "SELECT COUNT(*) FROM {assignsubmission_onlinetext} WHERE submission = ? AND onlinetext IS NOT NULL AND onlinetext != ''",
-                                    [$submission->id]
-                                );
-                                
-                                $hasfiles = ($filecount > 0 || $textcount > 0);
-                            }
-                            
-                            // Используем функцию для проверки оценки (включая принудительно проставленные)
-                            $hasgrade = $checkAssignmentGrade($assignment->id, $viewingstudent->id);
-                            
+                            // Отчет о чтении
                             if ($hasgrade) {
-                                // Есть оценка - зеленый "Чтение – сдано"
-                                $badgecontent = html_writer::link($assignmenturl, 'Чтение – сдано', [
-                                    'class' => 'assignment-status-link',
-                                    'target' => '_blank'
-                                ]);
-                                $statusitems[] = '<span class="badge assignment-status-item assignment-status-green">' . $badgecontent . '</span>';
+                                $statustext = 'Чтение – сдано';
+                                $badgeclass = 'assignment-status-green';
                             } elseif ($hasfiles) {
-                                // Файл загружен, но нет оценки - желтый "Чтение – не проверено"
-                                $badgecontent = html_writer::link($assignmenturl, 'Чтение – не проверено', [
-                                    'class' => 'assignment-status-link',
-                                    'target' => '_blank'
-                                ]);
-                                $statusitems[] = '<span class="badge assignment-status-item assignment-status-yellow">' . $badgecontent . '</span>';
-                                } else {
-                                // Нет файлов и нет оценки - красный "Чтение – не сдано"
-                                $badgecontent = html_writer::link($assignmenturl, 'Чтение – не сдано', [
-                                    'class' => 'assignment-status-link',
-                                    'target' => '_blank'
-                                ]);
-                                $statusitems[] = '<span class="badge assignment-status-item assignment-status-red">' . $badgecontent . '</span>';
+                                $statustext = 'Чтение – не проверено';
+                                $badgeclass = 'assignment-status-yellow';
+                            } else {
+                                $statustext = 'Чтение – не сдано';
+                                $badgeclass = 'assignment-status-red';
                             }
                         } elseif ($assignmenttype == 'written_work') {
-                            // Письменная работа
-                            $cm = get_coursemodule_from_instance('assign', $assignment->id, $course->id);
-                            if (!$cm) {
-                                continue;
-                            }
-                            $assignmenturl = new moodle_url('/mod/assign/view.php', ['id' => $cm->id]);
-                            
-                            $submission = $DB->get_record('assign_submission', [
-                                'assignment' => $assignment->id,
-                                'userid' => $viewingstudent->id
-                            ]);
-                            
-                            $hasfiles = false;
-                            if ($submission) {
-                                $filecount = $DB->count_records_sql(
-                                    "SELECT COUNT(*) FROM {assignsubmission_file} WHERE submission = ?",
-                                    [$submission->id]
-                                );
-                                $textcount = $DB->count_records_sql(
-                                    "SELECT COUNT(*) FROM {assignsubmission_onlinetext} WHERE submission = ? AND onlinetext IS NOT NULL AND onlinetext != ''",
-                                    [$submission->id]
-                                );
-                                $hasfiles = ($filecount > 0 || $textcount > 0);
-                            }
-                            
-                            // Используем функцию для проверки оценки (включая принудительно проставленные)
-                            $hasgrade = $checkAssignmentGrade($assignment->id, $viewingstudent->id);
-                            
-                            // Определяем текст для отображения (сокращаем длинные названия)
+                            // Письменная работа - сокращаем длинные названия
                             $assignmentname_lower = mb_strtolower(trim($assignment->name));
                             if ($assignmentname_lower == 'сдача письменной работы') {
                                 $basename = 'Письменная работа';
@@ -1638,33 +1603,38 @@ if ($action == 'viewprogram' && $programid > 0) {
                                 $basename = htmlspecialchars($assignment->name, ENT_QUOTES, 'UTF-8');
                             }
                             
-                            // Показываем письменную работу во всех состояниях
                             if ($hasgrade) {
-                                // Есть оценка - зеленый "Письменная работа - сдано"
                                 $statustext = $basename . ' - сдано';
-                                $badgecontent = html_writer::link($assignmenturl, $statustext, [
-                                    'class' => 'assignment-status-link',
-                                    'target' => '_blank'
-                                ]);
-                                $statusitems[] = '<span class="badge assignment-status-item assignment-status-green">' . $badgecontent . '</span>';
+                                $badgeclass = 'assignment-status-green';
                             } elseif ($hasfiles) {
-                                // Файл загружен, но нет оценки - желтый "Письменная работа - не проверено"
                                 $statustext = $basename . ' - не проверено';
-                                $badgecontent = html_writer::link($assignmenturl, $statustext, [
-                                    'class' => 'assignment-status-link',
-                                    'target' => '_blank'
-                                ]);
-                                $statusitems[] = '<span class="badge assignment-status-item assignment-status-yellow">' . $badgecontent . '</span>';
+                                $badgeclass = 'assignment-status-yellow';
                             } else {
-                                // Нет файлов и нет оценки - красный "Письменная работа - не сдано"
                                 $statustext = $basename . ' - не сдано';
-                                $badgecontent = html_writer::link($assignmenturl, $statustext, [
-                                    'class' => 'assignment-status-link',
-                                    'target' => '_blank'
-                                ]);
-                                $statusitems[] = '<span class="badge assignment-status-item assignment-status-red">' . $badgecontent . '</span>';
+                                $badgeclass = 'assignment-status-red';
+                            }
+                        } else {
+                            // Любое другое задание - используем оригинальное название
+                            $basename = htmlspecialchars($assignment->name, ENT_QUOTES, 'UTF-8');
+                            
+                            if ($hasgrade) {
+                                $statustext = $basename . ' - сдано';
+                                $badgeclass = 'assignment-status-green';
+                            } elseif ($hasfiles) {
+                                $statustext = $basename . ' - не проверено';
+                                $badgeclass = 'assignment-status-yellow';
+                            } else {
+                                $statustext = $basename . ' - не сдано';
+                                $badgeclass = 'assignment-status-red';
                             }
                         }
+                        
+                        // Отображаем задание
+                        $badgecontent = html_writer::link($assignmenturl, $statustext, [
+                            'class' => 'assignment-status-link',
+                            'target' => '_blank'
+                        ]);
+                        $statusitems[] = '<span class="badge assignment-status-item ' . $badgeclass . '">' . $badgecontent . '</span>';
                     }
                     
                     // Получаем тесты (экзамены)
