@@ -492,8 +492,9 @@ if ($tab != 'searchstudent') {
     $ungradedassignmentscount = $assignmentscount;
 
     // Подсчет не отвеченных сообщений (с учетом таблицы local_deanpromoodle_forum_no_reply)
+    // Используем ту же логику, что и для $forumscount и case 'forums'
     $unrepliedforumscount = 0;
-    if (!empty($teachercourses) && !empty($teacherroleids) && $studentroleid) {
+    if (!empty($teachercourses) && $studentroleid) {
         $forumids = [];
         $courseforums = [];
         foreach ($teachercourses as $course) {
@@ -510,17 +511,8 @@ if ($tab != 'searchstudent') {
                 $coursecontexts[$cid] = context_course::instance($cid);
             }
             $systemcontext = context_system::instance();
-            $placeholders = implode(',', array_fill(0, count($teacherroleids), '?'));
             $coursecontextids = array_map(function($ctx) { return $ctx->id; }, $coursecontexts);
             $coursecontextplaceholders = implode(',', array_fill(0, count($coursecontextids), '?'));
-            
-            $allteacheruserids = $DB->get_fieldset_sql(
-                "SELECT DISTINCT ra.userid
-                 FROM {role_assignments} ra
-                 WHERE (ra.contextid IN ($coursecontextplaceholders) OR ra.contextid = ?)
-                 AND ra.roleid IN ($placeholders)",
-                array_merge($coursecontextids, [$systemcontext->id], $teacherroleids)
-            );
             
             $allstudentuserids = $DB->get_fieldset_sql(
                 "SELECT DISTINCT ra.userid
@@ -530,9 +522,8 @@ if ($tab != 'searchstudent') {
                 array_merge($coursecontextids, [$studentroleid])
             );
             
-            if (!empty($allteacheruserids) && !empty($allstudentuserids)) {
+            if (!empty($allstudentuserids)) {
                 $forumplaceholders = implode(',', array_fill(0, count($forumids), '?'));
-                $teacherplaceholders = implode(',', array_fill(0, count($allteacheruserids), '?'));
                 $studentplaceholders = implode(',', array_fill(0, count($allstudentuserids), '?'));
                 
                 // Проверяем существование таблицы local_deanpromoodle_forum_no_reply
@@ -546,21 +537,45 @@ if ($tab != 'searchstudent') {
                     $noreplywhere = "AND fnr.id IS NULL";
                 }
                 
+                // Используем ту же логику, что и в case 'forums': NOT EXISTS для проверки ответов преподавателей
+                $excludeteachers = "AND NOT EXISTS (
+                     SELECT 1 FROM {role_assignments} ra3
+                     JOIN {context} ctx3 ON ctx3.id = ra3.contextid
+                     WHERE ra3.userid = p.userid
+                     AND ra3.roleid = ?
+                     AND (ctx3.contextlevel = 50 OR ctx3.id = ?)
+                 )";
+                
+                $noanswerfromteacher = "AND NOT EXISTS (
+                     SELECT 1 FROM {forum_posts} p2
+                     JOIN {role_assignments} ra2 ON ra2.userid = p2.userid
+                     JOIN {context} ctx2 ON ctx2.id = ra2.contextid
+                     WHERE p2.discussion = p.discussion
+                     AND p2.created > p.created
+                     AND ra2.roleid = ?
+                     AND (ctx2.contextlevel = 50 OR ctx2.id = ?)
+                 )";
+                
+                $sqlparams = array_merge(
+                    $forumids, 
+                    $allstudentuserids, 
+                    [$teacherroleid, $systemcontext->id], // для excludeteachers NOT EXISTS
+                    [$teacherroleid, $systemcontext->id]  // для noanswerfromteacher NOT EXISTS
+                );
+                
                 $unrepliedforumscount = $DB->count_records_sql(
                     "SELECT COUNT(DISTINCT p.id)
                      FROM {forum_posts} p
                      JOIN {user} u ON u.id = p.userid
                      JOIN {forum_discussions} d ON d.id = p.discussion
                      JOIN {forum} f ON f.id = d.forum
-                     LEFT JOIN {forum_posts} p2 ON p2.discussion = p.discussion 
-                         AND p2.created > p.created 
-                         AND p2.userid IN ($teacherplaceholders)
                      $noreplyjoin
                      WHERE d.forum IN ($forumplaceholders)
                      AND p.userid IN ($studentplaceholders)
-                     AND p2.id IS NULL
+                     $excludeteachers
+                     $noanswerfromteacher
                      $noreplywhere",
-                    array_merge($forumids, $allteacheruserids, $allstudentuserids)
+                    $sqlparams
                 );
             }
         }
