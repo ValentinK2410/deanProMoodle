@@ -906,7 +906,7 @@ switch ($tab) {
         $teacherid_item = $item->grader;
         $teachername = $DB->get_field('user', 'CONCAT(firstname, " ", lastname)', ['id' => $teacherid_item]);
         if (!$teachername) {
-            $teachername = 'Неизвестно';
+            $teachername = 'Неизвестно (ID: ' . (int)$teacherid_item . ')';
         }
         $datekey = date($dateformat, $item->timemodified);
         if (!isset($groupedhistory[$teacherid_item])) {
@@ -930,7 +930,7 @@ switch ($tab) {
         $teacherid_item = $item->grader;
         $teachername = $DB->get_field('user', 'CONCAT(firstname, " ", lastname)', ['id' => $teacherid_item]);
         if (!$teachername) {
-            $teachername = 'Неизвестно';
+            $teachername = 'Неизвестно (ID: ' . (int)$teacherid_item . ')';
         }
         $datekey = date($dateformat, $item->timemodified);
         if (!isset($groupedhistory[$teacherid_item])) {
@@ -954,7 +954,7 @@ switch ($tab) {
         $teacherid_item = $item->grader;
         $teachername = $DB->get_field('user', 'CONCAT(firstname, " ", lastname)', ['id' => $teacherid_item]);
         if (!$teachername) {
-            $teachername = 'Неизвестно';
+            $teachername = 'Неизвестно (ID: ' . (int)$teacherid_item . ')';
         }
         $datekey = date($dateformat, $item->timemodified);
         if (!isset($groupedhistory[$teacherid_item])) {
