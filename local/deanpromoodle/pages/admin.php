@@ -904,6 +904,9 @@ switch ($tab) {
         // Группировка заданий
         foreach ($assignmentshistory as $item) {
         $teacherid_item = $item->grader;
+        if ($teacherid_item <= 0) {
+            continue; // Пропускаем системные/неизвестные оценки (grader -1, 0)
+        }
         $teachername = $DB->get_field('user', 'CONCAT(firstname, " ", lastname)', ['id' => $teacherid_item]);
         if (!$teachername) {
             $teachername = 'Неизвестно (ID: ' . (int)$teacherid_item . ')';
@@ -928,6 +931,9 @@ switch ($tab) {
     // Группировка тестов
     foreach ($quizzeshistory as $item) {
         $teacherid_item = $item->grader;
+        if ($teacherid_item <= 0) {
+            continue; // Пропускаем системные/неизвестные оценки (grader -1, 0)
+        }
         $teachername = $DB->get_field('user', 'CONCAT(firstname, " ", lastname)', ['id' => $teacherid_item]);
         if (!$teachername) {
             $teachername = 'Неизвестно (ID: ' . (int)$teacherid_item . ')';
@@ -952,6 +958,9 @@ switch ($tab) {
     // Группировка форумов
     foreach ($forumshistory as $item) {
         $teacherid_item = $item->grader;
+        if ($teacherid_item <= 0) {
+            continue; // Пропускаем системные/неизвестные оценки (grader -1, 0)
+        }
         $teachername = $DB->get_field('user', 'CONCAT(firstname, " ", lastname)', ['id' => $teacherid_item]);
         if (!$teachername) {
             $teachername = 'Неизвестно (ID: ' . (int)$teacherid_item . ')';
