@@ -4748,24 +4748,23 @@ echo html_writer::tag('p', 'Автор: ' . html_writer::link('https://github.co
 echo html_writer::end_div();
 
 // JavaScript для полноэкранного режима таблицы
+// Функция должна быть в глобальной области для onclick
 $PAGE->requires->js_init_code("
-function toggleFullscreen() {
+window.toggleFullscreen = function() {
     var container = document.getElementById('courses-table-container');
     var table = document.getElementById('courses-table');
     var btn = document.getElementById('fullscreen-toggle-btn');
     
     if (container && container.classList.contains('fullscreen-mode')) {
-        // Выход из полноэкранного режима
         container.classList.remove('fullscreen-mode');
         if (table) table.classList.remove('courses-table-fullscreen');
         if (btn) btn.innerHTML = '<i class=\"fas fa-expand\"></i> Развернуть на весь экран';
     } else if (container) {
-        // Вход в полноэкранный режим
         container.classList.add('fullscreen-mode');
         if (table) table.classList.add('courses-table-fullscreen');
         if (btn) btn.innerHTML = '<i class=\"fas fa-compress\"></i> Вернуть как было';
     }
-}
+};
 
 // Добавление стиля к элементу page-content
 require(['jquery'], function($) {
