@@ -107,24 +107,28 @@ if ($studentid > 0) {
     $isadmin = has_capability('moodle/site:config', $context) || 
                has_capability('local/deanpromoodle:viewadmin', $context);
     
+    // Преподаватель: проверяем роль в контекстах курсов (teacher, editingteacher, coursecreator)
+    // get_user_roles($context) с системным контекстом не находит преподавателей — они назначаются в курсах
     $isteacher = false;
     if (!$isadmin) {
-$teacherroles = ['teacher', 'editingteacher', 'coursecreator'];
-$roles = get_user_roles($context, $USER->id, false);
-foreach ($roles as $role) {
-    if (in_array($role->shortname, $teacherroles)) {
-        $isteacher = true;
-        break;
-    }
-}
-if (!$isteacher) {
-    $systemcontext = context_system::instance();
-    $systemroles = get_user_roles($systemcontext, $USER->id, false);
-    foreach ($systemroles as $role) {
-        if (in_array($role->shortname, $teacherroles)) {
-            $isteacher = true;
-            break;
-                }
+        $teacherroleids = $DB->get_fieldset_select('role', 'id', "shortname IN ('teacher', 'editingteacher', 'coursecreator')");
+        if (!empty($teacherroleids)) {
+            $placeholders = implode(',', array_fill(0, count($teacherroleids), '?'));
+            // Сначала системный контекст
+            $isteacher = $DB->record_exists_sql(
+                "SELECT 1 FROM {role_assignments} ra
+                 WHERE ra.userid = ? AND ra.roleid IN ($placeholders) AND ra.contextid = ?",
+                array_merge([$USER->id], $teacherroleids, [$context->id])
+            );
+            if (!$isteacher) {
+                // Затем контексты курсов (contextlevel 50)
+                $isteacher = $DB->record_exists_sql(
+                    "SELECT 1 FROM {role_assignments} ra
+                     JOIN {context} ctx ON ctx.id = ra.contextid
+                     WHERE ra.userid = ? AND ra.roleid IN ($placeholders)
+                     AND ctx.contextlevel = 50",
+                    array_merge([$USER->id], $teacherroleids)
+                );
             }
         }
     }
