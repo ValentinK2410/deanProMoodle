@@ -127,7 +127,7 @@ $string['teacherbuttontitle'] = 'Teacher panel';
 $string['noprogramsfound'] = 'Unfortunately, no programs assigned to you were found. Please contact your teacher or the dean\'s office.';
 $string['nocohortsfound'] = 'You are not a member of any study group. Please contact your teacher or the dean\'s office for enrollment.';
 
-$string['admintab_activityfeed'] = 'Feed: new students';
+$string['admintab_activityfeed'] = 'Applicants';
 $string['feedtype_registration'] = 'Registration (student role)';
 $string['feedtype_course'] = 'Course enrolment';
 $string['feedtype_cohort'] = 'Cohort enrolment';

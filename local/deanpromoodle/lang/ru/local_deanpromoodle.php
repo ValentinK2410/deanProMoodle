@@ -139,7 +139,7 @@ $string['noprogramsfound'] = 'К сожалению, не найдено ни о
 $string['nocohortsfound'] = 'Вы не состоите ни в одной учебной группе. Обратитесь к преподавателю или в деканат для зачисления.';
 
 // Лента администратора: новые студенты и записи
-$string['admintab_activityfeed'] = 'Лента: новые студенты';
+$string['admintab_activityfeed'] = 'Абитуриенты';
 $string['feedtype_registration'] = 'Регистрация (роль студент)';
 $string['feedtype_course'] = 'Запись на курс';
 $string['feedtype_cohort'] = 'Зачисление в когорту';
