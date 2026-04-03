@@ -258,5 +258,21 @@ function xmldb_local_deanpromoodle_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026021001, 'local', 'deanpromoodle');
     }
 
+    // Таблица скрытых записей админ-ленты
+    if ($oldversion < 2026021101) {
+        $table = new xmldb_table('local_deanpromoodle_admin_feed_dismissed');
+        if (!$dbman->table_exists($table)) {
+            $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+            $table->add_field('itemkey', XMLDB_TYPE_CHAR, '100', null, XMLDB_NOTNULL, null, null);
+            $table->add_field('hiddenby', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+            $table->add_field('timecreated', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+            $table->add_key('itemkey_unique', XMLDB_KEY_UNIQUE, ['itemkey']);
+            $table->add_key('hiddenby_fk', XMLDB_KEY_FOREIGN, ['hiddenby'], 'user', ['id']);
+            $dbman->create_table($table);
+        }
+        upgrade_plugin_savepoint(true, 2026021101, 'local', 'deanpromoodle');
+    }
+
     return true;
 }

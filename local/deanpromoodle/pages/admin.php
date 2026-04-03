@@ -134,8 +134,9 @@ if (!$isadmin) {
 }
 
 // Получение параметров
-$tab = optional_param('tab', 'history', PARAM_ALPHA); // history, teachers, students, subjects, programs, categories
+$tab = optional_param('tab', 'history', PARAM_ALPHA); // history, teachers, students, activityfeed, subjects, programs, categories
 $teacherid = optional_param('teacherid', 0, PARAM_INT);
+$feedview = optional_param('feedview', 'active', PARAM_ALPHA); // active | hidden — для вкладки «Лента»
 $period = optional_param('period', 'month', PARAM_ALPHA); // day, week, month, year
 $datefrom = optional_param('datefrom', '', PARAM_TEXT);
 $dateto = optional_param('dateto', '', PARAM_TEXT);
@@ -451,7 +452,7 @@ if ($tab == 'programs' && $action == 'export_subjects' && $programid > 0) {
 }
 
 // Настройка страницы
-$PAGE->set_url(new moodle_url('/local/deanpromoodle/pages/admin.php', [
+$urlopts = [
     'tab' => $tab,
     'teacherid' => $teacherid,
     'period' => $period,
@@ -459,8 +460,12 @@ $PAGE->set_url(new moodle_url('/local/deanpromoodle/pages/admin.php', [
     'dateto' => $dateto,
     'studentperiod' => $studentperiod,
     'studentdatefrom' => $studentdatefrom,
-    'studentdateto' => $studentdateto
-]));
+    'studentdateto' => $studentdateto,
+];
+if ($tab === 'activityfeed' && ($feedview === 'hidden' || $feedview === 'active')) {
+    $urlopts['feedview'] = $feedview;
+}
+$PAGE->set_url(new moodle_url('/local/deanpromoodle/pages/admin.php', $urlopts));
 $PAGE->set_context(context_system::instance());
 // Получение заголовка с проверкой и fallback на русский
 $pagetitle = get_string('adminpagetitle', 'local_deanpromoodle');
@@ -491,6 +496,9 @@ $tabs[] = new tabobject('teachers',
 $tabs[] = new tabobject('students', 
     new moodle_url('/local/deanpromoodle/pages/admin.php', ['tab' => 'students']),
     'Студенты');
+$tabs[] = new tabobject('activityfeed',
+    new moodle_url('/local/deanpromoodle/pages/admin.php', ['tab' => 'activityfeed']),
+    get_string('admintab_activityfeed', 'local_deanpromoodle'));
 $tabs[] = new tabobject('subjects', 
     new moodle_url('/local/deanpromoodle/pages/admin.php', ['tab' => 'subjects']),
     'Предметы');
@@ -6931,6 +6939,137 @@ switch ($tab) {
         echo html_writer::end_div();
         break;
     
+    case 'activityfeed':
+        require_once($CFG->dirroot . '/local/deanpromoodle/locallib.php');
+
+        echo html_writer::start_div('local-deanpromoodle-admin-content', ['style' => 'margin-bottom: 30px;']);
+        echo html_writer::tag('h2', get_string('admintab_activityfeed', 'local_deanpromoodle'), ['style' => 'margin-bottom: 12px;']);
+        echo html_writer::div(get_string('feed_help', 'local_deanpromoodle'), 'alert alert-info', ['style' => 'margin-bottom: 16px;']);
+
+        $activeurl = new moodle_url('/local/deanpromoodle/pages/admin.php', ['tab' => 'activityfeed', 'feedview' => 'active']);
+        $hiddenurl = new moodle_url('/local/deanpromoodle/pages/admin.php', ['tab' => 'activityfeed', 'feedview' => 'hidden']);
+        $isactive = ($feedview !== 'hidden');
+        echo html_writer::start_div('', ['style' => 'margin-bottom: 16px;']);
+        echo html_writer::link($activeurl, get_string('feedview_active', 'local_deanpromoodle'), [
+            'class' => 'btn btn-sm ' . ($isactive ? 'btn-primary' : 'btn-outline-secondary'),
+            'style' => 'margin-right: 8px;',
+        ]);
+        echo html_writer::link($hiddenurl, get_string('feedview_hidden', 'local_deanpromoodle'), [
+            'class' => 'btn btn-sm ' . (!$isactive ? 'btn-primary' : 'btn-outline-secondary'),
+        ]);
+        echo html_writer::end_div();
+
+        $items = local_deanpromoodle_get_admin_activity_feed($feedview);
+        $studentpageurl = new moodle_url('/local/deanpromoodle/pages/student.php');
+        $ajaxurl = $CFG->wwwroot . '/local/deanpromoodle/pages/admin_ajax.php';
+        $sessk = sesskey();
+
+        if (empty($items)) {
+            echo html_writer::div(
+                $isactive ? 'Нет записей за последние 90 дней или все скрыты.' : 'Нет скрытых записей.',
+                'alert alert-info'
+            );
+        } else {
+            echo html_writer::start_tag('table', ['class' => 'table table-striped table-hover', 'style' => 'width:100%;font-size:0.95em;']);
+            echo html_writer::start_tag('thead');
+            echo html_writer::start_tag('tr');
+            echo html_writer::tag('th', 'Тип');
+            echo html_writer::tag('th', get_string('feed_eventdate', 'local_deanpromoodle'));
+            echo html_writer::tag('th', 'Студент');
+            echo html_writer::tag('th', 'Email');
+            echo html_writer::tag('th', 'Когорты');
+            echo html_writer::tag('th', 'Программа (по когорте)');
+            echo html_writer::tag('th', 'Курс');
+            echo html_writer::tag('th', 'Даты курса / примечание');
+            if (!$isactive) {
+                echo html_writer::tag('th', get_string('feed_hiddenat', 'local_deanpromoodle'));
+            }
+            echo html_writer::tag('th', 'Действия');
+            echo html_writer::end_tag('tr');
+            echo html_writer::end_tag('thead');
+            echo html_writer::start_tag('tbody');
+
+            foreach ($items as $row) {
+                $evdate = userdate($row->sorttime, get_string('strftimedatetime', 'langconfig'));
+                $profilelink = html_writer::link(
+                    new moodle_url($studentpageurl, ['studentid' => $row->userid, 'tab' => 'courses']),
+                    format_string($row->studentname),
+                    ['target' => '_blank']
+                );
+                echo html_writer::start_tag('tr', ['data-itemkey' => $row->itemkey]);
+                echo html_writer::tag('td', format_string($row->typelabel));
+                echo html_writer::tag('td', $evdate);
+                echo html_writer::tag('td', $profilelink);
+                echo html_writer::tag('td', s($row->email));
+                echo html_writer::tag('td', format_string($row->cohorts));
+                echo html_writer::tag('td', format_string($row->programs));
+                echo html_writer::tag('td', $row->course);
+                echo html_writer::tag('td', $row->coursedates);
+                if (!$isactive) {
+                    $hat = isset($row->hiddenat) ? userdate($row->hiddenat, get_string('strftimedatetime', 'langconfig')) : '—';
+                    if (!empty($row->hiddenbyname)) {
+                        $hat .= html_writer::empty_tag('br') . s($row->hiddenbyname);
+                    }
+                    echo html_writer::tag('td', $hat);
+                }
+                $btnlabel = $isactive ? get_string('feed_dismiss', 'local_deanpromoodle') : get_string('feed_restore', 'local_deanpromoodle');
+                $btnclass = $isactive ? 'btn-secondary local-feed-dismiss' : 'btn-warning local-feed-restore';
+                $actions = html_writer::tag('button', $btnlabel, [
+                    'type' => 'button',
+                    'class' => 'btn btn-sm ' . $btnclass,
+                    'data-itemkey' => $row->itemkey,
+                ]);
+                echo html_writer::tag('td', $actions);
+                echo html_writer::end_tag('tr');
+            }
+
+            echo html_writer::end_tag('tbody');
+            echo html_writer::end_tag('table');
+        }
+
+        $PAGE->requires->js_init_code("
+            (function() {
+                var ajaxUrl = " . json_encode($ajaxurl) . ";
+                var sesskey = " . json_encode($sessk) . ";
+                function postFeed(action, itemkey, btn) {
+                    btn.disabled = true;
+                    var fd = new FormData();
+                    fd.append('action', action);
+                    fd.append('itemkey', itemkey);
+                    fd.append('sesskey', sesskey);
+                    var xhr = new XMLHttpRequest();
+                    xhr.open('POST', ajaxUrl, true);
+                    xhr.onreadystatechange = function() {
+                        if (xhr.readyState === 4) {
+                            btn.disabled = false;
+                            if (xhr.status === 200) {
+                                try {
+                                    var r = JSON.parse(xhr.responseText);
+                                    if (r.success) { window.location.reload(); }
+                                    else { alert(r.error || 'Ошибка'); }
+                                } catch (e) { alert('Ошибка ответа'); }
+                            } else { alert('HTTP ' + xhr.status); }
+                        }
+                    };
+                    xhr.send(fd);
+                }
+                document.querySelectorAll('.local-feed-dismiss').forEach(function(btn) {
+                    btn.addEventListener('click', function() {
+                        if (!confirm('Скрыть эту запись из ленты? Её можно будет вернуть во вкладке «Скрытые».')) return;
+                        postFeed('dismissfeed', btn.getAttribute('data-itemkey'), btn);
+                    });
+                });
+                document.querySelectorAll('.local-feed-restore').forEach(function(btn) {
+                    btn.addEventListener('click', function() {
+                        postFeed('restorefeed', btn.getAttribute('data-itemkey'), btn);
+                    });
+                });
+            })();
+        ");
+
+        echo html_writer::end_div();
+        break;
+
     case 'searchstudent':
         // Вкладка "Поиск студента"
         echo html_writer::start_div('local-deanpromoodle-admin-content', ['style' => 'margin-bottom: 30px;']);

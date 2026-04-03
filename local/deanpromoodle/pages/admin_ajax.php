@@ -1277,6 +1277,48 @@ if ($action == 'getteachercourses' && $teacherid > 0) {
     } else {
         echo json_encode(['success' => false, 'error' => 'Ошибка при удалении пометки']);
     }
+} elseif ($action == 'dismissfeed') {
+    require_sesskey();
+    global $DB, $USER;
+    $itemkey = optional_param('itemkey', '', PARAM_RAW);
+    $itemkey = trim($itemkey);
+    if (!preg_match('/^(na|ce|cm)_\d+$/', $itemkey)) {
+        echo json_encode(['success' => false, 'error' => 'Неверный ключ записи']);
+        exit;
+    }
+    $dbman = $DB->get_manager();
+    if (!$dbman->table_exists('local_deanpromoodle_admin_feed_dismissed')) {
+        echo json_encode(['success' => false, 'error' => 'Обновите плагин (нет таблицы ленты).']);
+        exit;
+    }
+    if ($DB->record_exists('local_deanpromoodle_admin_feed_dismissed', ['itemkey' => $itemkey])) {
+        echo json_encode(['success' => true]);
+        exit;
+    }
+    $rec = new stdClass();
+    $rec->itemkey = $itemkey;
+    $rec->hiddenby = $USER->id;
+    $rec->timecreated = time();
+    $DB->insert_record('local_deanpromoodle_admin_feed_dismissed', $rec);
+    echo json_encode(['success' => true]);
+    exit;
+} elseif ($action == 'restorefeed') {
+    require_sesskey();
+    global $DB;
+    $itemkey = optional_param('itemkey', '', PARAM_RAW);
+    $itemkey = trim($itemkey);
+    if (!preg_match('/^(na|ce|cm)_\d+$/', $itemkey)) {
+        echo json_encode(['success' => false, 'error' => 'Неверный ключ записи']);
+        exit;
+    }
+    $dbman = $DB->get_manager();
+    if (!$dbman->table_exists('local_deanpromoodle_admin_feed_dismissed')) {
+        echo json_encode(['success' => false, 'error' => 'Обновите плагин (нет таблицы ленты).']);
+        exit;
+    }
+    $DB->delete_records('local_deanpromoodle_admin_feed_dismissed', ['itemkey' => $itemkey]);
+    echo json_encode(['success' => true]);
+    exit;
 } else {
     echo json_encode(['success' => false, 'error' => 'Invalid action or parameters']);
 }

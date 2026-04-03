@@ -126,3 +126,15 @@ $string['teacherbuttontitle'] = 'Teacher panel';
 // Student messages
 $string['noprogramsfound'] = 'Unfortunately, no programs assigned to you were found. Please contact your teacher or the dean\'s office.';
 $string['nocohortsfound'] = 'You are not a member of any study group. Please contact your teacher or the dean\'s office for enrollment.';
+
+$string['admintab_activityfeed'] = 'Feed: new students';
+$string['feedtype_registration'] = 'Registration (student role)';
+$string['feedtype_course'] = 'Course enrolment';
+$string['feedtype_cohort'] = 'Cohort enrolment';
+$string['feedview_active'] = 'Current';
+$string['feedview_hidden'] = 'Hidden (restorable)';
+$string['feed_dismiss'] = 'Hide from feed';
+$string['feed_restore'] = 'Restore to feed';
+$string['feed_help'] = 'Hiding does not delete the user or unenrol them — it only removes the row from this list. Restore from the Hidden tab.';
+$string['feed_eventdate'] = 'Event date';
+$string['feed_hiddenat'] = 'Hidden at';
