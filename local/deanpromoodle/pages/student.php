@@ -2221,6 +2221,7 @@ if ($action == 'viewprogram' && $programid > 0) {
         case 'additional':
             // Подвкладка "Дополнительные данные"
             try {
+                require_once($CFG->dirroot . '/local/deanpromoodle/locallib.php');
                 // Проверяем права на редактирование
                 $canedit = false;
                 if ($isadmin || $isteacher) {
@@ -2691,7 +2692,9 @@ if ($action == 'viewprogram' && $programid > 0) {
                                                         'street' => 255,
                                                         'house_apartment' => 100,
                                                         'previous_institution' => 255,
-                                                        'cohort' => 255
+                                                        'cohort' => 255,
+                                                        'intended_course' => 500,
+                                                        'registration_address' => 65535,
                                                     ];
                                                     
                                                     // Заполняем все поля из Excel
@@ -2942,6 +2945,15 @@ if ($action == 'viewprogram' && $programid > 0) {
                     $data->previous_institution = optional_param('previous_institution', '', PARAM_TEXT);
                     $data->previous_institution_year = optional_param('previous_institution_year', 0, PARAM_INT);
                     $data->cohort = optional_param('cohort', '', PARAM_TEXT);
+                    $data->registration_address = optional_param('registration_address', '', PARAM_RAW);
+                    $data->registration_address = trim($data->registration_address);
+                    if (strlen($data->registration_address) > 65535) {
+                        $data->registration_address = substr($data->registration_address, 0, 65535);
+                    }
+                    $data->intended_course = optional_param('intended_course', '', PARAM_TEXT);
+                    if (mb_strlen($data->intended_course, 'UTF-8') > 500) {
+                        $data->intended_course = mb_substr($data->intended_course, 0, 500, 'UTF-8');
+                    }
                     $data->timemodified = time();
                     
                     // Проверяем, существует ли запись
@@ -2958,10 +2970,28 @@ if ($action == 'viewprogram' && $programid > 0) {
                         $DB->insert_record('local_deanpromoodle_student_info', $data);
                         echo html_writer::div('Данные успешно сохранены', 'alert alert-success');
                     }
+
+                    if (optional_param('remove_passport_scan1', 0, PARAM_INT)) {
+                        local_deanpromoodle_delete_identity_scan($viewingstudent->id, 'passport_scan1');
+                    }
+                    if (optional_param('remove_passport_scan2', 0, PARAM_INT)) {
+                        local_deanpromoodle_delete_identity_scan($viewingstudent->id, 'passport_scan2');
+                    }
+                    if (!empty($_FILES['passport_scan1']['name']) || !empty($_FILES['passport_scan2']['name'])) {
+                        $scanerr = local_deanpromoodle_save_identity_scans($viewingstudent->id, $_FILES);
+                        if ($scanerr) {
+                            echo html_writer::div($scanerr, 'alert alert-danger');
+                        }
+                    }
                 }
                 
                 // Получаем данные из таблицы local_deanpromoodle_student_info
                 $studentinfo = $DB->get_record('local_deanpromoodle_student_info', ['userid' => $viewingstudent->id]);
+
+                $canviewidentity = local_deanpromoodle_can_view_user_identity_docs($viewingstudent->id);
+                $identityfiles = $canviewidentity
+                    ? local_deanpromoodle_get_identity_doc_files($viewingstudent->id)
+                    : ['passport_scan1' => null, 'passport_scan2' => null];
                 
                 // Определяем режим отображения
                 $editmode = ($action == 'edit' && $canedit);
@@ -3203,7 +3233,8 @@ if ($action == 'viewprogram' && $programid > 0) {
                     echo html_writer::start_tag('form', [
                         'method' => 'post',
                         'action' => $saveurl,
-                        'class' => 'student-info-form'
+                        'class' => 'student-info-form',
+                        'enctype' => 'multipart/form-data',
                     ]);
                     echo html_writer::input_hidden_params($saveurl);
                     echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'sesskey', 'value' => sesskey()]);
@@ -3231,6 +3262,7 @@ if ($action == 'viewprogram' && $programid > 0) {
                         .student-info-form input[type='tel'],
                         .student-info-form input[type='date'],
                         .student-info-form input[type='number'],
+                        .student-info-form input[type='file'],
                         .student-info-form select,
                         .student-info-form textarea {
                             width: 100%;
@@ -3538,6 +3570,29 @@ if ($action == 'viewprogram' && $programid > 0) {
                     ]);
                     echo html_writer::end_div();
                     echo html_writer::end_div();
+
+                    echo html_writer::start_tag('h3', ['style' => 'margin-top: 30px; margin-bottom: 20px; color: #495057;']);
+                    echo get_string('additional_registration_block', 'local_deanpromoodle');
+                    echo html_writer::end_tag('h3');
+
+                    echo html_writer::start_div('form-group');
+                    echo html_writer::tag('label', get_string('field_intended_course', 'local_deanpromoodle'));
+                    echo html_writer::tag('textarea', htmlspecialchars($studentinfo ? ($studentinfo->intended_course ?? '') : '', ENT_QUOTES, 'UTF-8'), [
+                        'name' => 'intended_course',
+                        'class' => 'form-control',
+                        'rows' => 2,
+                        'maxlength' => 500,
+                    ]);
+                    echo html_writer::end_div();
+
+                    echo html_writer::start_div('form-group');
+                    echo html_writer::tag('label', get_string('field_registration_address', 'local_deanpromoodle'));
+                    echo html_writer::tag('textarea', htmlspecialchars($studentinfo ? ($studentinfo->registration_address ?? '') : '', ENT_QUOTES, 'UTF-8'), [
+                        'name' => 'registration_address',
+                        'class' => 'form-control',
+                        'rows' => 3,
+                    ]);
+                    echo html_writer::end_div();
                     
                     // Предыдущее учебное заведение
                     echo html_writer::start_tag('h3', ['style' => 'margin-top: 30px; margin-bottom: 20px; color: #495057;']);
@@ -3578,6 +3633,38 @@ if ($action == 'viewprogram' && $programid > 0) {
                         'class' => 'form-control'
                     ]);
                     echo html_writer::end_div();
+
+                    echo html_writer::start_tag('h3', ['style' => 'margin-top: 30px; margin-bottom: 20px; color: #495057;']);
+                    echo get_string('identitydocs_section', 'local_deanpromoodle');
+                    echo html_writer::end_tag('h3');
+                    echo html_writer::div(get_string('identitydocs_hint', 'local_deanpromoodle'), 'alert alert-info', ['style' => 'font-size:13px;']);
+
+                    foreach (['passport_scan1' => 'identitydoc_passport_main', 'passport_scan2' => 'identitydoc_passport_reg'] as $slot => $labelkey) {
+                        echo html_writer::start_div('form-group');
+                        echo html_writer::tag('label', get_string($labelkey, 'local_deanpromoodle'));
+                        if (!empty($identityfiles[$slot])) {
+                            echo html_writer::div(
+                                local_deanpromoodle_render_identity_preview($identityfiles[$slot]),
+                                'local-deanpromoodle-scan-preview',
+                                ['style' => 'margin-bottom:10px;']
+                            );
+                            echo html_writer::tag('label',
+                                html_writer::empty_tag('input', [
+                                    'type' => 'checkbox',
+                                    'name' => 'remove_' . $slot,
+                                    'value' => '1',
+                                ]) . ' ' . get_string('identitydoc_remove', 'local_deanpromoodle'),
+                                ['class' => 'form-check-label']
+                            );
+                        }
+                        echo html_writer::empty_tag('input', [
+                            'type' => 'file',
+                            'name' => $slot,
+                            'class' => 'form-control',
+                            'accept' => 'image/jpeg,image/png,application/pdf',
+                        ]);
+                        echo html_writer::end_div();
+                    }
                     
                     // Кнопки действий
                     echo html_writer::start_div('form-actions');
@@ -3764,6 +3851,20 @@ if ($action == 'viewprogram' && $programid > 0) {
                             echo html_writer::end_tag('tr');
                         }
                     }
+
+                    if ($studentinfo && !empty($studentinfo->intended_course)) {
+                        echo html_writer::start_tag('tr');
+                        echo html_writer::tag('td', get_string('field_intended_course', 'local_deanpromoodle'));
+                        echo html_writer::tag('td', htmlspecialchars($studentinfo->intended_course, ENT_QUOTES, 'UTF-8'));
+                        echo html_writer::end_tag('tr');
+                    }
+                    if ($studentinfo && !empty($studentinfo->registration_address)) {
+                        $regaddr = htmlspecialchars($studentinfo->registration_address, ENT_QUOTES, 'UTF-8');
+                        echo html_writer::start_tag('tr');
+                        echo html_writer::tag('td', get_string('field_registration_address', 'local_deanpromoodle'));
+                        echo html_writer::tag('td', nl2br($regaddr, false));
+                        echo html_writer::end_tag('tr');
+                    }
                     
                     // Предыдущее учебное заведение
                     if ($studentinfo && !empty($studentinfo->previous_institution)) {
@@ -3786,6 +3887,28 @@ if ($action == 'viewprogram' && $programid > 0) {
                     echo html_writer::end_tag('tbody');
                     echo html_writer::end_tag('table');
                     echo html_writer::end_div();
+
+                    if ($canviewidentity && ($identityfiles['passport_scan1'] || $identityfiles['passport_scan2'])) {
+                        echo html_writer::start_div('additional-identity-docs', [
+                            'style' => 'margin-top:24px;padding:20px;background:white;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,0.1);',
+                        ]);
+                        echo html_writer::tag('h3', get_string('identitydocs_section', 'local_deanpromoodle'), [
+                            'style' => 'margin-top:0;margin-bottom:16px;color:#495057;',
+                        ]);
+                        foreach (['passport_scan1' => 'identitydoc_passport_main', 'passport_scan2' => 'identitydoc_passport_reg'] as $slot => $labelkey) {
+                            if (empty($identityfiles[$slot])) {
+                                continue;
+                            }
+                            echo html_writer::tag('h4', get_string($labelkey, 'local_deanpromoodle'), [
+                                'style' => 'font-size:16px;margin:16px 0 8px;',
+                            ]);
+                            echo html_writer::div(
+                                local_deanpromoodle_render_identity_preview($identityfiles[$slot]),
+                                'local-deanpromoodle-scan-preview'
+                            );
+                        }
+                        echo html_writer::end_div();
+                    }
                 }
             } catch (\Exception $e) {
                 echo html_writer::div('Ошибка: ' . $e->getMessage(), 'alert alert-danger');

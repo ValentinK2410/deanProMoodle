@@ -26,7 +26,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_deanpromoodle';
-$plugin->version = 2026021102; // YYYYMMDDXX format — переименование вкладки «Абитуриенты»
+$plugin->version = 2026021202; // Доп. данные: UI сканов, pluginfile, строки lang
 $plugin->requires = 2022041900; // Moodle 4.0+
 $plugin->maturity = MATURITY_ALPHA;
 $plugin->release = 'v1.0.0-alpha';

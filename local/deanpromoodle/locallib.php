@@ -456,3 +456,187 @@ function local_deanpromoodle_feed_resolve_item($itemkey) {
 
     return null;
 }
+
+/**
+ * Доступ к сканам документов: владелец или админ/преподаватель (как на странице студента).
+ *
+ * @param int $targetuserid
+ * @return bool
+ */
+function local_deanpromoodle_can_view_user_identity_docs($targetuserid) {
+    global $USER, $DB;
+
+    $targetuserid = (int) $targetuserid;
+    if ((int) $USER->id === $targetuserid) {
+        return true;
+    }
+
+    $ctx = context_system::instance();
+    if (has_capability('moodle/site:config', $ctx) || has_capability('local/deanpromoodle:viewadmin', $ctx)) {
+        return true;
+    }
+
+    $teacherroleids = $DB->get_fieldset_select('role', 'id', "shortname IN ('teacher', 'editingteacher', 'coursecreator')");
+    if (empty($teacherroleids)) {
+        return false;
+    }
+    list($insql, $params) = $DB->get_in_or_equal($teacherroleids, SQL_PARAMS_NAMED);
+    return $DB->record_exists_sql(
+        "SELECT 1 FROM {role_assignments} ra
+          JOIN {context} ctx ON ctx.id = ra.contextid
+         WHERE ra.userid = :me AND ra.roleid $insql
+           AND (ctx.contextlevel = :clevel OR ctx.id = :sysid)",
+        array_merge(['me' => $USER->id, 'clevel' => CONTEXT_COURSE, 'sysid' => $ctx->id], $params)
+    );
+}
+
+/**
+ * Сохраняет загруженные сканы (до 2 слотов) в filearea пользователя.
+ *
+ * @param int $userid Владелец файлов
+ * @param array $files массив $_FILES
+ * @return string|null сообщение об ошибке или null
+ */
+function local_deanpromoodle_save_identity_scans($userid, array $files) {
+    global $USER, $DB;
+
+    $userid = (int) $userid;
+    if ($userid !== (int) $USER->id && !has_capability('moodle/site:config', context_system::instance())
+            && !has_capability('local/deanpromoodle:viewadmin', context_system::instance())) {
+        $teacherroleids = $DB->get_fieldset_select('role', 'id', "shortname IN ('teacher', 'editingteacher', 'coursecreator')");
+        if (!empty($teacherroleids)) {
+            list($insql, $p) = $DB->get_in_or_equal($teacherroleids, SQL_PARAMS_NAMED);
+            $ok = $DB->record_exists_sql(
+                "SELECT 1 FROM {role_assignments} ra WHERE ra.userid = :me AND ra.roleid $insql",
+                array_merge(['me' => $USER->id], $p)
+            );
+            if (!$ok) {
+                return 'Нет права загружать файлы за этого пользователя';
+            }
+        } else {
+            return 'Нет права загружать файлы за этого пользователя';
+        }
+    }
+
+    $context = context_user::instance($userid);
+    $fs = get_file_storage();
+    $maxbytes = 5 * 1024 * 1024;
+    $allowedmimes = ['image/jpeg', 'image/png', 'application/pdf'];
+    $slots = ['passport_scan1', 'passport_scan2'];
+
+    foreach ($slots as $slot) {
+        if (empty($files[$slot]) || !isset($files[$slot]['error']) || $files[$slot]['error'] === UPLOAD_ERR_NO_FILE) {
+            continue;
+        }
+        if ($files[$slot]['error'] !== UPLOAD_ERR_OK) {
+            return 'Ошибка загрузки файла: ' . $slot;
+        }
+        if ($files[$slot]['size'] > $maxbytes) {
+            return 'Файл слишком большой (максимум 5 МБ): ' . $slot;
+        }
+        $tmp = $files[$slot]['tmp_name'];
+        if (!is_uploaded_file($tmp)) {
+            return 'Некорректная загрузка файла';
+        }
+        $mimetype = '';
+        if (class_exists('finfo')) {
+            $fi = new finfo(FILEINFO_MIME_TYPE);
+            $mimetype = $fi->file($tmp);
+        }
+        if ($mimetype === '' && function_exists('mime_content_type')) {
+            $mimetype = mime_content_type($tmp);
+        }
+        if (!in_array($mimetype, $allowedmimes, true)) {
+            return 'Допустимы только JPG, PNG или PDF';
+        }
+        $filename = clean_filename($files[$slot]['name']);
+        if ($filename === '') {
+            return 'Пустое имя файла';
+        }
+        $filepath = '/' . $slot . '/';
+        $fs->delete_area_files($context->id, 'local_deanpromoodle', 'identitydocs', 0, $filepath);
+        $record = (object) [
+            'contextid' => $context->id,
+            'component' => 'local_deanpromoodle',
+            'filearea' => 'identitydocs',
+            'itemid' => 0,
+            'filepath' => $filepath,
+            'filename' => $filename,
+            'userid' => (int) $USER->id,
+            'author' => fullname($USER),
+            'license' => 'allrightsreserved',
+            'timemodified' => time(),
+        ];
+        $fs->create_file_from_pathname($record, $tmp);
+    }
+
+    return null;
+}
+
+/**
+ * Удалить скан в слоте.
+ *
+ * @param int $userid
+ * @param string $slot passport_scan1|passport_scan2
+ */
+function local_deanpromoodle_delete_identity_scan($userid, $slot) {
+    if (!in_array($slot, ['passport_scan1', 'passport_scan2'], true)) {
+        return;
+    }
+    $context = context_user::instance((int) $userid);
+    $fs = get_file_storage();
+    $fs->delete_area_files($context->id, 'local_deanpromoodle', 'identitydocs', 0, '/' . $slot . '/');
+}
+
+/**
+ * Получить файлы сканов для отображения.
+ *
+ * @param int $userid
+ * @return array ключ slot => stored_file|null
+ */
+function local_deanpromoodle_get_identity_doc_files($userid) {
+    $context = context_user::instance((int) $userid);
+    $fs = get_file_storage();
+    $out = ['passport_scan1' => null, 'passport_scan2' => null];
+    foreach (array_keys($out) as $slot) {
+        $files = $fs->get_area_files($context->id, 'local_deanpromoodle', 'identitydocs', 0, '/' . $slot . '/', false);
+        foreach ($files as $f) {
+            if (!$f->is_directory()) {
+                $out[$slot] = $f;
+                break;
+            }
+        }
+    }
+    return $out;
+}
+
+/**
+ * Встроенный просмотр скана (изображение или PDF в iframe).
+ *
+ * @param stored_file $file
+ * @return string HTML
+ */
+function local_deanpromoodle_render_identity_preview($file) {
+    $url = moodle_url::make_pluginfile_url(
+        $file->get_contextid(),
+        'local_deanpromoodle',
+        'identitydocs',
+        0,
+        $file->get_filepath(),
+        $file->get_filename(),
+        false
+    );
+    $mime = $file->get_mimetype();
+    if (strpos($mime, 'image/') === 0) {
+        return html_writer::empty_tag('img', [
+            'src' => $url->out(false),
+            'alt' => '',
+            'style' => 'max-width:100%;max-height:480px;border:1px solid #dee2e6;border-radius:6px;',
+        ]);
+    }
+    if ($mime === 'application/pdf') {
+        $u = htmlspecialchars($url->out(false), ENT_QUOTES, 'UTF-8');
+        return '<iframe src="' . $u . '" class="local-deanpromoodle-doc-iframe" style="width:100%;min-height:520px;border:1px solid #dee2e6;border-radius:6px;" title="PDF"></iframe>';
+    }
+    return html_writer::link($url, get_string('identitydoc_openfile', 'local_deanpromoodle'), ['target' => '_blank', 'rel' => 'noopener']);
+}

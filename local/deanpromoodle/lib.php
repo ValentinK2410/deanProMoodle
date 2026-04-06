@@ -761,3 +761,39 @@ function local_deanpromoodle_before_footer() {
     
     $PAGE->requires->js_init_code($cookieConsentJs);
 }
+
+/**
+ * Отдача файлов сканов документов (только авторизованным с правом просмотра).
+ *
+ * @param stdClass $course
+ * @param stdClass $cm
+ * @param context $context
+ * @param string $filearea
+ * @param array $args
+ * @param bool $forcedownload
+ * @param array $options
+ * @return bool
+ */
+function local_deanpromoodle_pluginfile($course, $cm, $context, $filearea, $args, $forcedownload, array $options = []) {
+    if ($filearea !== 'identitydocs') {
+        return false;
+    }
+    if ($context->contextlevel != CONTEXT_USER) {
+        return false;
+    }
+    require_login();
+    require_once(__DIR__ . '/locallib.php');
+    $userid = (int) $context->instanceid;
+    if (!local_deanpromoodle_can_view_user_identity_docs($userid)) {
+        send_file_not_found();
+    }
+    $itemid = (int) array_shift($args);
+    $filename = array_pop($args);
+    $filepath = $args ? '/' . implode('/', $args) . '/' : '/';
+    $fs = get_file_storage();
+    $file = $fs->get_file($context->id, 'local_deanpromoodle', 'identitydocs', $itemid, $filepath, $filename);
+    if (!$file || $file->is_directory()) {
+        send_file_not_found();
+    }
+    send_stored_file($file, null, 0, $forcedownload, $options);
+}

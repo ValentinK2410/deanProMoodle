@@ -138,3 +138,13 @@ $string['feed_restore'] = 'Restore to feed';
 $string['feed_help'] = 'Hiding does not delete the user or unenrol them — it only removes the row from this list. Restore from the Hidden tab.';
 $string['feed_eventdate'] = 'Event date';
 $string['feed_hiddenat'] = 'Hidden at';
+
+$string['additional_registration_block'] = 'Intended course and registration address';
+$string['field_intended_course'] = 'Intended course / programme';
+$string['field_registration_address'] = 'Registration address (as on application)';
+$string['identitydocs_section'] = 'Document scans';
+$string['identitydocs_hint'] = 'Allowed: JPG, PNG, PDF up to 5 MB per file. Files are stored in a protected Moodle area; only you, administrators, and authorised staff can view them.';
+$string['identitydoc_passport_main'] = 'Passport scan (photo spread)';
+$string['identitydoc_passport_reg'] = 'Passport scan (registration page)';
+$string['identitydoc_remove'] = 'Remove current file';
+$string['identitydoc_openfile'] = 'Open file';

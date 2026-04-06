@@ -150,3 +150,14 @@ $string['feed_restore'] = 'Вернуть в ленту';
 $string['feed_help'] = 'Скрытие не удаляет пользователя и не отменяет зачисление — запись только убирается из списка. Во вкладке «Скрытые» можно вернуть.';
 $string['feed_eventdate'] = 'Дата события';
 $string['feed_hiddenat'] = 'Скрыто';
+
+// Дополнительные данные / сканы документов
+$string['additional_registration_block'] = 'Заявленный курс и адрес регистрации';
+$string['field_intended_course'] = 'Заявленный курс / программа';
+$string['field_registration_address'] = 'Адрес регистрации (как в анкете)';
+$string['identitydocs_section'] = 'Сканы документов';
+$string['identitydocs_hint'] = 'Допустимые форматы: JPG, PNG, PDF до 5 МБ на файл. Файлы хранятся в защищённой области Moodle; просматривать могут только вы, администраторы и преподаватели с соответствующим доступом.';
+$string['identitydoc_passport_main'] = 'Скан паспорта (разворот с фото)';
+$string['identitydoc_passport_reg'] = 'Скан страницы с регистрацией';
+$string['identitydoc_remove'] = 'Удалить текущий файл';
+$string['identitydoc_openfile'] = 'Открыть файл';
