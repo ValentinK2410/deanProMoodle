@@ -170,6 +170,8 @@
         <FIELD NAME="previous_institution" TYPE="char" LENGTH="255" NOTNULL="false"/>
         <FIELD NAME="previous_institution_year" TYPE="int" LENGTH="4" NOTNULL="false"/>
         <FIELD NAME="cohort" TYPE="char" LENGTH="255" NOTNULL="false"/>
+        <FIELD NAME="registration_address" TYPE="text" NOTNULL="false" COMMENT="Адрес регистрации (как в анкете регистрации)"/>
+        <FIELD NAME="intended_course" TYPE="char" LENGTH="500" NOTNULL="false" COMMENT="Заявленный курс / программа при поступлении"/>
         <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0"/>
         <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0"/>
       </FIELDS>

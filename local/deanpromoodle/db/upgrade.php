@@ -274,5 +274,18 @@ function xmldb_local_deanpromoodle_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026021101, 'local', 'deanpromoodle');
     }
 
+    if ($oldversion < 2026021201) {
+        $table = new xmldb_table('local_deanpromoodle_student_info');
+        $field = new xmldb_field('registration_address', XMLDB_TYPE_TEXT, null, null, null, null, null, 'cohort');
+        if ($dbman->table_exists($table) && !$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+        $field2 = new xmldb_field('intended_course', XMLDB_TYPE_CHAR, '500', null, null, null, null, 'registration_address');
+        if ($dbman->table_exists($table) && !$dbman->field_exists($table, $field2)) {
+            $dbman->add_field($table, $field2);
+        }
+        upgrade_plugin_savepoint(true, 2026021201, 'local', 'deanpromoodle');
+    }
+
     return true;
 }
