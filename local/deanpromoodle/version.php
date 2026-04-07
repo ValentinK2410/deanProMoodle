@@ -26,7 +26,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_deanpromoodle';
-$plugin->version = 2026021300; // Абитуриенты: фильтр МБС, колонка «Форма», settings.php
+$plugin->version = 2026021301; // Исправление: user.url отсутствует в БД — SELECT без url, fallback profile url
 $plugin->requires = 2022041900; // Moodle 4.0+
 $plugin->maturity = MATURITY_ALPHA;
 $plugin->release = 'v1.0.0-alpha';

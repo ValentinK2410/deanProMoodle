@@ -180,7 +180,8 @@ function local_deanpromoodle_user_is_mbs_portal_applicant($userid) {
     }
 
     $userid = (int) $userid;
-    $u = $DB->get_record('user', ['id' => $userid, 'deleted' => 0], 'id,auth,email,url');
+    // Полная запись: в части установок Moodle нет колонки user.url (сайт вынесен в поля профиля).
+    $u = $DB->get_record('user', ['id' => $userid, 'deleted' => 0]);
     if (!$u) {
         return false;
     }
@@ -191,8 +192,21 @@ function local_deanpromoodle_user_is_mbs_portal_applicant($userid) {
     }
     $hosts = array_filter(array_map('trim', explode(',', $hostsstr)));
 
+    $urltext = '';
+    if (isset($u->url) && (string) $u->url !== '') {
+        $urltext = (string) $u->url;
+    }
+    if ($urltext === '' && $DB->get_manager()->table_exists('user_info_field')) {
+        $fid = $DB->get_field('user_info_field', 'id', ['shortname' => 'url']);
+        if ($fid) {
+            $ud = $DB->get_record('user_info_data', ['userid' => $userid, 'fieldid' => $fid]);
+            if ($ud && $ud->data !== '') {
+                $urltext = $ud->data;
+            }
+        }
+    }
     foreach ($hosts as $h) {
-        if ($h !== '' && stripos((string) $u->url, $h) !== false) {
+        if ($h !== '' && $urltext !== '' && stripos($urltext, $h) !== false) {
             return true;
         }
     }
