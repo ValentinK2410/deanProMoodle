@@ -6961,6 +6961,10 @@ switch ($tab) {
 
         $items = local_deanpromoodle_get_admin_activity_feed($feedview);
         $studentpageurl = new moodle_url('/local/deanpromoodle/pages/student.php');
+        $studentadditionalurl = new moodle_url('/local/deanpromoodle/pages/student.php', [
+            'tab' => 'programs',
+            'subtab' => 'additional',
+        ]);
         $ajaxurl = $CFG->wwwroot . '/local/deanpromoodle/pages/admin_ajax.php';
         $sessk = sesskey();
 
@@ -6977,6 +6981,7 @@ switch ($tab) {
             echo html_writer::tag('th', get_string('feed_eventdate', 'local_deanpromoodle'));
             echo html_writer::tag('th', 'Студент');
             echo html_writer::tag('th', 'Email');
+            echo html_writer::tag('th', get_string('feed_column_form', 'local_deanpromoodle'), ['class' => 'text-center']);
             echo html_writer::tag('th', 'Когорты');
             echo html_writer::tag('th', 'Программа (по когорте)');
             echo html_writer::tag('th', 'Курс');
@@ -7001,6 +7006,33 @@ switch ($tab) {
                 echo html_writer::tag('td', $evdate);
                 echo html_writer::tag('td', $profilelink);
                 echo html_writer::tag('td', s($row->email));
+                if (isset($row->form_complete)) {
+                    $formurl = new moodle_url($studentadditionalurl, ['studentid' => $row->userid]);
+                    if ($row->form_complete) {
+                        $forminner = html_writer::tag('span', '', [
+                            'class' => 'fa fa-check-circle text-success',
+                            'style' => 'font-size:1.35em;',
+                            'aria-hidden' => 'true',
+                        ]);
+                        $formcell = html_writer::link($formurl, $forminner, [
+                            'title' => get_string('formstatus_ok', 'local_deanpromoodle'),
+                            'class' => 'local-deanpromoodle-applicant-form-ok',
+                        ]);
+                    } else {
+                        $forminner = html_writer::tag('span', '', [
+                            'class' => 'fa fa-exclamation-triangle text-warning',
+                            'style' => 'font-size:1.35em;',
+                            'aria-hidden' => 'true',
+                        ]);
+                        $formcell = html_writer::link($formurl, $forminner, [
+                            'title' => get_string('formstatus_warn', 'local_deanpromoodle'),
+                            'class' => 'local-deanpromoodle-applicant-form-warn',
+                        ]);
+                    }
+                } else {
+                    $formcell = '—';
+                }
+                echo html_writer::tag('td', $formcell, ['class' => 'text-center']);
                 echo html_writer::tag('td', format_string($row->cohorts));
                 echo html_writer::tag('td', format_string($row->programs));
                 echo html_writer::tag('td', $row->course);
