@@ -26,7 +26,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_deanpromoodle';
-$plugin->version = 2026021303; // get_record(user): поля '*', IGNORE_MISSING; доп. вкладка: try/catch SQL; teacher без списка колонок
+$plugin->version = 2026021304; // get_record(user): поля '*', IGNORE_MISSING; доп. вкладка: try/catch SQL; teacher без списка колонок.
 $plugin->requires = 2022041900; // Moodle 4.0+
 $plugin->maturity = MATURITY_ALPHA;
 $plugin->release = 'v1.0.0-alpha';
