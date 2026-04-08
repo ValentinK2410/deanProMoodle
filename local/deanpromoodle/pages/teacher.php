@@ -33,6 +33,7 @@ if (!file_exists($configpath)) {
 require_once($configpath);
 require_once($CFG->libdir . '/tablelib.php');
 require_once($CFG->libdir . '/enrollib.php');
+require_once($CFG->libdir . '/gradelib.php');
 require_once($CFG->dirroot . '/mod/assign/locallib.php');
 require_once($CFG->dirroot . '/mod/quiz/locallib.php');
 require_once($CFG->dirroot . '/mod/forum/lib.php');
@@ -669,7 +670,7 @@ switch ($tab) {
                                 // Убеждаемся, что объект участника содержит нужные поля для fullname()
                                 if (!isset($participant->firstname) || !isset($participant->lastname)) {
                                     // Если полей нет, получаем пользователя из БД
-                                    $user = $DB->get_record('user', ['id' => $participant->id], 'id, firstname, lastname, email');
+                                    $user = $DB->get_record('user', ['id' => $participant->id]);
                                     if ($user) {
                                         $participant->firstname = $user->firstname;
                                         $participant->lastname = $user->lastname;
@@ -1473,6 +1474,32 @@ switch ($tab) {
                     foreach ($grades as $grade) {
                         $cm = get_coursemodule_from_instance('assign', $assignment->id, $course->id);
                         if ($cm) {
+                            // Форматируем оценку для отображения (Зачет, шкала и т.д.)
+                            $gradedisplay = $grade->grade;
+                            $gradeitem = grade_item::fetch([
+                                'itemtype' => 'mod',
+                                'itemmodule' => 'assign',
+                                'iteminstance' => $assignment->id,
+                                'courseid' => $course->id
+                            ]);
+                            if ($gradeitem && $grade->grade !== null) {
+                                $usergrade = grade_grade::fetch([
+                                    'itemid' => $gradeitem->id,
+                                    'userid' => $grade->userid
+                                ]);
+                                if ($usergrade && !empty($usergrade->str_grade)) {
+                                    $gradedisplay = $usergrade->str_grade;
+                                } elseif ($gradeitem->scaleid) {
+                                    $scale = $DB->get_record('scale', ['id' => $gradeitem->scaleid]);
+                                    if ($scale && !empty($scale->scale)) {
+                                        $scaleitems = array_map('trim', explode(',', $scale->scale));
+                                        $idx = (int) round($grade->grade);
+                                        if ($idx >= 1 && $idx <= count($scaleitems)) {
+                                            $gradedisplay = $scaleitems[$idx - 1];
+                                        }
+                                    }
+                                }
+                            }
                             $gradedassignments[] = (object)[
                                 'id' => $grade->id,
                                 'assignmentid' => $assignment->id,
@@ -1484,7 +1511,7 @@ switch ($tab) {
                                 'userid' => $grade->userid,
                                 'studentname' => fullname($grade),
                                 'email' => $grade->email,
-                                'grade' => $grade->grade,
+                                'grade' => $gradedisplay,
                                 'graded' => userdate($grade->timemodified),
                                 'timemodified' => $grade->timemodified
                             ];

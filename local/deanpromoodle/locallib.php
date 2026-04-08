@@ -272,7 +272,7 @@ function local_deanpromoodle_applicant_additional_form_complete($userid, $siprel
     } else {
         $si = $sipreloaded;
     }
-    $u = $upreloaded ?? $DB->get_record('user', ['id' => $userid, 'deleted' => 0], 'id,firstname,lastname,email');
+    $u = $upreloaded ?? $DB->get_record('user', ['id' => $userid, 'deleted' => 0]);
     if (!$u) {
         return false;
     }
@@ -326,7 +326,7 @@ function local_deanpromoodle_get_admin_activity_feed($view) {
             if ($row) {
                 $row->hiddenat = $d->timecreated;
                 $row->hiddenby = $d->hiddenby;
-                $hu = $DB->get_record('user', ['id' => $d->hiddenby, 'deleted' => 0], 'id,firstname,lastname', IGNORE_MISSING);
+                $hu = $DB->get_record('user', ['id' => $d->hiddenby, 'deleted' => 0], '*', IGNORE_MISSING);
                 $row->hiddenbyname = $hu ? fullname($hu) : (string) $d->hiddenby;
                 $items[] = $row;
             }

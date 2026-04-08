@@ -2988,7 +2988,12 @@ if ($action == 'viewprogram' && $programid > 0) {
                 // Получаем данные из таблицы local_deanpromoodle_student_info
                 $studentinfo = false;
                 if ($DB->get_manager()->table_exists('local_deanpromoodle_student_info')) {
-                    $studentinfo = $DB->get_record('local_deanpromoodle_student_info', ['userid' => $viewingstudent->id]);
+                    try {
+                        $studentinfo = $DB->get_record('local_deanpromoodle_student_info', ['userid' => $viewingstudent->id]);
+                    } catch (\Throwable $e) {
+                        debugging('deanpromoodle additional tab student_info: ' . $e->getMessage(), DEBUG_DEVELOPER);
+                        $studentinfo = false;
+                    }
                 }
 
                 $canviewidentity = false;
@@ -3011,20 +3016,24 @@ if ($action == 'viewprogram' && $programid > 0) {
                     $cohortdisplay = htmlspecialchars($studentinfo->cohort, ENT_QUOTES, 'UTF-8');
                 } else {
                     // Fallback: получаем группы (когорты) студента из Moodle
-                    $studentcohorts = $DB->get_records_sql(
-                        "SELECT c.id, c.name, c.idnumber, c.description
-                         FROM {cohort_members} cm
-                         JOIN {cohort} c ON c.id = cm.cohortid
-                         WHERE cm.userid = ?
-                         ORDER BY c.name ASC",
-                        [$viewingstudent->id]
-                    );
-                    if (!empty($studentcohorts)) {
-                        $cohortnames = [];
-                        foreach ($studentcohorts as $cohort) {
-                            $cohortnames[] = htmlspecialchars($cohort->name, ENT_QUOTES, 'UTF-8');
+                    try {
+                        $studentcohorts = $DB->get_records_sql(
+                            "SELECT c.id, c.name, c.idnumber, c.description
+                             FROM {cohort_members} cm
+                             JOIN {cohort} c ON c.id = cm.cohortid
+                             WHERE cm.userid = ?
+                             ORDER BY c.name ASC",
+                            [$viewingstudent->id]
+                        );
+                        if (!empty($studentcohorts)) {
+                            $cohortnames = [];
+                            foreach ($studentcohorts as $cohort) {
+                                $cohortnames[] = htmlspecialchars($cohort->name, ENT_QUOTES, 'UTF-8');
+                            }
+                            $cohortdisplay = implode(', ', $cohortnames);
                         }
-                        $cohortdisplay = implode(', ', $cohortnames);
+                    } catch (\Throwable $e) {
+                        debugging('deanpromoodle additional tab cohorts: ' . $e->getMessage(), DEBUG_DEVELOPER);
                     }
                 }
                 
@@ -3034,18 +3043,22 @@ if ($action == 'viewprogram' && $programid > 0) {
                     $enrollmentdisplay = htmlspecialchars($studentinfo->enrollment_year, ENT_QUOTES, 'UTF-8');
                 } else {
                     // Fallback: получаем дату зачисления (берем самую раннюю дату зачисления в любой курс)
-                    $enrollments = $DB->get_records_sql(
-                        "SELECT MIN(ue.timestart) as earliest_enrollment
-                         FROM {user_enrolments} ue
-                         JOIN {enrol} e ON e.id = ue.enrolid
-                         WHERE ue.userid = ? AND ue.status = 0 AND e.status = 0",
-                        [$viewingstudent->id]
-                    );
-                    if (!empty($enrollments)) {
-                        $enrollment = reset($enrollments);
-                        if ($enrollment->earliest_enrollment > 0) {
-                            $enrollmentdisplay = userdate($enrollment->earliest_enrollment, get_string('strftimedatefullshort'));
+                    try {
+                        $enrollments = $DB->get_records_sql(
+                            "SELECT MIN(ue.timestart) as earliest_enrollment
+                             FROM {user_enrolments} ue
+                             JOIN {enrol} e ON e.id = ue.enrolid
+                             WHERE ue.userid = ? AND ue.status = 0 AND e.status = 0",
+                            [$viewingstudent->id]
+                        );
+                        if (!empty($enrollments)) {
+                            $enrollment = reset($enrollments);
+                            if ($enrollment->earliest_enrollment > 0) {
+                                $enrollmentdisplay = userdate($enrollment->earliest_enrollment, get_string('strftimedatefullshort'));
+                            }
                         }
+                    } catch (\Throwable $e) {
+                        debugging('deanpromoodle additional tab enrollments: ' . $e->getMessage(), DEBUG_DEVELOPER);
                     }
                 }
                 
