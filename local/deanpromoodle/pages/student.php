@@ -2986,12 +2986,21 @@ if ($action == 'viewprogram' && $programid > 0) {
                 }
                 
                 // Получаем данные из таблицы local_deanpromoodle_student_info
-                $studentinfo = $DB->get_record('local_deanpromoodle_student_info', ['userid' => $viewingstudent->id]);
+                $studentinfo = false;
+                if ($DB->get_manager()->table_exists('local_deanpromoodle_student_info')) {
+                    $studentinfo = $DB->get_record('local_deanpromoodle_student_info', ['userid' => $viewingstudent->id]);
+                }
 
-                $canviewidentity = local_deanpromoodle_can_view_user_identity_docs($viewingstudent->id);
-                $identityfiles = $canviewidentity
-                    ? local_deanpromoodle_get_identity_doc_files($viewingstudent->id)
-                    : ['passport_scan1' => null, 'passport_scan2' => null];
+                $canviewidentity = false;
+                $identityfiles = ['passport_scan1' => null, 'passport_scan2' => null];
+                try {
+                    $canviewidentity = local_deanpromoodle_can_view_user_identity_docs($viewingstudent->id);
+                    if ($canviewidentity) {
+                        $identityfiles = local_deanpromoodle_get_identity_doc_files($viewingstudent->id);
+                    }
+                } catch (\Throwable $e) {
+                    debugging('deanpromoodle additional tab identity: ' . $e->getMessage(), DEBUG_DEVELOPER);
+                }
                 
                 // Определяем режим отображения
                 $editmode = ($action == 'edit' && $canedit);
@@ -3066,8 +3075,8 @@ if ($action == 'viewprogram' && $programid > 0) {
                         $addressdisplay = implode(', ', $addressparts);
                     }
                 }
-                // Fallback: получаем адрес из профиля пользователя
-                if ($addressdisplay === '-' && !empty($viewingstudent->address)) {
+                // Fallback: получаем адрес из профиля пользователя (колонка address есть не во всех схемах {user})
+                if ($addressdisplay === '-' && isset($viewingstudent->address) && (string) $viewingstudent->address !== '') {
                     $addressdisplay = htmlspecialchars($viewingstudent->address, ENT_QUOTES, 'UTF-8');
                 }
                 
@@ -3080,9 +3089,13 @@ if ($action == 'viewprogram' && $programid > 0) {
                     $snils = $viewingstudent->idnumber ? $viewingstudent->idnumber : '';
                     if (empty($snils)) {
                         require_once($CFG->dirroot . '/user/profile/lib.php');
-                        $userfields = profile_user_record($viewingstudent->id);
-                        if (isset($userfields->snils)) {
-                            $snils = $userfields->snils;
+                        try {
+                            $userfields = profile_user_record($viewingstudent->id);
+                            if ($userfields && isset($userfields->snils)) {
+                                $snils = $userfields->snils;
+                            }
+                        } catch (\Throwable $e) {
+                            debugging('deanpromoodle profile_user_record: ' . $e->getMessage(), DEBUG_DEVELOPER);
                         }
                     }
                     if (!empty($snils)) {

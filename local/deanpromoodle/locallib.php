@@ -655,17 +655,21 @@ function local_deanpromoodle_delete_identity_scan($userid, $slot) {
  * @return array ключ slot => stored_file|null
  */
 function local_deanpromoodle_get_identity_doc_files($userid) {
-    $context = context_user::instance((int) $userid);
-    $fs = get_file_storage();
     $out = ['passport_scan1' => null, 'passport_scan2' => null];
-    foreach (array_keys($out) as $slot) {
-        $files = $fs->get_area_files($context->id, 'local_deanpromoodle', 'identitydocs', 0, '/' . $slot . '/', false);
-        foreach ($files as $f) {
-            if (!$f->is_directory()) {
-                $out[$slot] = $f;
-                break;
+    try {
+        $context = context_user::instance((int) $userid);
+        $fs = get_file_storage();
+        foreach (array_keys($out) as $slot) {
+            $files = $fs->get_area_files($context->id, 'local_deanpromoodle', 'identitydocs', 0, '/' . $slot . '/', false);
+            foreach ($files as $f) {
+                if (!$f->is_directory()) {
+                    $out[$slot] = $f;
+                    break;
+                }
             }
         }
+    } catch (\Throwable $e) {
+        debugging('local_deanpromoodle_get_identity_doc_files: ' . $e->getMessage(), DEBUG_DEVELOPER);
     }
     return $out;
 }
