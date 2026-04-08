@@ -211,6 +211,16 @@ function local_deanpromoodle_user_is_mbs_portal_applicant($userid) {
         }
     }
 
+    // Некоторые интеграции кладут ссылку на портал в idnumber вместо «Веб-страница».
+    $idnum = trim((string) ($u->idnumber ?? ''));
+    if ($idnum !== '') {
+        foreach ($hosts as $h) {
+            if ($h !== '' && stripos($idnum, $h) !== false) {
+                return true;
+            }
+        }
+    }
+
     $fieldshort = trim((string) get_config('local_deanpromoodle', 'applicants_profile_field'));
     if ($fieldshort !== '') {
         $field = $DB->get_record('user_info_field', ['shortname' => $fieldshort]);
@@ -341,20 +351,45 @@ function local_deanpromoodle_get_admin_activity_feed($view) {
     $items = [];
 
     // Регистрации студентов (вкладка «Абитуриенты»: только портал МБС при режиме mbs_only).
+    // За «последние 90 дней» считаем и создание аккаунта, и назначение роли student (зачисление на программу/курс).
     $roleid = $DB->get_field('role', 'id', ['shortname' => 'student'], IGNORE_MISSING);
     if ($roleid) {
         $users = $DB->get_records_sql(
-            "SELECT DISTINCT u.id, u.firstname, u.lastname, u.email, u.timecreated
+            "SELECT DISTINCT u.id, u.firstname, u.lastname, u.email, u.timecreated,
+                    (SELECT MAX(rax.timemodified) FROM {role_assignments} rax
+                       WHERE rax.userid = u.id AND rax.roleid = :roleid2) AS studentrolelastmod
                FROM {user} u
-               JOIN {role_assignments} ra ON ra.userid = u.id AND ra.roleid = ?
+               JOIN {role_assignments} ra ON ra.userid = u.id AND ra.roleid = :roleid1
               WHERE u.deleted = 0 AND u.suspended = 0 AND u.id > 1
-                AND u.timecreated >= ?
+                AND (
+                      u.timecreated >= :since1
+                   OR EXISTS (
+                        SELECT 1 FROM {role_assignments} ra3
+                         WHERE ra3.userid = u.id AND ra3.roleid = :roleid3 AND ra3.timemodified >= :since2
+                      )
+                    )
            ORDER BY u.timecreated DESC",
-            [$roleid, $since],
+            [
+                'roleid1' => $roleid,
+                'roleid2' => $roleid,
+                'roleid3' => $roleid,
+                'since1' => $since,
+                'since2' => $since,
+            ],
             0,
             500
         );
-        $uids = array_keys($users);
+        $users = array_values($users);
+        foreach ($users as $u) {
+            $lastmod = isset($u->studentrolelastmod) ? (int) $u->studentrolelastmod : 0;
+            $u->sorttime = max((int) $u->timecreated, $lastmod);
+        }
+        usort($users, function($a, $b) {
+            return ($b->sorttime ?? 0) <=> ($a->sorttime ?? 0);
+        });
+        $uids = array_map(static function($u) {
+            return (int) $u->id;
+        }, $users);
         $cohortstr = local_deanpromoodle_feed_user_cohort_strings($uids);
         $sibyuser = [];
         if ($dbman->table_exists('local_deanpromoodle_student_info') && count($uids) > 0) {
@@ -383,7 +418,7 @@ function local_deanpromoodle_get_admin_activity_feed($view) {
                 'itemkey' => $key,
                 'type' => 'registration',
                 'typelabel' => get_string('feedtype_registration', 'local_deanpromoodle'),
-                'sorttime' => $u->timecreated,
+                'sorttime' => isset($u->sorttime) ? (int) $u->sorttime : (int) $u->timecreated,
                 'userid' => $u->id,
                 'studentname' => fullname($u),
                 'email' => $u->email,
