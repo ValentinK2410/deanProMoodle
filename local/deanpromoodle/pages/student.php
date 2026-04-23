@@ -162,7 +162,7 @@ if ($studentid > 0) {
             break;
         }
     }
-    if (!$isteacher) {
+        if (!$isteacher) {
         $systemcontext = context_system::instance();
         $systemroles = get_user_roles($systemcontext, $USER->id, false);
         foreach ($systemroles as $role) {
@@ -171,11 +171,13 @@ if ($studentid > 0) {
                 break;
             }
         }
+    }
 }
 
-// Проверяем, является ли пользователь студентом
-    $isstudent = false;
+// Проверяем, является ли пользователь студентом (всегда, в т.ч. при studentid в URL — иначе $isstudent остаётся false).
+$isstudent = false;
 $studentroles = ['student'];
+$roles = get_user_roles($context, $USER->id, false);
 foreach ($roles as $role) {
     if (in_array($role->shortname, $studentroles)) {
         $isstudent = true;
@@ -193,10 +195,8 @@ if (!$isstudent) {
     }
 }
 
-    // Разрешаем админам и преподавателям просматривать страницу студента без редиректа
-    // Они будут видеть свою собственную информацию (если она есть) или пустую страницу
-    // Редирект убран по запросу пользователя
-}
+// Разрешаем админам и преподавателям просматривать страницу студента без редиректа
+// (логика выше: при отсутствии studentid в URL они остаются на странице со своим профилем)
 
 // Студент может заходить на любые вкладки страницы student.php
 
