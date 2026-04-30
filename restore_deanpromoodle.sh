@@ -2,7 +2,7 @@
 # Скрипт для восстановления удаленных файлов плагина deanpromoodle из Git
 
 # Переходим в каталог local
-cd /var/www/www-root/data/www/class.russianseminary.org/local
+cd /var/www/www-root/data/www/class.seminary.msk.ru/local
 
 # Проверяем, существует ли каталог deanpromoodle
 if [ -d "deanpromoodle" ]; then
@@ -29,7 +29,7 @@ rm -rf /tmp/deanpromoodle-restore
 
 # Очищаем кеш Moodle
 echo "Очищаем кеш Moodle..."
-rm -rf /var/www/www-root/data/www/class.russianseminary.org/moodledata/cache/*
+rm -rf /var/www/www-root/data/www/class.seminary.msk.ru/moodledata/cache/*
 
 echo "Восстановление завершено!"
 echo "Плагин восстановлен из Git репозитория."

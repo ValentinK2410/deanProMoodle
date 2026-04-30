@@ -6,7 +6,7 @@
 
 ```bash
 # 1. Перейдите в каталог local
-cd /var/www/www-root/data/www/class.russianseminary.org/local
+cd /var/www/www-root/data/www/class.seminary.msk.ru/local
 
 # 2. Клонируйте репозиторий во временный каталог
 git clone https://github.com/ValentinK2410/deanProMoodle.git /tmp/deanpromoodle-restore
@@ -22,7 +22,7 @@ sudo chmod -R 755 deanpromoodle
 rm -rf /tmp/deanpromoodle-restore
 
 # 6. Очистите кеш Moodle
-sudo rm -rf /var/www/www-root/data/www/class.russianseminary.org/moodledata/cache/*
+sudo rm -rf /var/www/www-root/data/www/class.seminary.msk.ru/moodledata/cache/*
 ```
 
 ## Способ 2: Проверка истории команд (если удаление было недавно)
@@ -46,7 +46,7 @@ history | grep -i "rm\|delete\|remove"
 ls -la ~/.local/share/Trash/files/
 
 # Восстановление из корзины (если файлы там есть)
-mv ~/.local/share/Trash/files/deanpromoodle /var/www/www-root/data/www/class.russianseminary.org/local/
+mv ~/.local/share/Trash/files/deanpromoodle /var/www/www-root/data/www/class.seminary.msk.ru/local/
 ```
 
 ## Способ 4: Восстановление из резервных копий
@@ -55,19 +55,19 @@ mv ~/.local/share/Trash/files/deanpromoodle /var/www/www-root/data/www/class.rus
 
 ```bash
 # Если есть резервная копия в другом месте
-cp -r /path/to/backup/deanpromoodle /var/www/www-root/data/www/class.russianseminary.org/local/
+cp -r /path/to/backup/deanpromoodle /var/www/www-root/data/www/class.seminary.msk.ru/local/
 
 # Установите права доступа
-sudo chown -R www-data:www-data /var/www/www-root/data/www/class.russianseminary.org/local/deanpromoodle
-sudo chmod -R 755 /var/www/www-root/data/www/class.russianseminary.org/local/deanpromoodle
+sudo chown -R www-data:www-data /var/www/www-root/data/www/class.seminary.msk.ru/local/deanpromoodle
+sudo chmod -R 755 /var/www/www-root/data/www/class.seminary.msk.ru/local/deanpromoodle
 ```
 
 ## Способ 5: Восстановление через Git (если каталог был Git репозиторием)
 
-Если каталог `/var/www/www-root/data/www/class.russianseminary.org/local/deanpromoodle` был Git репозиторием:
+Если каталог `/var/www/www-root/data/www/class.seminary.msk.ru/local/deanpromoodle` был Git репозиторием:
 
 ```bash
-cd /var/www/www-root/data/www/class.russianseminary.org/local
+cd /var/www/www-root/data/www/class.seminary.msk.ru/local
 
 # Попытка восстановить через git
 git clone https://github.com/ValentinK2410/deanProMoodle.git temp-repo
@@ -85,13 +85,13 @@ rm -rf temp-repo
 2. **Проверьте права доступа:**
 
    ```bash
-   sudo chown -R www-data:www-data /var/www/www-root/data/www/class.russianseminary.org/local/deanpromoodle
-   sudo chmod -R 755 /var/www/www-root/data/www/class.russianseminary.org/local/deanpromoodle
+   sudo chown -R www-data:www-data /var/www/www-root/data/www/class.seminary.msk.ru/local/deanpromoodle
+   sudo chmod -R 755 /var/www/www-root/data/www/class.seminary.msk.ru/local/deanpromoodle
    ```
 
 3. **Очистите кеш Moodle:**
    ```bash
-   sudo rm -rf /var/www/www-root/data/www/class.russianseminary.org/moodledata/cache/*
+   sudo rm -rf /var/www/www-root/data/www/class.seminary.msk.ru/moodledata/cache/*
    ```
 
 ## Если ничего не помогло:
@@ -107,7 +107,7 @@ tar -czf deanpromoodle-backup.tar.gz local/deanpromoodle
 # Затем на сервере Ubuntu:
 # Загрузите архив на сервер (через scp, sftp или другой способ)
 # Распакуйте:
-cd /var/www/www-root/data/www/class.russianseminary.org/local
+cd /var/www/www-root/data/www/class.seminary.msk.ru/local
 tar -xzf deanpromoodle-backup.tar.gz
 mv local/deanpromoodle .
 rm -rf local
