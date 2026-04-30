@@ -195,14 +195,14 @@ if (!$isstudent) {
     }
 }
 
-// Роль «student» чаще всего назначена в контексте курса: get_user_roles() по системному контексту её не видит,
-// из‑за этого не показывалась кнопка «Редактировать» на вкладке «Дополнительные данные».
+// Роль студента часто назначена только в курсе; плюс на сайте может быть клон роли с другим shortname, но archetype = student.
 if (!$isstudent) {
-    $studentroleid = $DB->get_field('role', 'id', ['shortname' => 'student']);
-    if ($studentroleid) {
+    $studentroleids = $DB->get_fieldset_select('role', 'id', "shortname = 'student' OR archetype = 'student'");
+    if (!empty($studentroleids)) {
+        [$insql, $inparams] = $DB->get_in_or_equal($studentroleids, SQL_PARAMS_QM);
         $isstudent = $DB->record_exists_sql(
-            "SELECT 1 FROM {role_assignments} WHERE userid = ? AND roleid = ?",
-            [$USER->id, $studentroleid]
+            "SELECT 1 FROM {role_assignments} WHERE userid = ? AND roleid $insql",
+            array_merge([$USER->id], $inparams)
         );
     }
 }
@@ -2239,8 +2239,8 @@ if ($action == 'viewprogram' && $programid > 0) {
                 if ($isadmin || $isteacher) {
                     // Админ и преподаватель могут редактировать любые данные
                     $canedit = true;
-                } elseif ($isstudent && $viewingstudent->id == $USER->id) {
-                    // Студент может редактировать только свои данные
+                } elseif ($viewingstudent->id == $USER->id && !$isviewingotherstudent && !isguestuser()) {
+                    // Свои доп. данные: смотрит свой профиль (не карточку другого пользователя под админом)
                     $canedit = true;
                 }
                 
