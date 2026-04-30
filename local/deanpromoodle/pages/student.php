@@ -195,6 +195,18 @@ if (!$isstudent) {
     }
 }
 
+// Роль «student» чаще всего назначена в контексте курса: get_user_roles() по системному контексту её не видит,
+// из‑за этого не показывалась кнопка «Редактировать» на вкладке «Дополнительные данные».
+if (!$isstudent) {
+    $studentroleid = $DB->get_field('role', 'id', ['shortname' => 'student']);
+    if ($studentroleid) {
+        $isstudent = $DB->record_exists_sql(
+            "SELECT 1 FROM {role_assignments} WHERE userid = ? AND roleid = ?",
+            [$USER->id, $studentroleid]
+        );
+    }
+}
+
 // Разрешаем админам и преподавателям просматривать страницу студента без редиректа
 // (логика выше: при отсутствии studentid в URL они остаются на странице со своим профилем)
 
