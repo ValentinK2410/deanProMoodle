@@ -27,3 +27,6 @@ config.php
 tmp/
 temp/
 *.tmp
+
+# Временные файлы для локального анализа (не коммитить)
+incoming-review/
