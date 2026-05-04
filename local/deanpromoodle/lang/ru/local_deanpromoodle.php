@@ -131,6 +131,8 @@ $string['searchsubject'] = 'Поиск предмета';
 // Тексты кнопок
 $string['lkbutton'] = 'Деканат';
 $string['lkbuttontitle'] = 'Деканат';
+$string['seminarysite_button'] = 'Сайт семинарии';
+$string['seminarysite_title'] = 'Перейти на сайт семинарии (SSO с Moodle)';
 $string['teacherbutton'] = 'Преподаватель';
 $string['teacherbuttontitle'] = 'Панель преподавателя';
 

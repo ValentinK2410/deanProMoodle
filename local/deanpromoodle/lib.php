@@ -504,11 +504,10 @@ function local_deanpromoodle_before_footer() {
     if ($isadmin && !$lkurl) {
         $lkurl = new moodle_url('/local/deanpromoodle/pages/admin.php');
     }
-    
-    // Если нет ни кнопки "Деканат", ни кнопки "Преподаватель", не добавляем ничего
-    if (!$lkurl && !$teacherurlstring) {
-        return;
-    }
+
+    // Ссылка на скрипт SSO Moodle → WordPress (корень сайта, не зависит от домена)
+    $wpssourl = new moodle_url('/moodle-sso-to-wordpress.php');
+    $wpssourlstring = $wpssourl->out(false);
     
     // Add JavaScript to insert buttons into header
     $lkurlstring = $lkurl ? $lkurl->out(false) : '';
@@ -526,17 +525,20 @@ function local_deanpromoodle_before_footer() {
     $teacherButtonTitleJson = json_encode($teacherButtonTitleRaw, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     $lkUrlJson = json_encode($lkurlstring, JSON_UNESCAPED_SLASHES);
     $teacherUrlJson = json_encode($teacherurlstring, JSON_UNESCAPED_SLASHES);
+    $wpSiteUrlJson = json_encode($wpssourlstring, JSON_UNESCAPED_SLASHES);
+    $wpButtonTextJson = json_encode(get_string('seminarysite_button', 'local_deanpromoodle'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    $wpButtonTitleJson = json_encode(get_string('seminarysite_title', 'local_deanpromoodle'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     
     $js = "
     (function() {
         // Check if buttons already added
-        if (document.getElementById('lk-button-deanpromoodle') || document.getElementById('teacher-button-deanpromoodle') || document.getElementById('telegram-button-deanpromoodle')) {
+        if (document.getElementById('seminarysite-button-deanpromoodle') || document.getElementById('lk-button-deanpromoodle') || document.getElementById('teacher-button-deanpromoodle') || document.getElementById('telegram-button-deanpromoodle')) {
             return;
         }
         
         function addLKButton() {
             // Check again before adding
-            if (document.getElementById('lk-button-deanpromoodle') || document.getElementById('teacher-button-deanpromoodle') || document.getElementById('telegram-button-deanpromoodle')) {
+            if (document.getElementById('seminarysite-button-deanpromoodle') || document.getElementById('lk-button-deanpromoodle') || document.getElementById('teacher-button-deanpromoodle') || document.getElementById('telegram-button-deanpromoodle')) {
                 return;
             }
             
@@ -589,6 +591,18 @@ function local_deanpromoodle_before_footer() {
                 return;
             }
             
+            " . "
+            // Сайт семинарии (Moodle → WordPress SSO), перед «Деканат»
+            var wpSiteButton = document.createElement('a');
+            wpSiteButton.id = 'seminarysite-button-deanpromoodle';
+            wpSiteButton.href = " . $wpSiteUrlJson . ";
+            wpSiteButton.target = '_blank';
+            wpSiteButton.rel = 'noopener noreferrer';
+            wpSiteButton.className = 'deanpromoodle-button deanpromoodle-button-seminarysite';
+            wpSiteButton.style.cssText = 'display: inline-block; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 14px; font-weight: 500; transition: 0.3s; cursor: pointer; border: medium; white-space: nowrap; color: white; margin-left: 10px; margin-right: 10px; background-color: rgb(139, 21, 56);';
+            wpSiteButton.textContent = " . $wpButtonTextJson . ";
+            wpSiteButton.title = " . $wpButtonTitleJson . ";
+            ssoContainer.appendChild(wpSiteButton);
             " . (!empty($lkurlstring) ? "
             // Create LK (Деканат) button
             var lkButton = document.createElement('a');
@@ -652,7 +666,7 @@ function local_deanpromoodle_before_footer() {
             if (attempt > 5) return; // Maximum 5 attempts
             
             // If buttons already added, do nothing
-            if (document.getElementById('lk-button-deanpromoodle') || document.getElementById('teacher-button-deanpromoodle') || document.getElementById('telegram-button-deanpromoodle')) {
+            if (document.getElementById('seminarysite-button-deanpromoodle') || document.getElementById('lk-button-deanpromoodle') || document.getElementById('teacher-button-deanpromoodle') || document.getElementById('telegram-button-deanpromoodle')) {
                 return;
             }
             

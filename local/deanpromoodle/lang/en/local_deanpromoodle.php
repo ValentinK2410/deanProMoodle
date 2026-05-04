@@ -120,6 +120,8 @@ $string['searchsubject'] = 'Search subject';
 // Button texts
 $string['lkbutton'] = 'Dean\'s Office';
 $string['lkbuttontitle'] = 'Dean\'s Office';
+$string['seminarysite_button'] = 'Seminary website';
+$string['seminarysite_title'] = 'Go to seminary website (Moodle SSO)';
 $string['teacherbutton'] = 'Teacher';
 $string['teacherbuttontitle'] = 'Teacher panel';
 
