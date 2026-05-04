@@ -139,7 +139,8 @@ if ($studentid > 0) {
         if (!$viewingstudent) {
             print_error('studentnotfound', 'local_deanpromoodle');
         }
-        $isviewingotherstudent = true;
+        // Баннер «просмотр студента» только если открыта карточка другого пользователя (не своя по studentid).
+        $isviewingotherstudent = ((int) $viewingstudent->id !== (int) $USER->id);
         // Не делаем редирект для админа/преподавателя при просмотре другого студента
     } else {
         // Для студентов - редирект, если пытаются посмотреть другого студента
@@ -2239,8 +2240,10 @@ if ($action == 'viewprogram' && $programid > 0) {
                 if ($isadmin || $isteacher) {
                     // Админ и преподаватель могут редактировать любые данные
                     $canedit = true;
-                } elseif ($viewingstudent->id == $USER->id && !$isviewingotherstudent && !isguestuser()) {
-                    // Свои доп. данные: смотрит свой профиль (не карточку другого пользователя под админом)
+                } elseif (!isguestuser()
+                        && isset($viewingstudent->id, $USER->id)
+                        && (int) $viewingstudent->id === (int) $USER->id) {
+                    // Свои доп. данные: свой профиль (в т.ч. когда в URL указан свой studentid)
                     $canedit = true;
                 }
                 
@@ -3134,12 +3137,16 @@ if ($action == 'viewprogram' && $programid > 0) {
                     
                     // Кнопка редактирования
                     if ($canedit && !$editmode) {
-                        $editurl = new moodle_url('/local/deanpromoodle/pages/student.php', [
+                        $editurlparams = [
                             'tab' => 'programs',
                             'subtab' => 'additional',
                             'action' => 'edit',
-                            'studentid' => $viewingstudent->id
-                        ]);
+                        ];
+                        // Чужую карточку передаём через studentid; свой профиль — без параметра (стабильнее прав доступа).
+                        if ((int) $viewingstudent->id !== (int) $USER->id) {
+                            $editurlparams['studentid'] = $viewingstudent->id;
+                        }
+                        $editurl = new moodle_url('/local/deanpromoodle/pages/student.php', $editurlparams);
                         echo html_writer::link($editurl, 'Редактировать', ['class' => 'btn btn-primary']);
                     }
                     
@@ -3256,17 +3263,20 @@ if ($action == 'viewprogram' && $programid > 0) {
                 
                 if ($editmode) {
                     // Форма редактирования - код формы будет добавлен ниже
-                    $saveurl = new moodle_url('/local/deanpromoodle/pages/student.php', [
+                    $saveurlparams = [
                         'tab' => 'programs',
                         'subtab' => 'additional',
                         'action' => 'save',
-                        'studentid' => $viewingstudent->id
-                    ]);
-                    $cancelurl = new moodle_url('/local/deanpromoodle/pages/student.php', [
-                        'tab' => 'programs',
-                        'subtab' => 'additional',
-                        'studentid' => $viewingstudent->id
-                    ]);
+                    ];
+                    if ((int) $viewingstudent->id !== (int) $USER->id) {
+                        $saveurlparams['studentid'] = $viewingstudent->id;
+                    }
+                    $saveurl = new moodle_url('/local/deanpromoodle/pages/student.php', $saveurlparams);
+                    $cancelurlparams = ['tab' => 'programs', 'subtab' => 'additional'];
+                    if ((int) $viewingstudent->id !== (int) $USER->id) {
+                        $cancelurlparams['studentid'] = $viewingstudent->id;
+                    }
+                    $cancelurl = new moodle_url('/local/deanpromoodle/pages/student.php', $cancelurlparams);
                     
                     echo html_writer::start_tag('form', [
                         'method' => 'post',
