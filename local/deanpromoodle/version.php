@@ -26,7 +26,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_deanpromoodle';
-$plugin->version = 2026021306; // Кнопка «Сайт семинарии» (moodle-sso-to-wordpress.php) перед «Деканат».
+$plugin->version = 2026021305; // Абитуриенты: 90 дней по роли student; MBS: idnumber; строки настроек.
 $plugin->requires = 2022041900; // Moodle 4.0+
 $plugin->maturity = MATURITY_ALPHA;
 $plugin->release = 'v1.0.0-alpha';
