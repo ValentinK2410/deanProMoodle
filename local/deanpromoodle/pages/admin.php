@@ -134,7 +134,7 @@ if (!$isadmin) {
 }
 
 // Получение параметров
-$tab = optional_param('tab', 'history', PARAM_ALPHA); // history, teachers, students, activityfeed, subjects, programs, categories
+$tab = optional_param('tab', 'history', PARAM_ALPHA); // history, teachers, students, activityfeed, studentregister, subjects, programs, categories
 $teacherid = optional_param('teacherid', 0, PARAM_INT);
 $feedview = optional_param('feedview', 'active', PARAM_ALPHA); // active | hidden — для вкладки «Лента»
 $period = optional_param('period', 'month', PARAM_ALPHA); // day, week, month, year
@@ -499,6 +499,9 @@ $tabs[] = new tabobject('students',
 $tabs[] = new tabobject('activityfeed',
     new moodle_url('/local/deanpromoodle/pages/admin.php', ['tab' => 'activityfeed']),
     get_string('admintab_activityfeed', 'local_deanpromoodle'));
+$tabs[] = new tabobject('studentregister',
+    new moodle_url('/local/deanpromoodle/pages/admin.php', ['tab' => 'studentregister']),
+    get_string('admintab_studentregister', 'local_deanpromoodle'));
 $tabs[] = new tabobject('subjects', 
     new moodle_url('/local/deanpromoodle/pages/admin.php', ['tab' => 'subjects']),
     'Предметы');
@@ -7100,6 +7103,102 @@ switch ($tab) {
         ");
 
         echo html_writer::end_div();
+        break;
+
+    case 'studentregister':
+        $registerurl = 'https://mbs.ru/wp-login.php?action=register';
+        echo html_writer::start_div('local-deanpromoodle-admin-content', ['style' => 'margin-bottom: 30px;']);
+        echo html_writer::tag('h2', get_string('admintab_studentregister', 'local_deanpromoodle'), ['style' => 'margin-bottom: 12px;']);
+        echo html_writer::div(get_string('studentregister_intro', 'local_deanpromoodle'), 'alert alert-info', ['style' => 'margin-bottom: 16px;']);
+
+        echo html_writer::tag('button', get_string('studentregister_open_modal', 'local_deanpromoodle'), [
+            'type' => 'button',
+            'class' => 'btn btn-primary btn-lg',
+            'id' => 'local-deanpromoodle-open-wp-register',
+        ]);
+
+        echo html_writer::start_div('modal fade', [
+            'id' => 'local-deanpromoodle-wp-register-modal',
+            'tabindex' => '-1',
+            'role' => 'dialog',
+            'aria-labelledby' => 'local-deanpromoodle-wp-register-title',
+            'aria-hidden' => 'true',
+        ]);
+        echo html_writer::start_div('modal-dialog modal-xl', ['role' => 'document']);
+        echo html_writer::start_div('modal-content');
+        echo html_writer::start_div('modal-header');
+        echo html_writer::tag('h5', get_string('studentregister_modal_title', 'local_deanpromoodle'), [
+            'class' => 'modal-title',
+            'id' => 'local-deanpromoodle-wp-register-title',
+        ]);
+        echo html_writer::start_tag('button', [
+            'type' => 'button',
+            'class' => 'close',
+            'data-dismiss' => 'modal',
+            'aria-label' => get_string('studentregister_close', 'local_deanpromoodle'),
+        ]);
+        echo html_writer::tag('span', '×', ['aria-hidden' => 'true']);
+        echo html_writer::end_tag('button');
+        echo html_writer::end_div();
+
+        echo html_writer::start_div('modal-body', ['style' => 'padding: 0;']);
+        echo html_writer::div(get_string('studentregister_iframe_notice', 'local_deanpromoodle'), 'px-3 py-2 border-bottom small text-muted');
+        echo html_writer::start_tag('iframe', [
+            'src' => $registerurl,
+            'title' => get_string('studentregister_modal_title', 'local_deanpromoodle'),
+            'style' => 'width: 100%; height: min(75vh, 820px); border: 0; display: block;',
+            'sandbox' => 'allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-same-origin',
+            'referrerpolicy' => 'no-referrer-when-downgrade',
+        ]);
+        echo html_writer::end_tag('iframe');
+        echo html_writer::end_div();
+
+        echo html_writer::start_div('modal-footer');
+        echo html_writer::link($registerurl, get_string('studentregister_open_newtab', 'local_deanpromoodle'), [
+            'class' => 'btn btn-outline-primary',
+            'target' => '_blank',
+            'rel' => 'noopener noreferrer',
+        ]);
+        echo html_writer::start_tag('button', [
+            'type' => 'button',
+            'class' => 'btn btn-secondary',
+            'data-dismiss' => 'modal',
+        ]);
+        echo get_string('studentregister_close', 'local_deanpromoodle');
+        echo html_writer::end_tag('button');
+        echo html_writer::end_div();
+
+        echo html_writer::end_div();
+        echo html_writer::end_div();
+        echo html_writer::end_div();
+
+        echo html_writer::end_div();
+
+        $PAGE->requires->js_init_code("
+            (function() {
+                var btn = document.getElementById('local-deanpromoodle-open-wp-register');
+                var modal = document.getElementById('local-deanpromoodle-wp-register-modal');
+                if (!btn || !modal) return;
+                function showModal() {
+                    if (typeof jQuery !== 'undefined' && jQuery.fn.modal) {
+                        jQuery(modal).modal('show');
+                    } else if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                        var inst = bootstrap.Modal.getInstance(modal);
+                        if (!inst) inst = new bootstrap.Modal(modal);
+                        inst.show();
+                    } else {
+                        modal.style.display = 'block';
+                        modal.classList.add('show');
+                        document.body.classList.add('modal-open');
+                    }
+                }
+                btn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    showModal();
+                });
+            })();
+        ");
+
         break;
 
     case 'searchstudent':

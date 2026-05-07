@@ -130,6 +130,13 @@ $string['noprogramsfound'] = 'Unfortunately, no programs assigned to you were fo
 $string['nocohortsfound'] = 'You are not a member of any study group. Please contact your teacher or the dean\'s office for enrollment.';
 
 $string['admintab_activityfeed'] = 'Applicants';
+$string['admintab_studentregister'] = 'Student registration';
+$string['studentregister_intro'] = 'Open the seminary website registration form in a window below to register a new user account for a student.';
+$string['studentregister_open_modal'] = 'Open registration form';
+$string['studentregister_modal_title'] = 'Registration — mbs.ru';
+$string['studentregister_open_newtab'] = 'Open in new tab';
+$string['studentregister_iframe_notice'] = 'If the form does not appear inside the window, the website may block embedding. Use «Open in new tab» or adjust frame options on the WordPress site.';
+$string['studentregister_close'] = 'Close';
 $string['feedtype_registration'] = 'Registration (student role)';
 $string['feedtype_course'] = 'Course enrolment';
 $string['feedtype_cohort'] = 'Cohort enrolment';
