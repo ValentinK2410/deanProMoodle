@@ -26,7 +26,9 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_deanpromoodle';
-$plugin->version = 2026021307; // Регистрация студента: открытие формы mbs.ru в новой вкладке вместо iframe.
+// Номер 2026021307 — логическая «новая» версия с доработками: лента абитуриентов (курсы из зачислений,
+// программы без фильтра visible, заявленный курс); вкладка «Регистрация студента», форма mbs.ru в новой вкладке.
+$plugin->version = 2026021305; // Абитуриенты: 90 дней по роли student; MBS: idnumber; строки настроек.
 $plugin->requires = 2022041900; // Moodle 4.0+
 $plugin->maturity = MATURITY_ALPHA;
 $plugin->release = 'v1.0.0-alpha';
