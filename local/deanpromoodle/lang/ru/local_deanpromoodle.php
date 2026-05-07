@@ -143,12 +143,8 @@ $string['nocohortsfound'] = 'Вы не состоите ни в одной уч�
 // Лента администратора: новые студенты и записи
 $string['admintab_activityfeed'] = 'Абитуриенты';
 $string['admintab_studentregister'] = 'Регистрация студента';
-$string['studentregister_intro'] = 'Откройте форму регистрации на сайте семинарии в окне ниже, чтобы создать учётную запись для студента.';
-$string['studentregister_open_modal'] = 'Открыть форму регистрации';
-$string['studentregister_modal_title'] = 'Регистрация — mbs.ru';
-$string['studentregister_open_newtab'] = 'Открыть в новой вкладке';
-$string['studentregister_iframe_notice'] = 'Если форма не отображается во встроенном окне, сайт может запрещать показ в iframe. Тогда воспользуйтесь кнопкой «Открыть в новой вкладке» или настройте заголовки на стороне WordPress.';
-$string['studentregister_close'] = 'Закрыть';
+$string['studentregister_intro'] = 'Форма регистрации на mbs.ru откроется в новой вкладке браузера (сайт не разрешает встраивание во фрейм на стороне Moodle).';
+$string['studentregister_open_newtab'] = 'Открыть форму регистрации в новой вкладке';
 $string['feedtype_registration'] = 'Регистрация (роль студент)';
 $string['feedtype_course'] = 'Запись на курс';
 $string['feedtype_cohort'] = 'Зачисление в когорту';

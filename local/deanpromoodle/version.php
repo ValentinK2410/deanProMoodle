@@ -26,7 +26,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_deanpromoodle';
-$plugin->version = 2026021306; // Вкладка админки: регистрация студента (модальное окно с формой mbs.ru).
+$plugin->version = 2026021307; // Регистрация студента: открытие формы mbs.ru в новой вкладке вместо iframe.
 $plugin->requires = 2022041900; // Moodle 4.0+
 $plugin->maturity = MATURITY_ALPHA;
 $plugin->release = 'v1.0.0-alpha';
