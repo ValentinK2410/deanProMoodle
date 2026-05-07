@@ -140,7 +140,7 @@ $string['feedview_active'] = 'Current';
 $string['feedview_hidden'] = 'Hidden (restorable)';
 $string['feed_dismiss'] = 'Hide from feed';
 $string['feed_restore'] = 'Restore to feed';
-$string['feed_help'] = 'Lists users with the Student role whose account was created or who received that role in the last 90 days (e.g. program enrolment), and who match the MBS portal rules (Web page, ID number, email domain, or auth — see local_deanpromoodle settings). Column «Form»: green check — required Additional data fields; warning — something missing. Hiding only removes the row; restore from the Hidden tab.';
+$string['feed_help'] = 'Lists users with the Student role whose account was created or who received that role in the last 90 days (e.g. program enrolment), and who match the MBS portal rules (Web page, ID number, email domain, or auth — see local_deanpromoodle settings). Column «Form»: green check — required Additional data fields; warning — something missing. «Program (by cohort)» and «Course» show one value each: first linked program name, or the most recent course enrolment (extra cohorts or courses are not listed). Hiding only removes the row; restore from the Hidden tab.';
 $string['feed_eventdate'] = 'Event date';
 $string['feed_hiddenat'] = 'Hidden at';
 

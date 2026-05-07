@@ -157,10 +157,30 @@ function local_deanpromoodle_feed_user_program_string($userid, $visibleonly = tr
 }
 
 /**
- * Курсы пользователей для ленты абитуриентов: активные зачисления со ролью студента на курсах (не сайт).
+ * Один «главный» ярлык для ленты: первая часть при нескольких значениях (когорты, программы).
+ *
+ * @param string $text
+ * @return string
+ */
+function local_deanpromoodle_feed_primary_label($text) {
+    $text = trim((string) $text);
+    if ($text === '') {
+        return '';
+    }
+    foreach ([' | ', '; ', ' · '] as $sep) {
+        $pos = strpos($text, $sep);
+        if ($pos !== false) {
+            return trim(substr($text, 0, $pos));
+        }
+    }
+    return $text;
+}
+
+/**
+ * Один курс для ленты абитуриентов: последнее активное зачисление студента (по timestart/timecreated).
  *
  * @param array $userids
- * @return array userid => ['course' => string, 'coursedates' => string] (пустые строки если нет зачислений)
+ * @return array userid => ['course' => string, 'coursedates' => string]
  */
 function local_deanpromoodle_feed_user_course_display_batch(array $userids) {
     global $DB;
@@ -194,40 +214,31 @@ function local_deanpromoodle_feed_user_course_display_batch(array $userids) {
               JOIN {context} ctx ON ctx.instanceid = c.id AND ctx.contextlevel = :ctxcourse
               JOIN {role_assignments} ra ON ra.userid = ue.userid AND ra.contextid = ctx.id AND ra.roleid = :srid
              WHERE ue.userid $insql AND ue.status = 0
-          ORDER BY ue.userid ASC, sortenrol DESC, c.fullname ASC";
+          ORDER BY ue.userid ASC, sortenrol DESC, c.id ASC";
 
     $rows = $DB->get_recordset_sql($sql, $params);
-    $byuser = [];
+    $bestbyuser = [];
     foreach ($rows as $r) {
         $uid = (int) $r->userid;
-        $cid = (int) $r->courseid;
-        if (!isset($byuser[$uid])) {
-            $byuser[$uid] = [];
+        $sort = (int) $r->sortenrol;
+        if (!isset($bestbyuser[$uid]) || $sort > (int) $bestbyuser[$uid]->sortenrol) {
+            $bestbyuser[$uid] = $r;
         }
-        if (isset($byuser[$uid][$cid])) {
-            continue;
-        }
-        $byuser[$uid][$cid] = $r;
     }
     $rows->close();
 
     foreach ($userids as $uid) {
-        if (empty($byuser[$uid])) {
+        if (empty($bestbyuser[$uid])) {
             continue;
         }
-        $coursenames = [];
-        $dateparts = [];
-        foreach ($byuser[$uid] as $r) {
-            $coursenames[] = format_string($r->fullname) . ' (' . format_string($r->shortname) . ')';
-            $start = !empty($r->startdate) && (int) $r->startdate > 0
-                ? userdate((int) $r->startdate, get_string('strftimedate', 'langconfig')) : '—';
-            $end = !empty($r->enddate) && (int) $r->enddate > 0
-                ? userdate((int) $r->enddate, get_string('strftimedate', 'langconfig')) : '—';
-            $dateparts[] = $start . ' — ' . $end;
-        }
+        $r = $bestbyuser[$uid];
+        $start = !empty($r->startdate) && (int) $r->startdate > 0
+            ? userdate((int) $r->startdate, get_string('strftimedate', 'langconfig')) : '—';
+        $end = !empty($r->enddate) && (int) $r->enddate > 0
+            ? userdate((int) $r->enddate, get_string('strftimedate', 'langconfig')) : '—';
         $out[$uid] = [
-            'course' => implode(' · ', $coursenames),
-            'coursedates' => implode(' · ', $dateparts),
+            'course' => format_string($r->fullname) . ' (' . format_string($r->shortname) . ')',
+            'coursedates' => $start . ' — ' . $end,
         ];
     }
 
@@ -492,7 +503,7 @@ function local_deanpromoodle_get_admin_activity_feed($view) {
             if (isset($dismissset[$key])) {
                 continue;
             }
-            $programs = local_deanpromoodle_feed_user_program_string($u->id, false);
+            $programs = local_deanpromoodle_feed_primary_label(local_deanpromoodle_feed_user_program_string($u->id, false));
             $cohorts = isset($cohortstr[$u->id]) ? $cohortstr[$u->id] : '';
             $sirow = array_key_exists($u->id, $sibyuser) ? $sibyuser[$u->id] : false;
             $formcomplete = local_deanpromoodle_applicant_additional_form_complete($u->id, $sirow, $u);
@@ -549,7 +560,7 @@ function local_deanpromoodle_feed_resolve_item($itemkey) {
             return null;
         }
         $cohortstr = local_deanpromoodle_feed_user_cohort_strings([$id]);
-        $programs = local_deanpromoodle_feed_user_program_string($id, false);
+        $programs = local_deanpromoodle_feed_primary_label(local_deanpromoodle_feed_user_program_string($id, false));
         $formcomplete = local_deanpromoodle_applicant_additional_form_complete($id);
         $cdata = local_deanpromoodle_feed_user_course_display_batch([$id]);
         $cd = isset($cdata[$id]) ? $cdata[$id] : ['course' => '', 'coursedates' => ''];
@@ -598,7 +609,7 @@ function local_deanpromoodle_feed_resolve_item($itemkey) {
         $start = $e->startdate > 0 ? userdate($e->startdate, get_string('strftimedate', 'langconfig')) : '—';
         $end = $e->enddate > 0 ? userdate($e->enddate, get_string('strftimedate', 'langconfig')) : '—';
         $cohortstr = local_deanpromoodle_feed_user_cohort_strings([$e->userid]);
-        $programs = local_deanpromoodle_feed_user_program_string($e->userid, false);
+        $programs = local_deanpromoodle_feed_primary_label(local_deanpromoodle_feed_user_program_string($e->userid, false));
         $uobj = (object)['firstname' => $e->firstname, 'lastname' => $e->lastname, 'email' => $e->email];
         return (object)[
             'itemkey' => $itemkey,
@@ -630,7 +641,7 @@ function local_deanpromoodle_feed_resolve_item($itemkey) {
             return null;
         }
         $proglab = local_deanpromoodle_feed_program_labels_for_cohorts([$cm->cohortid], false);
-        $prog = isset($proglab[$cm->cohortid]) ? $proglab[$cm->cohortid] : '—';
+        $prog = isset($proglab[$cm->cohortid]) ? local_deanpromoodle_feed_primary_label($proglab[$cm->cohortid]) : '—';
         $allcohorts = local_deanpromoodle_feed_user_cohort_strings([$cm->userid]);
         $cohorts = !empty($allcohorts[$cm->userid]) ? $allcohorts[$cm->userid] : format_string($cm->cohortname);
         $uobj = (object)['firstname' => $cm->firstname, 'lastname' => $cm->lastname, 'email' => $cm->email];
