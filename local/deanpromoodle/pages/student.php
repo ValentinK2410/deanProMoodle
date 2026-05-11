@@ -3553,9 +3553,18 @@ if ($action == 'viewprogram' && $programid > 0) {
                         'Ж' => 'Женский'
                     ];
                     $genderselect = html_writer::start_tag('select', ['name' => 'gender', 'class' => 'form-control']);
+                    $currentgender = '';
+                    if ($studentinfo && isset($studentinfo->gender)) {
+                        $currentgender = trim((string) $studentinfo->gender);
+                    }
                     foreach ($genderoptions as $value => $label) {
-                        $selected = ($studentinfo && $studentinfo->gender == $value) ? 'selected' : '';
-                        $genderselect .= html_writer::tag('option', $label, ['value' => $value, 'selected' => $selected]);
+                        $optattrs = ['value' => $value];
+                        // Нельзя передавать selected => '' — иначе у всех option оказывается атрибут selected,
+                        // и браузер выбирает последний пункт (Ж).
+                        if ($currentgender === (string) $value) {
+                            $optattrs['selected'] = 'selected';
+                        }
+                        $genderselect .= html_writer::tag('option', $label, $optattrs);
                     }
                     $genderselect .= html_writer::end_tag('select');
                     echo $genderselect;

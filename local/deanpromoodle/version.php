@@ -30,7 +30,8 @@ $plugin->component = 'local_deanpromoodle';
 // два новых файловых слота в identitydocs (документ об образовании, рекомендация церкви); сохранённые сайты получают шаг upgrade.
 // Ранее: лента абитуриентов, регистрация студента и т.д.
 // 2026051102 — явная кнопка «Скачать» для сканов/PDF из identitydocs (forcedownload в pluginfile).
-$plugin->version = 2026051102;
+// 2026051103 — выпадающий список «Пол»: не передавать пустой selected у option (ошибочно показывался «Ж»).
+$plugin->version = 2026051103;
 $plugin->requires = 2022041900; // Moodle 4.0+
 $plugin->maturity = MATURITY_ALPHA;
 $plugin->release = 'v1.0.0-alpha';
