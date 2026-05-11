@@ -2981,14 +2981,13 @@ if ($action == 'viewprogram' && $programid > 0) {
                         // Обновляем существующую запись
                         $data->id = $existing->id;
                         $DB->update_record('local_deanpromoodle_student_info', $data);
-                        echo html_writer::div('Данные успешно сохранены', 'alert alert-success');
                     } else {
                         // Создаем новую запись
                         $data->timecreated = time();
                         $DB->insert_record('local_deanpromoodle_student_info', $data);
-                        echo html_writer::div('Данные успешно сохранены', 'alert alert-success');
                     }
 
+                    $scanerr = null;
                     if (optional_param('remove_passport_scan1', 0, PARAM_INT)) {
                         local_deanpromoodle_delete_identity_scan($viewingstudent->id, 'passport_scan1');
                     }
@@ -2997,10 +2996,21 @@ if ($action == 'viewprogram' && $programid > 0) {
                     }
                     if (!empty($_FILES['passport_scan1']['name']) || !empty($_FILES['passport_scan2']['name'])) {
                         $scanerr = local_deanpromoodle_save_identity_scans($viewingstudent->id, $_FILES);
-                        if ($scanerr) {
-                            echo html_writer::div($scanerr, 'alert alert-danger');
-                        }
                     }
+
+                    \core\notification::success('Данные успешно сохранены.');
+                    if ($scanerr !== null && $scanerr !== '') {
+                        \core\notification::error($scanerr);
+                    }
+
+                    $redirectadditional = new moodle_url('/local/deanpromoodle/pages/student.php', [
+                        'tab' => 'programs',
+                        'subtab' => 'additional',
+                    ]);
+                    if ((int) $viewingstudent->id !== (int) $USER->id) {
+                        $redirectadditional->param('studentid', (int) $viewingstudent->id);
+                    }
+                    redirect($redirectadditional);
                 }
                 
                 // Получаем данные из таблицы local_deanpromoodle_student_info
@@ -3698,6 +3708,12 @@ if ($action == 'viewprogram' && $programid > 0) {
                                 local_deanpromoodle_render_identity_preview($identityfiles[$slot]),
                                 'local-deanpromoodle-scan-preview',
                                 ['style' => 'margin-bottom:10px;']
+                            );
+                            echo html_writer::div(
+                                get_string('identitydoc_current_file', 'local_deanpromoodle')
+                                . ': ' . htmlspecialchars($identityfiles[$slot]->get_filename(), ENT_QUOTES, 'UTF-8'),
+                                'text-muted',
+                                ['style' => 'font-size:13px;margin-bottom:8px;']
                             );
                             echo html_writer::tag('label',
                                 html_writer::empty_tag('input', [

@@ -153,6 +153,7 @@ $string['identitydoc_passport_main'] = 'Passport scan (photo spread)';
 $string['identitydoc_passport_reg'] = 'Passport scan (registration page)';
 $string['identitydoc_remove'] = 'Remove current file';
 $string['identitydoc_openfile'] = 'Open file';
+$string['identitydoc_current_file'] = 'Current file';
 
 $string['feed_column_form'] = 'Form';
 $string['formstatus_ok'] = 'Required fields in Additional data are complete';

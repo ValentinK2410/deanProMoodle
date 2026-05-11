@@ -805,11 +805,26 @@ function local_deanpromoodle_get_identity_doc_files($userid) {
     try {
         $context = context_user::instance((int) $userid);
         $fs = get_file_storage();
-        foreach (array_keys($out) as $slot) {
-            $files = $fs->get_area_files($context->id, 'local_deanpromoodle', 'identitydocs', 0, '/' . $slot . '/', false);
-            foreach ($files as $f) {
-                if (!$f->is_directory()) {
-                    $out[$slot] = $f;
+        // В file_storage::get_area_files пятый аргумент — строка SORT (ORDER BY), не filepath.
+        // Раньше сюда передавали '/' . $slot . '/', из‑за чего записи из БД не находились и сканы не отображались.
+        $files = $fs->get_area_files(
+            $context->id,
+            'local_deanpromoodle',
+            'identitydocs',
+            0,
+            'filepath, filename',
+            false
+        );
+        foreach ($files as $f) {
+            if ($f->is_directory()) {
+                continue;
+            }
+            $path = $f->get_filepath();
+            foreach (array_keys($out) as $slot) {
+                if ($path === '/' . $slot . '/') {
+                    if ($out[$slot] === null || $f->get_timemodified() > $out[$slot]->get_timemodified()) {
+                        $out[$slot] = $f;
+                    }
                     break;
                 }
             }

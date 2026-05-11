@@ -166,6 +166,7 @@ $string['identitydoc_passport_main'] = 'Скан паспорта (развор�
 $string['identitydoc_passport_reg'] = 'Скан страницы с регистрацией';
 $string['identitydoc_remove'] = 'Удалить текущий файл';
 $string['identitydoc_openfile'] = 'Открыть файл';
+$string['identitydoc_current_file'] = 'Текущий файл';
 
 // Абитуриенты: фильтр портала МБС и колонка «Форма»
 $string['feed_column_form'] = 'Форма';
