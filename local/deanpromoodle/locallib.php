@@ -822,7 +822,9 @@ function local_deanpromoodle_save_identity_scans($userid, array $files) {
             return 'Пустое имя файла';
         }
         $filepath = '/' . $slot . '/';
-        $fs->delete_area_files($context->id, 'local_deanpromoodle', 'identitydocs', 0, $filepath);
+        // В Moodle 4.x delete_area_files() не принимает путь к подпапке: 5-й аргумент игнорируется,
+        // и удаляется вся filearea identitydocs — отсюда пропадал первый скан при загрузке второго.
+        local_deanpromoodle_delete_identity_scan($userid, $slot);
         $record = (object) [
             'contextid' => $context->id,
             'component' => 'local_deanpromoodle',
@@ -860,9 +862,26 @@ function local_deanpromoodle_delete_identity_scan($userid, $slot) {
     if (!in_array($slot, ['passport_scan1', 'passport_scan2'], true)) {
         return;
     }
-    $context = context_user::instance((int) $userid);
-    $fs = get_file_storage();
-    $fs->delete_area_files($context->id, 'local_deanpromoodle', 'identitydocs', 0, '/' . $slot . '/');
+    $targetpath = '/' . $slot . '/';
+    try {
+        $context = context_user::instance((int) $userid);
+        $fs = get_file_storage();
+        $files = $fs->get_area_files(
+            $context->id,
+            'local_deanpromoodle',
+            'identitydocs',
+            0,
+            'filepath, filename',
+            false
+        );
+        foreach ($files as $f) {
+            if ($f->get_filepath() === $targetpath) {
+                $f->delete();
+            }
+        }
+    } catch (\Throwable $e) {
+        debugging('local_deanpromoodle_delete_identity_scan: ' . $e->getMessage(), DEBUG_DEVELOPER);
+    }
 }
 
 /**
