@@ -26,13 +26,11 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_deanpromoodle';
-// 2026051101 — и последний upgrade savepoint в db/upgrade.php, и актуальный $plugin->version ниже.
-// доп. поля в local_deanpromoodle_student_info (семья, образование/работа, церковь, адрес по частям),
-// два новых файловых слота в identitydocs (документ об образовании, рекомендация церкви).
+// 2026051101 — последний upgrade savepoint в db/upgrade.php; доп. поля student_info, слоты identitydocs.
+// 2026051102 — актуальный $plugin->version ниже; кнопка «Скачать» для файлов из identitydocs.
 // Ранее: лента абитуриентов, регистрация студента и т.д.
-// Значения ниже только в комментариях (код уже в дереве): 2026051102 — кнопка «Скачать» для identitydocs.
-// 2026051103 — выпадающий список «Пол»: не передавать пустой selected у option (ошибочно показывался «Ж»).
-$plugin->version = 2026051101;
+// 2026051103 — только в комментарии: выпадающий список «Пол», корректный атрибут selected у option (не «Ж» по ошибке).
+$plugin->version = 2026051102;
 $plugin->requires = 2022041900; // Moodle 4.0+
 $plugin->maturity = MATURITY_ALPHA;
 $plugin->release = 'v1.0.0-alpha';
