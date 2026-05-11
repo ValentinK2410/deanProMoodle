@@ -3037,6 +3037,10 @@ if ($action == 'viewprogram' && $programid > 0) {
                 
                 // Определяем режим отображения
                 $editmode = ($action == 'edit' && $canedit);
+                /* Заголовок «Сканы документов» с двоеточием задаётся в коде — иначе кастом языка / старый кэш переводов
+                   может навсегда показывать строку без «:». local_deanpromoodle identity heading v20260511 */
+                $heading_identitydocs = preg_replace('#:+$#u', '', trim(get_string('identitydocs_section', 'local_deanpromoodle')));
+                $heading_identitydocs .= ':';
                 
                 // Группа (cohort) - сначала из таблицы, если нет - из cohort_members
                 $cohortdisplay = '';
@@ -3695,8 +3699,12 @@ if ($action == 'viewprogram' && $programid > 0) {
                     ]);
                     echo html_writer::end_div();
 
+                    echo html_writer::span('', '', [
+                        'class' => 'sr-only deanpromoodle-identity-marker',
+                        'data-deanpromoodle-plugin-identity-mark' => '20260511',
+                    ]);
                     echo html_writer::start_tag('h3', ['style' => 'margin-top: 30px; margin-bottom: 20px; color: #495057;']);
-                    echo get_string('identitydocs_section', 'local_deanpromoodle');
+                    echo htmlspecialchars($heading_identitydocs, ENT_QUOTES, 'UTF-8');
                     echo html_writer::end_tag('h3');
                     echo html_writer::div(get_string('identitydocs_hint', 'local_deanpromoodle'), 'alert alert-info', ['style' => 'font-size:13px;']);
                     echo html_writer::div(
@@ -3999,7 +4007,7 @@ if ($action == 'viewprogram' && $programid > 0) {
                         echo html_writer::start_div('additional-identity-docs', [
                             'style' => 'margin-top:24px;padding:20px;background:white;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,0.1);',
                         ]);
-                        echo html_writer::tag('h3', get_string('identitydocs_section', 'local_deanpromoodle'), [
+                        echo html_writer::tag('h3', htmlspecialchars($heading_identitydocs, ENT_QUOTES, 'UTF-8'), [
                             'style' => 'margin-top:0;margin-bottom:12px;color:#495057;',
                         ]);
                         echo html_writer::div(get_string('identitydocs_hint', 'local_deanpromoodle'), 'alert alert-info', [
