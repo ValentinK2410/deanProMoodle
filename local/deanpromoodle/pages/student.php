@@ -2453,7 +2453,26 @@ if ($action == 'viewprogram' && $programid > 0) {
                                             'region' => ['регион область', 'регион', 'область', 'region', 'регион/область', 'регион область'],
                                             'city' => ['город', 'city'],
                                             'street' => ['улица', 'street'],
-                                            'house_apartment' => ['дом квартира', 'дом', 'квартира', 'house apartment', 'house_apartment', 'address', 'дом/квартира', 'дом квартира'],
+                                            'district' => ['район', 'district', 'area'],
+                                            'house' => ['дом строение', 'дом', 'house', 'house no', 'building'],
+                                            'apartment' => ['квартира', 'flat', 'apartment', 'кв'],
+                                            'house_apartment' => ['дом квартира', 'дом/квартира', 'house apartment', 'house_apartment', 'дом квартира одной строкой'],
+                                            'registration_address' => ['адрес регистрации', 'registration address', 'registration_address'],
+                                            'intended_course' => ['заявленный курс', 'intended course', 'intended_course', 'программа'],
+                                            'marital_status' => ['семейное положение', 'marital status', 'marital_status', 'семья'],
+                                            'children_count' => ['количество детей', 'дети', 'children count', 'children_count', 'число детей'],
+                                            'education_general' => ['образование', 'education', 'education_general', 'уровень образования'],
+                                            'speciality' => ['специальность по направлению', 'speciality', 'специальность', 'направление подготовки'],
+                                            'graduated_speciality' => ['специальность по диплому', 'graduated speciality', 'graduated_speciality', 'диплом специальность'],
+                                            'education_doc_series' => ['серия документа об образовании', 'серия диплома', 'education doc series', 'education_doc_series'],
+                                            'education_doc_number' => ['номер документа об образовании', 'номер диплома', 'education doc number', 'education_doc_number'],
+                                            'workplace' => ['место работы', 'работа', 'workplace', 'occupation'],
+                                            'student_registry_id' => ['id студента', 'student id', 'student_registry_id', 'реестр'],
+                                            'ministry' => ['служение в церкви', 'ministry', 'церковное служение'],
+                                            'church_name' => ['название церкви', 'церковь', 'church name', 'church_name', 'община'],
+                                            'church_pastor_name' => ['пастор', 'pastor', 'church pastor', 'church_pastor_name'],
+                                            'church_pastor_contact' => ['контакты пастора', 'pastor contact', 'church_pastor_contact'],
+                                            'baptism_date' => ['дата крещения', 'baptism date', 'baptism_date', 'крещение'],
                                             'previous_institution' => ['предыдущее учебное заведение', 'предыдущееучебноезаведение', 'previous institution', 'previous_institution', 'предыдущее заведение'],
                                             'previous_institution_year' => ['год окончания предыдущего учебного заведения', 'годокончанияпредыдущегоучебногозаведения', 'previous institution year', 'previous_institution_year', 'год окончания'],
                                             'cohort' => ['группа', 'cohort', 'group']
@@ -2709,10 +2728,25 @@ if ($action == 'viewprogram' && $programid > 0) {
                                                         'city' => 255,
                                                         'street' => 255,
                                                         'house_apartment' => 100,
+                                                        'district' => 255,
+                                                        'house' => 50,
+                                                        'apartment' => 50,
+                                                        'registration_address' => 65535,
+                                                        'intended_course' => 500,
+                                                        'marital_status' => 100,
+                                                        'speciality' => 255,
+                                                        'graduated_speciality' => 255,
+                                                        'education_doc_series' => 50,
+                                                        'education_doc_number' => 50,
+                                                        'workplace' => 255,
+                                                        'student_registry_id' => 100,
+                                                        'church_name' => 255,
+                                                        'church_pastor_name' => 255,
+                                                        'education_general' => 65535,
+                                                        'ministry' => 65535,
+                                                        'church_pastor_contact' => 65535,
                                                         'previous_institution' => 255,
                                                         'cohort' => 255,
-                                                        'intended_course' => 500,
-                                                        'registration_address' => 65535,
                                                     ];
                                                     
                                                     // Заполняем все поля из Excel
@@ -2722,13 +2756,16 @@ if ($action == 'viewprogram' && $programid > 0) {
                                                             
                                                             // Обработка специальных полей
                                                             if ($field == 'enrollment_year' || $field == 'previous_institution_year') {
-                                                                // Год - целое число
-                                                                $data->$field = !empty($value) ? (int)$value : 0;
-                                                                // Проверка диапазона года
+                                                                $data->$field = !empty($value) ? (int) $value : 0;
                                                                 if ($data->$field < 1900 || $data->$field > 2100) {
                                                                     $data->$field = 0;
                                                                 }
-                                                            } elseif ($field == 'birthdate' || $field == 'passport_issue_date') {
+                                                            } else if ($field == 'children_count') {
+                                                                $data->$field = ($value === '') ? null : (int) $value;
+                                                                if ($data->$field !== null && ($data->$field < 0 || $data->$field > 50)) {
+                                                                    $data->$field = null;
+                                                                }
+                                                            } else if ($field == 'birthdate' || $field == 'passport_issue_date' || $field == 'baptism_date') {
                                                                 // Конвертируем дату в timestamp
                                                                 if (!empty($value)) {
                                                                     $timestamp = false;
@@ -2959,7 +2996,22 @@ if ($action == 'viewprogram' && $programid > 0) {
                     $data->region = optional_param('region', '', PARAM_TEXT);
                     $data->city = optional_param('city', '', PARAM_TEXT);
                     $data->street = optional_param('street', '', PARAM_TEXT);
+                    $data->district = optional_param('district', '', PARAM_TEXT);
+                    if (mb_strlen($data->district, 'UTF-8') > 255) {
+                        $data->district = mb_substr($data->district, 0, 255, 'UTF-8');
+                    }
+                    $data->house = optional_param('house', '', PARAM_TEXT);
+                    if (mb_strlen($data->house, 'UTF-8') > 50) {
+                        $data->house = mb_substr($data->house, 0, 50, 'UTF-8');
+                    }
+                    $data->apartment = optional_param('apartment', '', PARAM_TEXT);
+                    if (mb_strlen($data->apartment, 'UTF-8') > 50) {
+                        $data->apartment = mb_substr($data->apartment, 0, 50, 'UTF-8');
+                    }
                     $data->house_apartment = optional_param('house_apartment', '', PARAM_TEXT);
+                    if (mb_strlen($data->house_apartment, 'UTF-8') > 100) {
+                        $data->house_apartment = mb_substr($data->house_apartment, 0, 100, 'UTF-8');
+                    }
                     $data->previous_institution = optional_param('previous_institution', '', PARAM_TEXT);
                     $data->previous_institution_year = optional_param('previous_institution_year', 0, PARAM_INT);
                     $data->cohort = optional_param('cohort', '', PARAM_TEXT);
@@ -2971,6 +3023,68 @@ if ($action == 'viewprogram' && $programid > 0) {
                     $data->intended_course = optional_param('intended_course', '', PARAM_TEXT);
                     if (mb_strlen($data->intended_course, 'UTF-8') > 500) {
                         $data->intended_course = mb_substr($data->intended_course, 0, 500, 'UTF-8');
+                    }
+                    $data->marital_status = optional_param('marital_status', '', PARAM_TEXT);
+                    if (mb_strlen($data->marital_status, 'UTF-8') > 100) {
+                        $data->marital_status = mb_substr($data->marital_status, 0, 100, 'UTF-8');
+                    }
+                    $childrenparam = optional_param('children_count', '', PARAM_TEXT);
+                    if ($childrenparam === '') {
+                        $data->children_count = null;
+                    } else {
+                        $data->children_count = (int) $childrenparam;
+                        if ($data->children_count < 0 || $data->children_count > 50) {
+                            $data->children_count = null;
+                        }
+                    }
+                    $data->education_general = optional_param('education_general', '', PARAM_RAW);
+                    $data->education_general = trim((string) $data->education_general);
+                    if (strlen($data->education_general) > 65535) {
+                        $data->education_general = substr($data->education_general, 0, 65535);
+                    }
+                    $data->speciality = optional_param('speciality', '', PARAM_TEXT);
+                    if (mb_strlen($data->speciality, 'UTF-8') > 255) {
+                        $data->speciality = mb_substr($data->speciality, 0, 255, 'UTF-8');
+                    }
+                    $data->education_doc_series = optional_param('education_doc_series', '', PARAM_TEXT);
+                    if (mb_strlen($data->education_doc_series, 'UTF-8') > 50) {
+                        $data->education_doc_series = mb_substr($data->education_doc_series, 0, 50, 'UTF-8');
+                    }
+                    $data->education_doc_number = optional_param('education_doc_number', '', PARAM_TEXT);
+                    if (mb_strlen($data->education_doc_number, 'UTF-8') > 50) {
+                        $data->education_doc_number = mb_substr($data->education_doc_number, 0, 50, 'UTF-8');
+                    }
+                    $data->graduated_speciality = optional_param('graduated_speciality', '', PARAM_TEXT);
+                    if (mb_strlen($data->graduated_speciality, 'UTF-8') > 255) {
+                        $data->graduated_speciality = mb_substr($data->graduated_speciality, 0, 255, 'UTF-8');
+                    }
+                    $data->workplace = optional_param('workplace', '', PARAM_TEXT);
+                    if (mb_strlen($data->workplace, 'UTF-8') > 255) {
+                        $data->workplace = mb_substr($data->workplace, 0, 255, 'UTF-8');
+                    }
+                    $data->student_registry_id = optional_param('student_registry_id', '', PARAM_TEXT);
+                    if (mb_strlen($data->student_registry_id, 'UTF-8') > 100) {
+                        $data->student_registry_id = mb_substr($data->student_registry_id, 0, 100, 'UTF-8');
+                    }
+                    $baptism_date = optional_param('baptism_date', '', PARAM_TEXT);
+                    $data->baptism_date = !empty($baptism_date) ? strtotime($baptism_date) : 0;
+                    $data->ministry = optional_param('ministry', '', PARAM_RAW);
+                    $data->ministry = trim((string) $data->ministry);
+                    if (strlen($data->ministry) > 65535) {
+                        $data->ministry = substr($data->ministry, 0, 65535);
+                    }
+                    $data->church_name = optional_param('church_name', '', PARAM_TEXT);
+                    if (mb_strlen($data->church_name, 'UTF-8') > 255) {
+                        $data->church_name = mb_substr($data->church_name, 0, 255, 'UTF-8');
+                    }
+                    $data->church_pastor_name = optional_param('church_pastor_name', '', PARAM_TEXT);
+                    if (mb_strlen($data->church_pastor_name, 'UTF-8') > 255) {
+                        $data->church_pastor_name = mb_substr($data->church_pastor_name, 0, 255, 'UTF-8');
+                    }
+                    $data->church_pastor_contact = optional_param('church_pastor_contact', '', PARAM_RAW);
+                    $data->church_pastor_contact = trim((string) $data->church_pastor_contact);
+                    if (strlen($data->church_pastor_contact) > 65535) {
+                        $data->church_pastor_contact = substr($data->church_pastor_contact, 0, 65535);
                     }
                     $data->timemodified = time();
                     
@@ -2988,13 +3102,19 @@ if ($action == 'viewprogram' && $programid > 0) {
                     }
 
                     $scanerr = null;
-                    if (optional_param('remove_passport_scan1', 0, PARAM_INT)) {
-                        local_deanpromoodle_delete_identity_scan($viewingstudent->id, 'passport_scan1');
+                    foreach (local_deanpromoodle_student_document_slots() as $slot) {
+                        if (optional_param('remove_' . $slot, 0, PARAM_INT)) {
+                            local_deanpromoodle_delete_identity_scan($viewingstudent->id, $slot);
+                        }
                     }
-                    if (optional_param('remove_passport_scan2', 0, PARAM_INT)) {
-                        local_deanpromoodle_delete_identity_scan($viewingstudent->id, 'passport_scan2');
+                    $fileuploadattempt = false;
+                    foreach (local_deanpromoodle_student_document_slots() as $slot) {
+                        if (!empty($_FILES[$slot]['name'])) {
+                            $fileuploadattempt = true;
+                            break;
+                        }
                     }
-                    if (!empty($_FILES['passport_scan1']['name']) || !empty($_FILES['passport_scan2']['name'])) {
+                    if ($fileuploadattempt) {
                         $scanerr = local_deanpromoodle_save_identity_scans($viewingstudent->id, $_FILES);
                     }
 
@@ -3025,7 +3145,7 @@ if ($action == 'viewprogram' && $programid > 0) {
                 }
 
                 $canviewidentity = false;
-                $identityfiles = ['passport_scan1' => null, 'passport_scan2' => null];
+                $identityfiles = array_fill_keys(local_deanpromoodle_student_document_slots(), null);
                 try {
                     $canviewidentity = local_deanpromoodle_can_view_user_identity_docs($viewingstudent->id);
                     if ($canviewidentity) {
@@ -3110,10 +3230,21 @@ if ($action == 'viewprogram' && $programid > 0) {
                     if (!empty($studentinfo->city)) {
                         $addressparts[] = htmlspecialchars($studentinfo->city, ENT_QUOTES, 'UTF-8');
                     }
+                    if (!empty($studentinfo->district)) {
+                        $addressparts[] = htmlspecialchars($studentinfo->district, ENT_QUOTES, 'UTF-8');
+                    }
                     if (!empty($studentinfo->street)) {
                         $addressparts[] = htmlspecialchars($studentinfo->street, ENT_QUOTES, 'UTF-8');
                     }
-                    if (!empty($studentinfo->house_apartment)) {
+                    if (!empty($studentinfo->house)) {
+                        $addressparts[] = 'д. ' . htmlspecialchars($studentinfo->house, ENT_QUOTES, 'UTF-8');
+                    }
+                    if (!empty($studentinfo->apartment)) {
+                        $addressparts[] = 'кв. ' . htmlspecialchars($studentinfo->apartment, ENT_QUOTES, 'UTF-8');
+                    }
+                    if (!empty($studentinfo->house_apartment)
+                            && empty($studentinfo->house)
+                            && empty($studentinfo->apartment)) {
                         $addressparts[] = htmlspecialchars($studentinfo->house_apartment, ENT_QUOTES, 'UTF-8');
                     }
                     if (!empty($addressparts)) {
@@ -3478,6 +3609,19 @@ if ($action == 'viewprogram' && $programid > 0) {
                     echo html_writer::end_div();
                     echo html_writer::end_div();
                     
+                    echo html_writer::start_div('form-row');
+                    echo html_writer::start_div('form-group');
+                    echo html_writer::tag('label', get_string('field_student_registry_id', 'local_deanpromoodle'));
+                    echo html_writer::empty_tag('input', [
+                        'type' => 'text',
+                        'name' => 'student_registry_id',
+                        'value' => $studentinfo ? htmlspecialchars($studentinfo->student_registry_id ?? '', ENT_QUOTES, 'UTF-8') : '',
+                        'class' => 'form-control',
+                        'maxlength' => '100',
+                    ]);
+                    echo html_writer::end_div();
+                    echo html_writer::end_div();
+                    
                     // Гражданство, место рождения
                     echo html_writer::start_div('form-row');
                     echo html_writer::start_div('form-group');
@@ -3497,6 +3641,39 @@ if ($action == 'viewprogram' && $programid > 0) {
                         'name' => 'birthplace',
                         'value' => $studentinfo ? htmlspecialchars($studentinfo->birthplace, ENT_QUOTES, 'UTF-8') : '',
                         'class' => 'form-control'
+                    ]);
+                    echo html_writer::end_div();
+                    echo html_writer::end_div();
+                    
+                    echo html_writer::start_tag('h3', ['style' => 'margin-top: 30px; margin-bottom: 20px; color: #495057;']);
+                    echo get_string('section_family', 'local_deanpromoodle');
+                    echo html_writer::end_tag('h3');
+                    echo html_writer::start_div('form-row');
+                    echo html_writer::start_div('form-group');
+                    echo html_writer::tag('label', get_string('field_marital_status', 'local_deanpromoodle'));
+                    echo html_writer::empty_tag('input', [
+                        'type' => 'text',
+                        'name' => 'marital_status',
+                        'value' => $studentinfo ? htmlspecialchars($studentinfo->marital_status ?? '', ENT_QUOTES, 'UTF-8') : '',
+                        'class' => 'form-control',
+                        'maxlength' => '100',
+                    ]);
+                    echo html_writer::end_div();
+                    echo html_writer::start_div('form-group');
+                    echo html_writer::tag('label', get_string('field_children_count', 'local_deanpromoodle'));
+                    $childreneditval = '';
+                    if ($studentinfo && isset($studentinfo->children_count) && $studentinfo->children_count !== null && $studentinfo->children_count !== '') {
+                        $childreneditval = (int) $studentinfo->children_count;
+                    }
+                    echo html_writer::empty_tag('input', [
+                        'type' => 'number',
+                        'name' => 'children_count',
+                        'min' => '0',
+                        'max' => '50',
+                        'step' => '1',
+                        'value' => $childreneditval,
+                        'class' => 'form-control',
+                        'placeholder' => '—',
                     ]);
                     echo html_writer::end_div();
                     echo html_writer::end_div();
@@ -3614,7 +3791,16 @@ if ($action == 'viewprogram' && $programid > 0) {
                     echo html_writer::end_div();
                     echo html_writer::end_div();
                     
-                    echo html_writer::start_div('form-row');
+                    echo html_writer::start_div('form-group');
+                    echo html_writer::tag('label', get_string('field_district', 'local_deanpromoodle'));
+                    echo html_writer::empty_tag('input', [
+                        'type' => 'text',
+                        'name' => 'district',
+                        'value' => $studentinfo ? htmlspecialchars($studentinfo->district ?? '', ENT_QUOTES, 'UTF-8') : '',
+                        'class' => 'form-control',
+                    ]);
+                    echo html_writer::end_div();
+                    
                     echo html_writer::start_div('form-group');
                     echo html_writer::tag('label', 'Улица');
                     echo html_writer::empty_tag('input', [
@@ -3625,15 +3811,39 @@ if ($action == 'viewprogram' && $programid > 0) {
                     ]);
                     echo html_writer::end_div();
                     
+                    echo html_writer::start_div('form-row');
                     echo html_writer::start_div('form-group');
-                    echo html_writer::tag('label', 'Дом/Квартира');
+                    echo html_writer::tag('label', get_string('field_house', 'local_deanpromoodle'));
+                    echo html_writer::empty_tag('input', [
+                        'type' => 'text',
+                        'name' => 'house',
+                        'value' => $studentinfo ? htmlspecialchars($studentinfo->house ?? '', ENT_QUOTES, 'UTF-8') : '',
+                        'class' => 'form-control',
+                        'maxlength' => '50',
+                    ]);
+                    echo html_writer::end_div();
+                    
+                    echo html_writer::start_div('form-group');
+                    echo html_writer::tag('label', get_string('field_apartment', 'local_deanpromoodle'));
+                    echo html_writer::empty_tag('input', [
+                        'type' => 'text',
+                        'name' => 'apartment',
+                        'value' => $studentinfo ? htmlspecialchars($studentinfo->apartment ?? '', ENT_QUOTES, 'UTF-8') : '',
+                        'class' => 'form-control',
+                        'maxlength' => '50',
+                    ]);
+                    echo html_writer::end_div();
+                    echo html_writer::end_div();
+                    
+                    echo html_writer::start_div('form-group');
+                    echo html_writer::tag('label', get_string('field_house_apartment_legacy', 'local_deanpromoodle'));
                     echo html_writer::empty_tag('input', [
                         'type' => 'text',
                         'name' => 'house_apartment',
                         'value' => $studentinfo ? htmlspecialchars($studentinfo->house_apartment, ENT_QUOTES, 'UTF-8') : '',
-                        'class' => 'form-control'
+                        'class' => 'form-control',
+                        'maxlength' => '100',
                     ]);
-                    echo html_writer::end_div();
                     echo html_writer::end_div();
 
                     echo html_writer::start_tag('h3', ['style' => 'margin-top: 30px; margin-bottom: 20px; color: #495057;']);
@@ -3659,6 +3869,78 @@ if ($action == 'viewprogram' && $programid > 0) {
                     ]);
                     echo html_writer::end_div();
                     
+                    echo html_writer::start_tag('h3', ['style' => 'margin-top: 30px; margin-bottom: 20px; color: #495057;']);
+                    echo get_string('section_education_work', 'local_deanpromoodle');
+                    echo html_writer::end_tag('h3');
+
+                    echo html_writer::start_div('form-group');
+                    echo html_writer::tag('label', get_string('field_education_general', 'local_deanpromoodle'));
+                    echo html_writer::tag('textarea', htmlspecialchars($studentinfo ? ($studentinfo->education_general ?? '') : '', ENT_QUOTES, 'UTF-8'), [
+                        'name' => 'education_general',
+                        'class' => 'form-control',
+                        'rows' => 4,
+                    ]);
+                    echo html_writer::end_div();
+
+                    echo html_writer::start_div('form-row');
+                    echo html_writer::start_div('form-group');
+                    echo html_writer::tag('label', get_string('field_speciality', 'local_deanpromoodle'));
+                    echo html_writer::empty_tag('input', [
+                        'type' => 'text',
+                        'name' => 'speciality',
+                        'value' => $studentinfo ? htmlspecialchars($studentinfo->speciality ?? '', ENT_QUOTES, 'UTF-8') : '',
+                        'class' => 'form-control',
+                        'maxlength' => '255',
+                    ]);
+                    echo html_writer::end_div();
+
+                    echo html_writer::start_div('form-group');
+                    echo html_writer::tag('label', get_string('field_graduated_speciality', 'local_deanpromoodle'));
+                    echo html_writer::empty_tag('input', [
+                        'type' => 'text',
+                        'name' => 'graduated_speciality',
+                        'value' => $studentinfo ? htmlspecialchars($studentinfo->graduated_speciality ?? '', ENT_QUOTES, 'UTF-8') : '',
+                        'class' => 'form-control',
+                        'maxlength' => '255',
+                    ]);
+                    echo html_writer::end_div();
+                    echo html_writer::end_div();
+
+                    echo html_writer::start_div('form-row');
+                    echo html_writer::start_div('form-group');
+                    echo html_writer::tag('label', get_string('field_education_doc_series', 'local_deanpromoodle'));
+                    echo html_writer::empty_tag('input', [
+                        'type' => 'text',
+                        'name' => 'education_doc_series',
+                        'value' => $studentinfo ? htmlspecialchars($studentinfo->education_doc_series ?? '', ENT_QUOTES, 'UTF-8') : '',
+                        'class' => 'form-control',
+                        'maxlength' => '50',
+                    ]);
+                    echo html_writer::end_div();
+
+                    echo html_writer::start_div('form-group');
+                    echo html_writer::tag('label', get_string('field_education_doc_number', 'local_deanpromoodle'));
+                    echo html_writer::empty_tag('input', [
+                        'type' => 'text',
+                        'name' => 'education_doc_number',
+                        'value' => $studentinfo ? htmlspecialchars($studentinfo->education_doc_number ?? '', ENT_QUOTES, 'UTF-8') : '',
+                        'class' => 'form-control',
+                        'maxlength' => '50',
+                    ]);
+                    echo html_writer::end_div();
+                    echo html_writer::end_div();
+
+                    echo html_writer::start_div('form-group');
+                    echo html_writer::tag('label', get_string('field_workplace', 'local_deanpromoodle'));
+                    echo html_writer::empty_tag('input', [
+                        'type' => 'text',
+                        'name' => 'workplace',
+                        'value' => $studentinfo ? htmlspecialchars($studentinfo->workplace ?? '', ENT_QUOTES, 'UTF-8') : '',
+                        'class' => 'form-control',
+                        'maxlength' => '255',
+                    ]);
+                    echo html_writer::end_div();
+
                     // Предыдущее учебное заведение
                     echo html_writer::start_tag('h3', ['style' => 'margin-top: 30px; margin-bottom: 20px; color: #495057;']);
                     echo 'Предыдущее учебное заведение';
@@ -3699,6 +3981,66 @@ if ($action == 'viewprogram' && $programid > 0) {
                     ]);
                     echo html_writer::end_div();
 
+                    echo html_writer::start_tag('h3', ['style' => 'margin-top: 30px; margin-bottom: 20px; color: #495057;']);
+                    echo get_string('section_church', 'local_deanpromoodle');
+                    echo html_writer::end_tag('h3');
+
+                    echo html_writer::start_div('form-group');
+                    echo html_writer::tag('label', get_string('field_baptism_date', 'local_deanpromoodle'));
+                    $baptismdateedit = '';
+                    if ($studentinfo && isset($studentinfo->baptism_date) && (int) $studentinfo->baptism_date > 0) {
+                        $baptismdateedit = date('Y-m-d', (int) $studentinfo->baptism_date);
+                    }
+                    echo html_writer::empty_tag('input', [
+                        'type' => 'date',
+                        'name' => 'baptism_date',
+                        'value' => $baptismdateedit,
+                        'class' => 'form-control',
+                    ]);
+                    echo html_writer::end_div();
+
+                    echo html_writer::start_div('form-group');
+                    echo html_writer::tag('label', get_string('field_ministry', 'local_deanpromoodle'));
+                    echo html_writer::tag('textarea', htmlspecialchars($studentinfo ? ($studentinfo->ministry ?? '') : '', ENT_QUOTES, 'UTF-8'), [
+                        'name' => 'ministry',
+                        'class' => 'form-control',
+                        'rows' => 3,
+                    ]);
+                    echo html_writer::end_div();
+
+                    echo html_writer::start_div('form-row');
+                    echo html_writer::start_div('form-group');
+                    echo html_writer::tag('label', get_string('field_church_name', 'local_deanpromoodle'));
+                    echo html_writer::empty_tag('input', [
+                        'type' => 'text',
+                        'name' => 'church_name',
+                        'value' => $studentinfo ? htmlspecialchars($studentinfo->church_name ?? '', ENT_QUOTES, 'UTF-8') : '',
+                        'class' => 'form-control',
+                        'maxlength' => '255',
+                    ]);
+                    echo html_writer::end_div();
+
+                    echo html_writer::start_div('form-group');
+                    echo html_writer::tag('label', get_string('field_church_pastor_name', 'local_deanpromoodle'));
+                    echo html_writer::empty_tag('input', [
+                        'type' => 'text',
+                        'name' => 'church_pastor_name',
+                        'value' => $studentinfo ? htmlspecialchars($studentinfo->church_pastor_name ?? '', ENT_QUOTES, 'UTF-8') : '',
+                        'class' => 'form-control',
+                        'maxlength' => '255',
+                    ]);
+                    echo html_writer::end_div();
+                    echo html_writer::end_div();
+
+                    echo html_writer::start_div('form-group');
+                    echo html_writer::tag('label', get_string('field_church_pastor_contact', 'local_deanpromoodle'));
+                    echo html_writer::tag('textarea', htmlspecialchars($studentinfo ? ($studentinfo->church_pastor_contact ?? '') : '', ENT_QUOTES, 'UTF-8'), [
+                        'name' => 'church_pastor_contact',
+                        'class' => 'form-control',
+                        'rows' => 3,
+                    ]);
+                    echo html_writer::end_div();
+
                     echo html_writer::span('', '', [
                         'class' => 'sr-only deanpromoodle-identity-marker',
                         'data-deanpromoodle-plugin-identity-mark' => '20260511',
@@ -3713,7 +4055,7 @@ if ($action == 'viewprogram' && $programid > 0) {
                         ['style' => 'font-size:13px;margin-bottom:16px;']
                     );
 
-                    foreach (['passport_scan1' => 'identitydoc_passport_main', 'passport_scan2' => 'identitydoc_passport_reg'] as $slot => $labelkey) {
+                    foreach (local_deanpromoodle_student_document_slot_labels() as $slot => $labelkey) {
                         echo html_writer::start_div('form-group');
                         $badgetag = !empty($identityfiles[$slot])
                             ? html_writer::span(
@@ -3891,6 +4233,13 @@ if ($action == 'viewprogram' && $programid > 0) {
                         echo html_writer::end_tag('tr');
                     }
                     
+                    if ($studentinfo && !empty($studentinfo->student_registry_id)) {
+                        echo html_writer::start_tag('tr');
+                        echo html_writer::tag('td', get_string('field_student_registry_id', 'local_deanpromoodle'));
+                        echo html_writer::tag('td', htmlspecialchars($studentinfo->student_registry_id, ENT_QUOTES, 'UTF-8'));
+                        echo html_writer::end_tag('tr');
+                    }
+                    
                     // Гражданство
                     if ($studentinfo && !empty($studentinfo->citizenship)) {
                         echo html_writer::start_tag('tr');
@@ -3904,6 +4253,19 @@ if ($action == 'viewprogram' && $programid > 0) {
                         echo html_writer::start_tag('tr');
                         echo html_writer::tag('td', 'Место рождения');
                         echo html_writer::tag('td', htmlspecialchars($studentinfo->birthplace, ENT_QUOTES, 'UTF-8'));
+                        echo html_writer::end_tag('tr');
+                    }
+                    
+                    if ($studentinfo && !empty($studentinfo->marital_status)) {
+                        echo html_writer::start_tag('tr');
+                        echo html_writer::tag('td', get_string('field_marital_status', 'local_deanpromoodle'));
+                        echo html_writer::tag('td', htmlspecialchars($studentinfo->marital_status, ENT_QUOTES, 'UTF-8'));
+                        echo html_writer::end_tag('tr');
+                    }
+                    if ($studentinfo && property_exists($studentinfo, 'children_count') && $studentinfo->children_count !== null) {
+                        echo html_writer::start_tag('tr');
+                        echo html_writer::tag('td', get_string('field_children_count', 'local_deanpromoodle'));
+                        echo html_writer::tag('td', htmlspecialchars((string) (int) $studentinfo->children_count, ENT_QUOTES, 'UTF-8'));
                         echo html_writer::end_tag('tr');
                     }
                     
@@ -3948,8 +4310,19 @@ if ($action == 'viewprogram' && $programid > 0) {
                         if (!empty($studentinfo->country)) $addressparts[] = htmlspecialchars($studentinfo->country, ENT_QUOTES, 'UTF-8');
                         if (!empty($studentinfo->region)) $addressparts[] = htmlspecialchars($studentinfo->region, ENT_QUOTES, 'UTF-8');
                         if (!empty($studentinfo->city)) $addressparts[] = htmlspecialchars($studentinfo->city, ENT_QUOTES, 'UTF-8');
+                        if (!empty($studentinfo->district)) $addressparts[] = htmlspecialchars($studentinfo->district, ENT_QUOTES, 'UTF-8');
                         if (!empty($studentinfo->street)) $addressparts[] = htmlspecialchars($studentinfo->street, ENT_QUOTES, 'UTF-8');
-                        if (!empty($studentinfo->house_apartment)) $addressparts[] = htmlspecialchars($studentinfo->house_apartment, ENT_QUOTES, 'UTF-8');
+                        if (!empty($studentinfo->house)) {
+                            $addressparts[] = 'д. ' . htmlspecialchars($studentinfo->house, ENT_QUOTES, 'UTF-8');
+                        }
+                        if (!empty($studentinfo->apartment)) {
+                            $addressparts[] = 'кв. ' . htmlspecialchars($studentinfo->apartment, ENT_QUOTES, 'UTF-8');
+                        }
+                        if (!empty($studentinfo->house_apartment)
+                                && empty($studentinfo->house)
+                                && empty($studentinfo->apartment)) {
+                            $addressparts[] = htmlspecialchars($studentinfo->house_apartment, ENT_QUOTES, 'UTF-8');
+                        }
                         
                         if (!empty($addressparts)) {
                             echo html_writer::start_tag('tr');
@@ -3973,6 +4346,41 @@ if ($action == 'viewprogram' && $programid > 0) {
                         echo html_writer::end_tag('tr');
                     }
                     
+                    if ($studentinfo && !empty($studentinfo->education_general)) {
+                        $eg = htmlspecialchars($studentinfo->education_general, ENT_QUOTES, 'UTF-8');
+                        echo html_writer::start_tag('tr');
+                        echo html_writer::tag('td', get_string('field_education_general', 'local_deanpromoodle'));
+                        echo html_writer::tag('td', nl2br($eg, false));
+                        echo html_writer::end_tag('tr');
+                    }
+                    if ($studentinfo && !empty($studentinfo->speciality)) {
+                        echo html_writer::start_tag('tr');
+                        echo html_writer::tag('td', get_string('field_speciality', 'local_deanpromoodle'));
+                        echo html_writer::tag('td', htmlspecialchars($studentinfo->speciality, ENT_QUOTES, 'UTF-8'));
+                        echo html_writer::end_tag('tr');
+                    }
+                    if ($studentinfo && !empty($studentinfo->graduated_speciality)) {
+                        echo html_writer::start_tag('tr');
+                        echo html_writer::tag('td', get_string('field_graduated_speciality', 'local_deanpromoodle'));
+                        echo html_writer::tag('td', htmlspecialchars($studentinfo->graduated_speciality, ENT_QUOTES, 'UTF-8'));
+                        echo html_writer::end_tag('tr');
+                    }
+                    if ($studentinfo && (!empty($studentinfo->education_doc_series) || !empty($studentinfo->education_doc_number))) {
+                        $docline = trim(htmlspecialchars($studentinfo->education_doc_series ?? '', ENT_QUOTES, 'UTF-8')
+                            . ' ' . htmlspecialchars($studentinfo->education_doc_number ?? '', ENT_QUOTES, 'UTF-8'));
+                        echo html_writer::start_tag('tr');
+                        echo html_writer::tag('td', get_string('field_education_doc_series', 'local_deanpromoodle') . ' / '
+                            . get_string('field_education_doc_number', 'local_deanpromoodle'));
+                        echo html_writer::tag('td', $docline);
+                        echo html_writer::end_tag('tr');
+                    }
+                    if ($studentinfo && !empty($studentinfo->workplace)) {
+                        echo html_writer::start_tag('tr');
+                        echo html_writer::tag('td', get_string('field_workplace', 'local_deanpromoodle'));
+                        echo html_writer::tag('td', htmlspecialchars($studentinfo->workplace, ENT_QUOTES, 'UTF-8'));
+                        echo html_writer::end_tag('tr');
+                    }
+                    
                     // Предыдущее учебное заведение
                     if ($studentinfo && !empty($studentinfo->previous_institution)) {
                         echo html_writer::start_tag('tr');
@@ -3991,18 +4399,52 @@ if ($action == 'viewprogram' && $programid > 0) {
                     echo html_writer::tag('td', $cohortdisplay ?: '-');
                     echo html_writer::end_tag('tr');
                     
+                    if ($studentinfo && isset($studentinfo->baptism_date) && (int) $studentinfo->baptism_date > 0) {
+                        echo html_writer::start_tag('tr');
+                        echo html_writer::tag('td', get_string('field_baptism_date', 'local_deanpromoodle'));
+                        echo html_writer::tag('td', userdate((int) $studentinfo->baptism_date, get_string('strftimedatefullshort')));
+                        echo html_writer::end_tag('tr');
+                    }
+                    if ($studentinfo && !empty($studentinfo->ministry)) {
+                        $mint = htmlspecialchars($studentinfo->ministry, ENT_QUOTES, 'UTF-8');
+                        echo html_writer::start_tag('tr');
+                        echo html_writer::tag('td', get_string('field_ministry', 'local_deanpromoodle'));
+                        echo html_writer::tag('td', nl2br($mint, false));
+                        echo html_writer::end_tag('tr');
+                    }
+                    if ($studentinfo && !empty($studentinfo->church_name)) {
+                        echo html_writer::start_tag('tr');
+                        echo html_writer::tag('td', get_string('field_church_name', 'local_deanpromoodle'));
+                        echo html_writer::tag('td', htmlspecialchars($studentinfo->church_name, ENT_QUOTES, 'UTF-8'));
+                        echo html_writer::end_tag('tr');
+                    }
+                    if ($studentinfo && !empty($studentinfo->church_pastor_name)) {
+                        echo html_writer::start_tag('tr');
+                        echo html_writer::tag('td', get_string('field_church_pastor_name', 'local_deanpromoodle'));
+                        echo html_writer::tag('td', htmlspecialchars($studentinfo->church_pastor_name, ENT_QUOTES, 'UTF-8'));
+                        echo html_writer::end_tag('tr');
+                    }
+                    if ($studentinfo && !empty($studentinfo->church_pastor_contact)) {
+                        $cpc = htmlspecialchars($studentinfo->church_pastor_contact, ENT_QUOTES, 'UTF-8');
+                        echo html_writer::start_tag('tr');
+                        echo html_writer::tag('td', get_string('field_church_pastor_contact', 'local_deanpromoodle'));
+                        echo html_writer::tag('td', nl2br($cpc, false));
+                        echo html_writer::end_tag('tr');
+                    }
+                    
                     echo html_writer::end_tag('tbody');
                     echo html_writer::end_tag('table');
                     echo html_writer::end_div();
 
                     if ($canviewidentity) {
-                        $slots = ['passport_scan1' => 'identitydoc_passport_main', 'passport_scan2' => 'identitydoc_passport_reg'];
+                        $slots = local_deanpromoodle_student_document_slot_labels();
                         $slotsdone = 0;
                         foreach ($slots as $s => $_lbl) {
                             if (!empty($identityfiles[$s])) {
                                 $slotsdone++;
                             }
                         }
+                        $slotstotal = count($slots);
 
                         echo html_writer::start_div('additional-identity-docs', [
                             'style' => 'margin-top:24px;padding:20px;background:white;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,0.1);',
@@ -4019,7 +4461,7 @@ if ($action == 'viewprogram' && $programid > 0) {
                             ['style' => 'font-size:13px;margin-bottom:12px;']
                         );
                         echo html_writer::div(
-                            get_string('identitydocs_summary_loaded', 'local_deanpromoodle', ['done' => $slotsdone, 'total' => 2]),
+                            get_string('identitydocs_summary_loaded', 'local_deanpromoodle', ['done' => $slotsdone, 'total' => $slotstotal]),
                             '',
                             ['style' => 'font-weight:600;margin-bottom:16px;color:#495057;']
                         );

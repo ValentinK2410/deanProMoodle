@@ -754,7 +754,28 @@ function local_deanpromoodle_identity_upload_resolve_mimetype($pathname, $origin
 }
 
 /**
- * Сохраняет загруженные сканы (до 2 слотов) в filearea пользователя.
+ * Слоты прикладываемых файлов в filearea identitydocs (паспорт, документ об образовании, рекомендация церкви).
+ *
+ * @return array slot => ключ строки имени слота из local_deanpromoodle
+ */
+function local_deanpromoodle_student_document_slot_labels(): array {
+    return [
+        'passport_scan1' => 'identitydoc_passport_main',
+        'passport_scan2' => 'identitydoc_passport_reg',
+        'education_document' => 'additionaldoc_education',
+        'church_recommendation' => 'additionaldoc_church_rec',
+    ];
+}
+
+/**
+ * @return string[]
+ */
+function local_deanpromoodle_student_document_slots(): array {
+    return array_keys(local_deanpromoodle_student_document_slot_labels());
+}
+
+/**
+ * Сохраняет загруженные файлы документов (несколько независимых слотов) в filearea пользователя identitydocs.
  *
  * @param int $userid Владелец файлов
  * @param array $files массив $_FILES
@@ -784,7 +805,7 @@ function local_deanpromoodle_save_identity_scans($userid, array $files) {
     $context = context_user::instance($userid);
     $fs = get_file_storage();
     $maxbytes = 5 * 1024 * 1024;
-    $slots = ['passport_scan1', 'passport_scan2'];
+    $slots = local_deanpromoodle_student_document_slots();
 
     foreach ($slots as $slot) {
         if (empty($files[$slot]) || !isset($files[$slot]['error']) || $files[$slot]['error'] === UPLOAD_ERR_NO_FILE) {
@@ -856,10 +877,10 @@ function local_deanpromoodle_save_identity_scans($userid, array $files) {
  * Удалить скан в слоте.
  *
  * @param int $userid
- * @param string $slot passport_scan1|passport_scan2
+ * @param string $slot один из ключей {@see local_deanpromoodle_student_document_slots()}
  */
 function local_deanpromoodle_delete_identity_scan($userid, $slot) {
-    if (!in_array($slot, ['passport_scan1', 'passport_scan2'], true)) {
+    if (!in_array($slot, local_deanpromoodle_student_document_slots(), true)) {
         return;
     }
     $targetpath = '/' . $slot . '/';
@@ -891,7 +912,7 @@ function local_deanpromoodle_delete_identity_scan($userid, $slot) {
  * @return array ключ slot => stored_file|null
  */
 function local_deanpromoodle_get_identity_doc_files($userid) {
-    $out = ['passport_scan1' => null, 'passport_scan2' => null];
+    $out = array_fill_keys(local_deanpromoodle_student_document_slots(), null);
     try {
         $context = context_user::instance((int) $userid);
         $fs = get_file_storage();

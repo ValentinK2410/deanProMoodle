@@ -287,5 +287,42 @@ function xmldb_local_deanpromoodle_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026021201, 'local', 'deanpromoodle');
     }
 
+    if ($oldversion < 2026051101) {
+        $table = new xmldb_table('local_deanpromoodle_student_info');
+        $after = 'intended_course';
+        $fields = [
+            ['marital_status', XMLDB_TYPE_CHAR, '100', null, null, null, null],
+            ['children_count', XMLDB_TYPE_INTEGER, '4', null, null, null, null],
+            ['education_general', XMLDB_TYPE_TEXT, null, null, null, null, null],
+            ['speciality', XMLDB_TYPE_CHAR, '255', null, null, null, null],
+            ['education_doc_series', XMLDB_TYPE_CHAR, '50', null, null, null, null],
+            ['education_doc_number', XMLDB_TYPE_CHAR, '50', null, null, null, null],
+            ['graduated_speciality', XMLDB_TYPE_CHAR, '255', null, null, null, null],
+            ['workplace', XMLDB_TYPE_CHAR, '255', null, null, null, null],
+            ['student_registry_id', XMLDB_TYPE_CHAR, '100', null, null, null, null],
+            ['district', XMLDB_TYPE_CHAR, '255', null, null, null, null],
+            ['house', XMLDB_TYPE_CHAR, '50', null, null, null, null],
+            ['apartment', XMLDB_TYPE_CHAR, '50', null, null, null, null],
+            ['baptism_date', XMLDB_TYPE_INTEGER, '10', null, null, null, null],
+            ['ministry', XMLDB_TYPE_TEXT, null, null, null, null, null],
+            ['church_name', XMLDB_TYPE_CHAR, '255', null, null, null, null],
+            ['church_pastor_name', XMLDB_TYPE_CHAR, '255', null, null, null, null],
+            ['church_pastor_contact', XMLDB_TYPE_TEXT, null, null, null, null, null],
+        ];
+        foreach ($fields as $fdef) {
+            $fname = $fdef[0];
+            $ftype = $fdef[1];
+            $flen = $fdef[2];
+            $field = ($ftype === XMLDB_TYPE_TEXT)
+                ? new xmldb_field($fname, $ftype, null, null, null, null, null, $after)
+                : new xmldb_field($fname, $ftype, $flen, null, null, null, null, $after);
+            if ($dbman->table_exists($table) && !$dbman->field_exists($table, $field)) {
+                $dbman->add_field($table, $field);
+            }
+            $after = $fname;
+        }
+        upgrade_plugin_savepoint(true, 2026051101, 'local', 'deanpromoodle');
+    }
+
     return true;
 }
