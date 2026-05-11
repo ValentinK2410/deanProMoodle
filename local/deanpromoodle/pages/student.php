@@ -2003,6 +2003,11 @@ if ($action == 'viewprogram' && $programid > 0) {
         // Всегда проверяем права заново, чтобы быть уверенными
         $isadmin = has_capability('moodle/site:config', $context) || 
                    has_capability('local/deanpromoodle:viewadmin', $context);
+        // Внешние зачеты: редактирование только у полного админа сайта (не local/deanpromoodle:viewadmin и т.п.)
+        $canmanageexternalcredits = has_capability('moodle/site:config', $context);
+        $canviewexternalcreditstab = $canmanageexternalcredits
+            || has_capability('local/deanpromoodle:viewadmin', $context)
+            || ((int) $viewingstudent->id === (int) $USER->id);
         
         // Подвкладки - создаем массив ПЕРЕД проверкой $subtab
         $subtabs = [];
@@ -2018,8 +2023,8 @@ if ($action == 'viewprogram' && $programid > 0) {
             new moodle_url('/local/deanpromoodle/pages/student.php', $subtaburlparams),
             'Дополнительные данные');
         
-        // Если пользователь пытается открыть external_credits, но не является админом, редиректим ДО создания tabtree
-        if ($subtab == 'external_credits' && !$isadmin) {
+        // Если пользователь пытается открыть external_credits без права просмотра — редирект
+        if ($subtab == 'external_credits' && !$canviewexternalcreditstab) {
             $redirectparams = ['tab' => 'programs', 'subtab' => 'programs'];
             if ($studentid > 0) {
                 $redirectparams['studentid'] = $studentid;
@@ -2027,18 +2032,16 @@ if ($action == 'viewprogram' && $programid > 0) {
             redirect(new moodle_url('/local/deanpromoodle/pages/student.php', $redirectparams));
         }
         
-        // Подвкладка "Внешние зачеты" видна только администраторам
-        // ВАЖНО: Добавляем подвкладку ТОЛЬКО если пользователь админ, чтобы tabtree мог её найти
-        if ($isadmin) {
+        // Подвкладка "Внешние зачеты": просмотр (см. $canviewexternalcreditstab), редактирование — только site:config
+        if ($canviewexternalcreditstab) {
             $subtaburlparams['subtab'] = 'external_credits';
             $subtabs[] = new tabobject('external_credits', 
                 new moodle_url('/local/deanpromoodle/pages/student.php', $subtaburlparams),
                 'Внешние зачеты');
         }
         
-        // КРИТИЧЕСКИ ВАЖНО: Если админ пытается открыть external_credits, но подвкладка не найдена в массиве,
-        // это означает, что что-то пошло не так. Добавляем подвкладку принудительно.
-        if ($isadmin && $subtab == 'external_credits') {
+        // Если открыт external_credits, но подвкладка не в массиве — восстанавливаем
+        if ($canviewexternalcreditstab && $subtab == 'external_credits') {
             $found = false;
             foreach ($subtabs as $tab) {
                 // Проверяем свойство id объекта tabobject
@@ -3964,13 +3967,20 @@ if ($action == 'viewprogram' && $programid > 0) {
             break;
             
         case 'external_credits':
-            // Подвкладка "Внешние зачеты" - только для администраторов
-            if (!$isadmin) {
+            if (!$canviewexternalcreditstab) {
                 redirect(new moodle_url('/local/deanpromoodle/pages/student.php', [
                     'tab' => 'programs',
                     'subtab' => 'programs',
                     'studentid' => $studentid
                 ]));
+            }
+            if (($action === 'add_external_credit' || $action === 'edit_external_credit' || $action === 'delete_external_credit')
+                    && !$canmanageexternalcredits) {
+                redirect(new moodle_url('/local/deanpromoodle/pages/student.php', [
+                    'tab' => 'programs',
+                    'subtab' => 'external_credits',
+                    'studentid' => $studentid
+                ]), get_string('nopermissions', 'error'), null, \core\output\notification::NOTIFY_ERROR);
             }
             
             // Обработка действий с внешними зачетами
@@ -3979,7 +3989,9 @@ if ($action == 'viewprogram' && $programid > 0) {
             // Добавление/редактирование внешнего зачета
             // Проверяем, что это POST-запрос с данными формы (не просто открытие формы)
             $formsubmitted = optional_param('sesskey', '', PARAM_RAW);
-            if (($action == 'add_external_credit' || $action == 'edit_external_credit') && $externalcreditid >= 0 && !empty($formsubmitted)) {
+            if ($canmanageexternalcredits
+                    && ($action == 'add_external_credit' || $action == 'edit_external_credit')
+                    && $externalcreditid >= 0 && !empty($formsubmitted)) {
                 // Проверяем sesskey для безопасности
                 require_sesskey();
                 
@@ -4371,7 +4383,7 @@ if ($action == 'viewprogram' && $programid > 0) {
             }
             
             // Удаление внешнего зачета
-            if ($action == 'delete_external_credit' && $externalcreditid > 0) {
+            if ($canmanageexternalcredits && $action == 'delete_external_credit' && $externalcreditid > 0) {
                 require_sesskey();
                 try {
                     $record = $DB->get_record('local_deanpromoodle_student_external_credits', [
@@ -4396,8 +4408,9 @@ if ($action == 'viewprogram' && $programid > 0) {
                 }
             }
             
-            // Форма добавления/редактирования
-            if ($action == 'add_external_credit' || ($action == 'edit_external_credit' && $externalcreditid > 0)) {
+            // Форма добавления/редактирования (только полный администратор сайта)
+            if ($canmanageexternalcredits
+                    && ($action == 'add_external_credit' || ($action == 'edit_external_credit' && $externalcreditid > 0))) {
                 $externalcredit = null;
                 if ($action == 'edit_external_credit' && $externalcreditid > 0) {
                     $externalcredit = $DB->get_record('local_deanpromoodle_student_external_credits', [
@@ -4571,17 +4584,18 @@ if ($action == 'viewprogram' && $programid > 0) {
                 // Список внешних зачетов
                 echo html_writer::tag('h3', 'Внешние зачеты студента: ' . fullname($viewingstudent));
                 
-                // Кнопка добавления
-                $addurl = new moodle_url('/local/deanpromoodle/pages/student.php', [
-                    'tab' => 'programs',
-                    'subtab' => 'external_credits',
-                    'action' => 'add_external_credit',
-                    'studentid' => $studentid
-                ]);
-                echo html_writer::link($addurl, '<i class="fas fa-plus"></i> Добавить внешний зачет', [
-                    'class' => 'btn btn-primary',
-                    'style' => 'margin-bottom: 20px;'
-                ]);
+                if ($canmanageexternalcredits) {
+                    $addurl = new moodle_url('/local/deanpromoodle/pages/student.php', [
+                        'tab' => 'programs',
+                        'subtab' => 'external_credits',
+                        'action' => 'add_external_credit',
+                        'studentid' => $studentid
+                    ]);
+                    echo html_writer::link($addurl, '<i class="fas fa-plus"></i> Добавить внешний зачет', [
+                        'class' => 'btn btn-primary',
+                        'style' => 'margin-bottom: 20px;'
+                    ]);
+                }
                 
                 // Получаем внешние зачеты студента
                 $externalcredits = $DB->get_records_sql(
@@ -4607,7 +4621,9 @@ if ($action == 'viewprogram' && $programid > 0) {
                     echo html_writer::tag('th', 'Дата зачета');
                     echo html_writer::tag('th', 'Документ');
                     echo html_writer::tag('th', 'Добавил');
-                    echo html_writer::tag('th', 'Действия', ['style' => 'width: 150px;']);
+                    if ($canmanageexternalcredits) {
+                        echo html_writer::tag('th', 'Действия', ['style' => 'width: 150px;']);
+                    }
                     echo html_writer::end_tag('tr');
                     echo html_writer::end_tag('thead');
                     echo html_writer::start_tag('tbody');
@@ -4650,35 +4666,36 @@ if ($action == 'viewprogram' && $programid > 0) {
                             : '-';
                         echo html_writer::tag('td', htmlspecialchars($creator, ENT_QUOTES, 'UTF-8'));
                         
-                        // Действия
-                        echo html_writer::start_tag('td');
-                        $editurl = new moodle_url('/local/deanpromoodle/pages/student.php', [
-                            'tab' => 'programs',
-                            'subtab' => 'external_credits',
-                            'action' => 'edit_external_credit',
-                            'externalcreditid' => $credit->id,
-                            'studentid' => $studentid
-                        ]);
-                        echo html_writer::link($editurl, '<i class="fas fa-edit"></i>', [
-                            'class' => 'btn btn-sm btn-warning',
-                            'title' => 'Редактировать',
-                            'style' => 'margin-right: 5px;'
-                        ]);
-                        
-                        $deleteurl = new moodle_url('/local/deanpromoodle/pages/student.php', [
-                            'tab' => 'programs',
-                            'subtab' => 'external_credits',
-                            'action' => 'delete_external_credit',
-                            'externalcreditid' => $credit->id,
-                            'studentid' => $studentid,
-                            'sesskey' => sesskey()
-                        ]);
-                        echo html_writer::link($deleteurl, '<i class="fas fa-trash"></i>', [
-                            'class' => 'btn btn-sm btn-danger',
-                            'title' => 'Удалить',
-                            'onclick' => 'return confirm(\'Вы уверены, что хотите удалить этот внешний зачет?\');'
-                        ]);
-                        echo html_writer::end_tag('td');
+                        if ($canmanageexternalcredits) {
+                            echo html_writer::start_tag('td');
+                            $editurl = new moodle_url('/local/deanpromoodle/pages/student.php', [
+                                'tab' => 'programs',
+                                'subtab' => 'external_credits',
+                                'action' => 'edit_external_credit',
+                                'externalcreditid' => $credit->id,
+                                'studentid' => $studentid
+                            ]);
+                            echo html_writer::link($editurl, '<i class="fas fa-edit"></i>', [
+                                'class' => 'btn btn-sm btn-warning',
+                                'title' => 'Редактировать',
+                                'style' => 'margin-right: 5px;'
+                            ]);
+                            
+                            $deleteurl = new moodle_url('/local/deanpromoodle/pages/student.php', [
+                                'tab' => 'programs',
+                                'subtab' => 'external_credits',
+                                'action' => 'delete_external_credit',
+                                'externalcreditid' => $credit->id,
+                                'studentid' => $studentid,
+                                'sesskey' => sesskey()
+                            ]);
+                            echo html_writer::link($deleteurl, '<i class="fas fa-trash"></i>', [
+                                'class' => 'btn btn-sm btn-danger',
+                                'title' => 'Удалить',
+                                'onclick' => 'return confirm(\'Вы уверены, что хотите удалить этот внешний зачет?\');'
+                            ]);
+                            echo html_writer::end_tag('td');
+                        }
                         
                         echo html_writer::end_tag('tr');
                         
@@ -4686,7 +4703,7 @@ if ($action == 'viewprogram' && $programid > 0) {
                         if (!empty($credit->notes)) {
                             echo html_writer::start_tag('tr', ['style' => 'background-color: #f8f9fa;']);
                             echo html_writer::tag('td', '<strong>Примечания:</strong> ' . htmlspecialchars($credit->notes, ENT_QUOTES, 'UTF-8'), [
-                                'colspan' => '7',
+                                'colspan' => $canmanageexternalcredits ? '7' : '6',
                                 'style' => 'font-size: 0.9em; padding: 8px 16px;'
                             ]);
                             echo html_writer::end_tag('tr');
@@ -4703,7 +4720,7 @@ if ($action == 'viewprogram' && $programid > 0) {
             // По умолчанию показываем программы
             // НО: если админ пытается открыть external_credits, но по какой-то причине case не сработал,
             // это означает, что подвкладка не была обработана. В этом случае редиректим на external_credits явно.
-            if ($isadmin && $subtab == 'external_credits') {
+            if ($canviewexternalcreditstab && $subtab == 'external_credits') {
                 // Это не должно происходить, но если произошло - редиректим на external_credits явно
                 $redirectparams = ['tab' => 'programs', 'subtab' => 'external_credits'];
                 if ($studentid > 0) {
