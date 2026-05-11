@@ -697,6 +697,63 @@ function local_deanpromoodle_can_view_user_identity_docs($targetuserid) {
 }
 
 /**
+ * Определить MIME для загрузки скана: finfo часто даёт application/octet-stream для PDF/JPEG.
+ *
+ * @param string $pathname путь к временному файлу
+ * @param string $originalname оригинальное имя из браузера
+ * @return string распознанный тип из image/jpeg | image/png | application/pdf или пустая строка
+ */
+function local_deanpromoodle_identity_upload_resolve_mimetype($pathname, $originalname) {
+    $allowed = ['image/jpeg' => true, 'image/png' => true, 'application/pdf' => true];
+    $mimetype = '';
+    if (is_readable($pathname)) {
+        if (class_exists('finfo')) {
+            $fi = new finfo(FILEINFO_MIME_TYPE);
+            $mimetype = $fi->file($pathname) ?: '';
+        } else if (function_exists('mime_content_type')) {
+            $mimetype = mime_content_type($pathname) ?: '';
+        }
+    }
+    $mimetype = strtolower(trim((string) $mimetype));
+    if (isset($allowed[$mimetype])) {
+        return $mimetype;
+    }
+
+    $ext = strtolower((string) pathinfo($originalname, PATHINFO_EXTENSION));
+    $exttomime = [
+        'jpg' => 'image/jpeg',
+        'jpeg' => 'image/jpeg',
+        'png' => 'image/png',
+        'pdf' => 'application/pdf',
+    ];
+    if ($ext !== '' && isset($exttomime[$ext])) {
+        return $exttomime[$ext];
+    }
+
+    $fh = @fopen($pathname, 'rb');
+    if ($fh) {
+        $head = fread($fh, 8);
+        fclose($fh);
+        if ($head !== false && $head !== '') {
+            if (strncmp($head, '%PDF-', 5) === 0) {
+                return 'application/pdf';
+            }
+            if (isset($head[1]) && $head[0] === "\xff" && $head[1] === "\xd8") {
+                return 'image/jpeg';
+            }
+            if (strncmp($head, "\x89PNG\r\n\x1a\n", 8) === 0) {
+                return 'image/png';
+            }
+            if (strlen($head) >= 4 && substr($head, 0, 4) === "\x89PNG") {
+                return 'image/png';
+            }
+        }
+    }
+
+    return '';
+}
+
+/**
  * Сохраняет загруженные сканы (до 2 слотов) в filearea пользователя.
  *
  * @param int $userid Владелец файлов
@@ -727,7 +784,6 @@ function local_deanpromoodle_save_identity_scans($userid, array $files) {
     $context = context_user::instance($userid);
     $fs = get_file_storage();
     $maxbytes = 5 * 1024 * 1024;
-    $allowedmimes = ['image/jpeg', 'image/png', 'application/pdf'];
     $slots = ['passport_scan1', 'passport_scan2'];
 
     foreach ($slots as $slot) {
@@ -735,25 +791,31 @@ function local_deanpromoodle_save_identity_scans($userid, array $files) {
             continue;
         }
         if ($files[$slot]['error'] !== UPLOAD_ERR_OK) {
-            return 'Ошибка загрузки файла: ' . $slot;
+            $errcode = (int) $files[$slot]['error'];
+            if ($errcode === UPLOAD_ERR_INI_SIZE || $errcode === UPLOAD_ERR_FORM_SIZE) {
+                return 'Файл слишком большой для настроек PHP/сервера. Разрешено до 5 МБ на файл; при необходимости уменьшите файл или сообщите администратору (upload_max_filesize / post_max_size).';
+            }
+            if ($errcode === UPLOAD_ERR_PARTIAL) {
+                return 'Загрузка прервалась. Попробуйте отправить форму ещё раз.';
+            }
+            if ($errcode === UPLOAD_ERR_NO_TMP_DIR) {
+                return 'На сервере не настроен каталог временных загрузок (upload_tmp_dir).';
+            }
+            if ($errcode === UPLOAD_ERR_CANT_WRITE || $errcode === UPLOAD_ERR_EXTENSION) {
+                return 'Не удалось записать файл на сервер. Обратитесь к администратору.';
+            }
+            return 'Ошибка загрузки файла (код ' . $errcode . '): ' . $slot;
         }
         if ($files[$slot]['size'] > $maxbytes) {
             return 'Файл слишком большой (максимум 5 МБ): ' . $slot;
         }
         $tmp = $files[$slot]['tmp_name'];
         if (!is_uploaded_file($tmp)) {
-            return 'Некорректная загрузка файла';
+            return 'Некорректная загрузка файла. Попробуйте другой браузер или обратитесь к администратору (проверка is_uploaded_file).';
         }
-        $mimetype = '';
-        if (class_exists('finfo')) {
-            $fi = new finfo(FILEINFO_MIME_TYPE);
-            $mimetype = $fi->file($tmp);
-        }
-        if ($mimetype === '' && function_exists('mime_content_type')) {
-            $mimetype = mime_content_type($tmp);
-        }
-        if (!in_array($mimetype, $allowedmimes, true)) {
-            return 'Допустимы только JPG, PNG или PDF';
+        $mimetype = local_deanpromoodle_identity_upload_resolve_mimetype($tmp, $files[$slot]['name'] ?? '');
+        if (!in_array($mimetype, ['image/jpeg', 'image/png', 'application/pdf'], true)) {
+            return 'Разрешены только JPG, PNG и PDF с корректным содержимым. Если файл PDF, сохраните его заново или смените формат.';
         }
         $filename = clean_filename($files[$slot]['name']);
         if ($filename === '') {
@@ -773,7 +835,16 @@ function local_deanpromoodle_save_identity_scans($userid, array $files) {
             'license' => 'allrightsreserved',
             'timemodified' => time(),
         ];
-        $fs->create_file_from_pathname($record, $tmp);
+        try {
+            $fs->create_file_from_pathname($record, $tmp);
+        } catch (\Throwable $e) {
+            debugging('local_deanpromoodle_save_identity_scans create_file: ' . $e->getMessage(), DEBUG_DEVELOPER);
+            return 'Не удалось записать файл в хранилище Moodle. Обратитесь к администратору сайта.';
+        }
+        $stored = $fs->get_file($context->id, 'local_deanpromoodle', 'identitydocs', 0, $filepath, $filename);
+        if (!$stored || $stored->is_directory()) {
+            return 'Файл не найден сразу после сохранения — возможна ошибка дискового хранилища.';
+        }
     }
 
     return null;
