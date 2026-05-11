@@ -29,7 +29,8 @@ $plugin->component = 'local_deanpromoodle';
 // 2026051101 — доп. поля в local_deanpromoodle_student_info (семья, образование/работа, церковь, адрес по частям),
 // два новых файловых слота в identitydocs (документ об образовании, рекомендация церкви); сохранённые сайты получают шаг upgrade.
 // Ранее: лента абитуриентов, регистрация студента и т.д.
-$plugin->version = 2026051101;
+// 2026051102 — явная кнопка «Скачать» для сканов/PDF из identitydocs (forcedownload в pluginfile).
+$plugin->version = 2026051102;
 $plugin->requires = 2022041900; // Moodle 4.0+
 $plugin->maturity = MATURITY_ALPHA;
 $plugin->release = 'v1.0.0-alpha';

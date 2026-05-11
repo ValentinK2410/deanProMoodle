@@ -947,32 +947,92 @@ function local_deanpromoodle_get_identity_doc_files($userid) {
 }
 
 /**
- * Встроенный просмотр скана (изображение или PDF в iframe).
+ * URL отдачи файла из identitydocs (pluginfile). При $forcedownload браузер предложит сохранить файл.
  *
  * @param stored_file $file
- * @return string HTML
+ * @param bool $forcedownload
+ * @return moodle_url
  */
-function local_deanpromoodle_render_identity_preview($file) {
-    $url = moodle_url::make_pluginfile_url(
+function local_deanpromoodle_make_identity_doc_pluginfile_url(stored_file $file, $forcedownload = false) {
+    return moodle_url::make_pluginfile_url(
         $file->get_contextid(),
         'local_deanpromoodle',
         'identitydocs',
         0,
         $file->get_filepath(),
         $file->get_filename(),
-        false
+        (bool) $forcedownload
     );
+}
+
+/**
+ * Ссылка «Скачать» для сохранённого скана без открытия в браузере.
+ *
+ * @param stored_file $file
+ * @return string HTML (одна ссылка)
+ */
+function local_deanpromoodle_render_identity_download_link(stored_file $file) {
+    return html_writer::link(
+        local_deanpromoodle_make_identity_doc_pluginfile_url($file, true),
+        get_string('identitydoc_download', 'local_deanpromoodle'),
+        [
+            'class' => 'btn btn-sm btn-outline-secondary local-deanpromoodle-identity-download',
+        ]
+    );
+}
+
+/**
+ * Обёртка для превью: под ней кнопка скачивания.
+ *
+ * @param stored_file $file
+ * @param string $previewinner HTML блока превью
+ * @return string
+ */
+function local_deanpromoodle_wrap_identity_preview_with_download(stored_file $file, $previewinner) {
+    $actions = html_writer::start_div('', [
+        'style' => 'margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;',
+    ]);
+    $actions .= local_deanpromoodle_render_identity_download_link($file);
+    $actions .= html_writer::end_div();
+    return $previewinner . $actions;
+}
+
+/**
+ * Встроенный просмотр скана (изображение или PDF в iframe) и ссылка на скачивание.
+ *
+ * @param stored_file $file
+ * @return string HTML
+ */
+function local_deanpromoodle_render_identity_preview($file) {
+    $url = local_deanpromoodle_make_identity_doc_pluginfile_url($file, false);
     $mime = $file->get_mimetype();
+
+    $inner = '';
     if (strpos($mime, 'image/') === 0) {
-        return html_writer::empty_tag('img', [
+        $inner = html_writer::empty_tag('img', [
             'src' => $url->out(false),
             'alt' => '',
             'style' => 'max-width:100%;max-height:480px;border:1px solid #dee2e6;border-radius:6px;',
         ]);
+        return local_deanpromoodle_wrap_identity_preview_with_download($file, $inner);
     }
     if ($mime === 'application/pdf') {
         $u = htmlspecialchars($url->out(false), ENT_QUOTES, 'UTF-8');
-        return '<iframe src="' . $u . '" class="local-deanpromoodle-doc-iframe" style="width:100%;min-height:520px;border:1px solid #dee2e6;border-radius:6px;" title="PDF"></iframe>';
+        $inner = '<iframe src="' . $u . '" class="local-deanpromoodle-doc-iframe" '
+            . 'style="width:100%;min-height:520px;border:1px solid #dee2e6;border-radius:6px;" title="PDF"></iframe>';
+        return local_deanpromoodle_wrap_identity_preview_with_download($file, $inner);
     }
-    return html_writer::link($url, get_string('identitydoc_openfile', 'local_deanpromoodle'), ['target' => '_blank', 'rel' => 'noopener']);
+
+    $open = html_writer::link(
+        $url,
+        get_string('identitydoc_openfile', 'local_deanpromoodle'),
+        ['target' => '_blank', 'rel' => 'noopener']
+    );
+    $actions = html_writer::start_div('', [
+        'style' => 'margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;',
+    ]);
+    $actions .= $open;
+    $actions .= local_deanpromoodle_render_identity_download_link($file);
+    $actions .= html_writer::end_div();
+    return $actions;
 }
