@@ -3699,19 +3699,51 @@ if ($action == 'viewprogram' && $programid > 0) {
                     echo get_string('identitydocs_section', 'local_deanpromoodle');
                     echo html_writer::end_tag('h3');
                     echo html_writer::div(get_string('identitydocs_hint', 'local_deanpromoodle'), 'alert alert-info', ['style' => 'font-size:13px;']);
+                    echo html_writer::div(
+                        get_string('identitydocs_storage_note', 'local_deanpromoodle'),
+                        'alert alert-light border',
+                        ['style' => 'font-size:13px;margin-bottom:16px;']
+                    );
 
                     foreach (['passport_scan1' => 'identitydoc_passport_main', 'passport_scan2' => 'identitydoc_passport_reg'] as $slot => $labelkey) {
                         echo html_writer::start_div('form-group');
-                        echo html_writer::tag('label', get_string($labelkey, 'local_deanpromoodle'));
+                        $badgetag = !empty($identityfiles[$slot])
+                            ? html_writer::span(
+                                get_string('identitydoc_status_uploaded', 'local_deanpromoodle'),
+                                'badge badge-success',
+                                ['style' => 'margin-left:10px;vertical-align:middle;']
+                            )
+                            : html_writer::span(
+                                get_string('identitydoc_status_missing', 'local_deanpromoodle'),
+                                'badge badge-secondary',
+                                [
+                                    'style' => 'margin-left:10px;vertical-align:middle;background-color:#6c757d;color:#fff;',
+                                ]
+                            );
+                        echo html_writer::tag(
+                            'label',
+                            get_string($labelkey, 'local_deanpromoodle') . $badgetag,
+                            ['style' => 'display:block;font-weight:600;']
+                        );
+                        if (empty($identityfiles[$slot])) {
+                            echo html_writer::div(
+                                get_string('identitydoc_upload_hint', 'local_deanpromoodle'),
+                                'text-muted',
+                                ['style' => 'font-size:13px;margin-bottom:8px;']
+                            );
+                        }
                         if (!empty($identityfiles[$slot])) {
                             echo html_writer::div(
                                 local_deanpromoodle_render_identity_preview($identityfiles[$slot]),
                                 'local-deanpromoodle-scan-preview',
                                 ['style' => 'margin-bottom:10px;']
                             );
+                            $fileline = get_string('identitydoc_current_file', 'local_deanpromoodle')
+                                . ': ' . htmlspecialchars($identityfiles[$slot]->get_filename(), ENT_QUOTES, 'UTF-8');
+                            $fileline .= ' · ' . get_string('identitydoc_uploaded_on', 'local_deanpromoodle')
+                                . ' ' . userdate($identityfiles[$slot]->get_timemodified(), get_string('strftimedatetimeshort', 'langconfig'));
                             echo html_writer::div(
-                                get_string('identitydoc_current_file', 'local_deanpromoodle')
-                                . ': ' . htmlspecialchars($identityfiles[$slot]->get_filename(), ENT_QUOTES, 'UTF-8'),
+                                $fileline,
                                 'text-muted',
                                 ['style' => 'font-size:13px;margin-bottom:8px;']
                             );
@@ -3955,24 +3987,81 @@ if ($action == 'viewprogram' && $programid > 0) {
                     echo html_writer::end_tag('table');
                     echo html_writer::end_div();
 
-                    if ($canviewidentity && ($identityfiles['passport_scan1'] || $identityfiles['passport_scan2'])) {
+                    if ($canviewidentity) {
+                        $slots = ['passport_scan1' => 'identitydoc_passport_main', 'passport_scan2' => 'identitydoc_passport_reg'];
+                        $slotsdone = 0;
+                        foreach ($slots as $s => $_lbl) {
+                            if (!empty($identityfiles[$s])) {
+                                $slotsdone++;
+                            }
+                        }
+
                         echo html_writer::start_div('additional-identity-docs', [
                             'style' => 'margin-top:24px;padding:20px;background:white;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,0.1);',
                         ]);
                         echo html_writer::tag('h3', get_string('identitydocs_section', 'local_deanpromoodle'), [
-                            'style' => 'margin-top:0;margin-bottom:16px;color:#495057;',
+                            'style' => 'margin-top:0;margin-bottom:12px;color:#495057;',
                         ]);
-                        foreach (['passport_scan1' => 'identitydoc_passport_main', 'passport_scan2' => 'identitydoc_passport_reg'] as $slot => $labelkey) {
-                            if (empty($identityfiles[$slot])) {
-                                continue;
-                            }
-                            echo html_writer::tag('h4', get_string($labelkey, 'local_deanpromoodle'), [
-                                'style' => 'font-size:16px;margin:16px 0 8px;',
-                            ]);
-                            echo html_writer::div(
-                                local_deanpromoodle_render_identity_preview($identityfiles[$slot]),
-                                'local-deanpromoodle-scan-preview'
+                        echo html_writer::div(get_string('identitydocs_hint', 'local_deanpromoodle'), 'alert alert-info', [
+                            'style' => 'font-size:13px;',
+                        ]);
+                        echo html_writer::div(
+                            get_string('identitydocs_storage_note', 'local_deanpromoodle'),
+                            'alert alert-light border',
+                            ['style' => 'font-size:13px;margin-bottom:12px;']
+                        );
+                        echo html_writer::div(
+                            get_string('identitydocs_summary_loaded', 'local_deanpromoodle', ['done' => $slotsdone, 'total' => 2]),
+                            '',
+                            ['style' => 'font-weight:600;margin-bottom:16px;color:#495057;']
+                        );
+
+                        foreach ($slots as $slot => $labelkey) {
+                            echo html_writer::start_div('', ['style' => 'margin-bottom:20px;']);
+                            $badgetag = !empty($identityfiles[$slot])
+                                ? html_writer::span(
+                                    get_string('identitydoc_status_uploaded', 'local_deanpromoodle'),
+                                    'badge badge-success',
+                                    ['style' => 'margin-left:10px;vertical-align:middle;']
+                                )
+                                : html_writer::span(
+                                    get_string('identitydoc_status_missing', 'local_deanpromoodle'),
+                                    'badge badge-secondary',
+                                    [
+                                        'style' => 'margin-left:10px;vertical-align:middle;background-color:#6c757d;color:#fff;',
+                                    ]
+                                );
+                            echo html_writer::tag(
+                                'h4',
+                                get_string($labelkey, 'local_deanpromoodle') . $badgetag,
+                                ['style' => 'font-size:16px;margin:0 0 10px;color:#212529;']
                             );
+                            if (!empty($identityfiles[$slot])) {
+                                $fname = htmlspecialchars($identityfiles[$slot]->get_filename(), ENT_QUOTES, 'UTF-8');
+                                echo html_writer::div(
+                                    get_string('identitydoc_current_file', 'local_deanpromoodle')
+                                    . ': ' . $fname
+                                    . ' · ' . get_string('identitydoc_uploaded_on', 'local_deanpromoodle')
+                                    . ' '
+                                    . userdate(
+                                        $identityfiles[$slot]->get_timemodified(),
+                                        get_string('strftimedatetimeshort', 'langconfig')
+                                    ),
+                                    'text-muted small',
+                                    ['style' => 'margin-bottom:8px;']
+                                );
+                                echo html_writer::div(
+                                    local_deanpromoodle_render_identity_preview($identityfiles[$slot]),
+                                    'local-deanpromoodle-scan-preview'
+                                );
+                            } else {
+                                echo html_writer::div(
+                                    get_string('identitydoc_upload_hint', 'local_deanpromoodle'),
+                                    'alert alert-secondary',
+                                    ['style' => 'font-size:13px;margin:0;padding:8px 12px;']
+                                );
+                            }
+                            echo html_writer::end_div();
                         }
                         echo html_writer::end_div();
                     }

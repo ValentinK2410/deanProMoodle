@@ -161,12 +161,18 @@ $string['additional_registration_block'] = 'Заявленный курс и а�
 $string['field_intended_course'] = 'Заявленный курс / программа';
 $string['field_registration_address'] = 'Адрес регистрации (как в анкете)';
 $string['identitydocs_section'] = 'Сканы документов';
-$string['identitydocs_hint'] = 'Допустимые форматы: JPG, PNG, PDF до 5 МБ на файл. Файлы хранятся в защищённой области Moodle; просматривать могут только вы, администраторы и преподаватели с соответствующим доступом.';
+$string['identitydocs_hint'] = 'Допустимые форматы: JPG, PNG, PDF до 5 МБ на файл. Просматривать файлы могут только вы, администраторы и уполномоченные преподаватели.';
+$string['identitydocs_storage_note'] = 'Файлы не попадают в общую папку на сервере и не видны в обычных файлах курса: после сохранения они хранятся в защищённой области Moodle, привязанной к вашей учётной записи. Узнать, что скан принят, можно по отметке «Загружен» и по превью ниже; скачивание — по ссылке «Открыть файл» (для PDF тоже).';
+$string['identitydocs_summary_loaded'] = 'Загружено файлов: {$a->done} из {$a->total}.';
 $string['identitydoc_passport_main'] = 'Скан паспорта (разворот с фото)';
 $string['identitydoc_passport_reg'] = 'Скан страницы с регистрацией';
 $string['identitydoc_remove'] = 'Удалить текущий файл';
 $string['identitydoc_openfile'] = 'Открыть файл';
 $string['identitydoc_current_file'] = 'Текущий файл';
+$string['identitydoc_status_uploaded'] = 'Загружен';
+$string['identitydoc_status_missing'] = 'Не загружен';
+$string['identitydoc_upload_hint'] = 'Выберите файл и нажмите «Сохранить» внизу формы.';
+$string['identitydoc_uploaded_on'] = 'Дата загрузки';
 
 // Абитуриенты: фильтр портала МБС и колонка «Форма»
 $string['feed_column_form'] = 'Форма';
