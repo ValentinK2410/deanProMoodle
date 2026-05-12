@@ -34,6 +34,9 @@ CLEAR_MOODLE_CACHE="${CLEAR_MOODLE_CACHE:-0}"
 # Куда складывать сервисные скрипты репозитория (рядом с сайтом, не в public_html).
 # Патч MySQL окружения: MOODLE_ROOT=… bash …/patch-moodle-environment-mysql80-temporary.sh
 DEANPRO_SCRIPTS_DIR="${DEANPRO_SCRIPTS_DIR:-$(dirname "$MOODLE_ROOT")/deanpromoodle-scripts}"
+
+# Если в локальном клоне репозитория нет scripts/ (или старая ветка) — пробуем скачать с GitHub.
+PATCH_SCRIPT_RAW="${PATCH_SCRIPT_RAW:-https://raw.githubusercontent.com/ValentinK2410/deanProMoodle/${BRANCH}/scripts/patch-moodle-environment-mysql80-temporary.sh}"
 # -------------------------------------------
 
 stamp() { date '+%Y-%m-%d %H:%M:%S'; }
@@ -78,14 +81,29 @@ else
 fi
 
 PATCH_SCRIPT_SRC="$WORKDIR/repo/scripts/patch-moodle-environment-mysql80-temporary.sh"
+PATCH_SCRIPT_DST="$DEANPRO_SCRIPTS_DIR/patch-moodle-environment-mysql80-temporary.sh"
+mkdir -p "$DEANPRO_SCRIPTS_DIR"
 if [[ -f "$PATCH_SCRIPT_SRC" ]]; then
-  mkdir -p "$DEANPRO_SCRIPTS_DIR"
   cp -f "$PATCH_SCRIPT_SRC" "$DEANPRO_SCRIPTS_DIR/"
-  chmod 0755 "$DEANPRO_SCRIPTS_DIR/patch-moodle-environment-mysql80-temporary.sh"
-  echo "$(stamp) Скрипт патча окружения: $DEANPRO_SCRIPTS_DIR/patch-moodle-environment-mysql80-temporary.sh"
-  echo "           Запуск: MOODLE_ROOT=\"$MOODLE_ROOT\" bash \"$DEANPRO_SCRIPTS_DIR/patch-moodle-environment-mysql80-temporary.sh\""
+  chmod 0755 "$PATCH_SCRIPT_DST"
+  echo "$(stamp) Скрипт патча окружения из репозитория: $PATCH_SCRIPT_DST"
 else
-  echo "$(stamp) Предупреждение: в репозитории нет scripts/patch-moodle-environment-mysql80-temporary.sh"
+  echo "$(stamp) В клоне нет scripts/patch-moodle-environment-mysql80-temporary.sh — пробуем raw..."
+  if command -v curl >/dev/null 2>&1; then
+    if curl -fsSL -o "${PATCH_SCRIPT_DST}.part" "$PATCH_SCRIPT_RAW" && mv -f "${PATCH_SCRIPT_DST}.part" "$PATCH_SCRIPT_DST"; then
+      chmod 0755 "$PATCH_SCRIPT_DST"
+      echo "$(stamp) Скрипт скачан: $PATCH_SCRIPT_DST"
+    else
+      rm -f "${PATCH_SCRIPT_DST}.part"
+      echo "$(stamp) Ошибка: curl не смог загрузить $PATCH_SCRIPT_RAW" >&2
+      echo "$(stamp) Создайте каталог вручную или обновите ветку/репозиторий до main." >&2
+    fi
+  else
+    echo "$(stamp) Ошибка: нет утилиты curl для загрузки патча окружения" >&2
+  fi
+fi
+if [[ -f "$PATCH_SCRIPT_DST" ]]; then
+  echo "           Запуск: MOODLE_ROOT=\"$MOODLE_ROOT\" bash \"$PATCH_SCRIPT_DST\""
 fi
 
 if [[ "${CLEAR_MOODLE_CACHE:-0}" == "1" ]]; then

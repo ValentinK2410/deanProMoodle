@@ -10,6 +10,13 @@
 # Откатить только этот патч в файле:
 #   MOODLE_ROOT=/path/to/moodle bash scripts/patch-moodle-environment-mysql80-temporary.sh --revert
 #
+# Если на сервере ещё нет этого файла (каталог deanpromoodle-scripts не создавали):
+#   обновите плагин через scripts/update-deanpromoodle-from-git.sh из ветки main, либо один раз:
+#   mkdir -p ~/class.mbs.ru/deanpromoodle-scripts
+#   curl -fsSL -o ~/class.mbs.ru/deanpromoodle-scripts/patch-moodle-environment-mysql80-temporary.sh \\
+#     'https://raw.githubusercontent.com/ValentinK2410/deanProMoodle/main/scripts/patch-moodle-environment-mysql80-temporary.sh'
+#   chmod +x ~/class.mbs.ru/deanpromoodle-scripts/patch-moodle-environment-mysql80-temporary.sh
+#
 set -eu
 
 MOODLE_ROOT="${MOODLE_ROOT:?Задайте MOODLE_ROOT — корень установки Moodle (каталог с admin/environment.xml)}"
