@@ -8,6 +8,8 @@
 #   2. Отредактируйте переменные в блоке «НАСТРОЙКИ» ниже.
 #   3. chmod +x scripts/update-deanpromoodle-from-git.sh
 #   4. Запуск из корня репозитория или с полным путём к скрипту.
+#   При каждом обновлении в $DEANPRO_SCRIPTS_DIR кладётся
+#   patch-moodle-environment-mysql80-temporary.sh (по умолчанию ~/class.mbs.ru/deanpromoodle-scripts).
 #
 set -eu
 
@@ -28,6 +30,10 @@ WORKDIR="${WORKDIR:-$HOME/tmp/deanpromoodle-git-update}"
 # Очистка файлового кеша Moodle (необязательно): CLEAR_MOODLE_CACHE=1 ./script.sh
 MOODLEDATA_CACHE="${MOODLEDATA_CACHE:-$HOME/class.mbs.ru/moodledata/cache}"
 CLEAR_MOODLE_CACHE="${CLEAR_MOODLE_CACHE:-0}"
+
+# Куда складывать сервисные скрипты репозитория (рядом с сайтом, не в public_html).
+# Патч MySQL окружения: MOODLE_ROOT=… bash …/patch-moodle-environment-mysql80-temporary.sh
+DEANPRO_SCRIPTS_DIR="${DEANPRO_SCRIPTS_DIR:-$(dirname "$MOODLE_ROOT")/deanpromoodle-scripts}"
 # -------------------------------------------
 
 stamp() { date '+%Y-%m-%d %H:%M:%S'; }
@@ -37,6 +43,7 @@ echo "  REPO:    $REPO_URL"
 echo "  BRANCH:  $BRANCH"
 echo "  WORKDIR: $WORKDIR"
 echo "  DEST:    $PLUGIN_DST"
+echo "  SCRIPTS: $DEANPRO_SCRIPTS_DIR"
 
 if [[ ! -d "$(dirname "$PLUGIN_DST")" ]]; then
   echo "$(stamp) Ошибка: нет родительского каталога для плагина: $(dirname "$PLUGIN_DST")"
@@ -68,6 +75,17 @@ if [[ -f "$PLUGIN_DST/version.php" ]]; then
 else
   echo "$(stamp) Ошибка: version.php не найден в месте установки"
   exit 1
+fi
+
+PATCH_SCRIPT_SRC="$WORKDIR/repo/scripts/patch-moodle-environment-mysql80-temporary.sh"
+if [[ -f "$PATCH_SCRIPT_SRC" ]]; then
+  mkdir -p "$DEANPRO_SCRIPTS_DIR"
+  cp -f "$PATCH_SCRIPT_SRC" "$DEANPRO_SCRIPTS_DIR/"
+  chmod 0755 "$DEANPRO_SCRIPTS_DIR/patch-moodle-environment-mysql80-temporary.sh"
+  echo "$(stamp) Скрипт патча окружения: $DEANPRO_SCRIPTS_DIR/patch-moodle-environment-mysql80-temporary.sh"
+  echo "           Запуск: MOODLE_ROOT=\"$MOODLE_ROOT\" bash \"$DEANPRO_SCRIPTS_DIR/patch-moodle-environment-mysql80-temporary.sh\""
+else
+  echo "$(stamp) Предупреждение: в репозитории нет scripts/patch-moodle-environment-mysql80-temporary.sh"
 fi
 
 if [[ "${CLEAR_MOODLE_CACHE:-0}" == "1" ]]; then
