@@ -137,6 +137,7 @@ if (!$isadmin) {
 $tab = optional_param('tab', 'history', PARAM_ALPHA); // history, teachers, students, activityfeed, studentregister, subjects, programs, categories
 $teacherid = optional_param('teacherid', 0, PARAM_INT);
 $feedview = optional_param('feedview', 'active', PARAM_ALPHA); // active | hidden — для вкладки «Лента»
+$feedkind = optional_param('feedkind', 'registration', PARAM_ALPHA); // registration | course | cohort
 $period = optional_param('period', 'month', PARAM_ALPHA); // day, week, month, year
 $datefrom = optional_param('datefrom', '', PARAM_TEXT);
 $dateto = optional_param('dateto', '', PARAM_TEXT);
@@ -464,6 +465,10 @@ $urlopts = [
 ];
 if ($tab === 'activityfeed' && ($feedview === 'hidden' || $feedview === 'active')) {
     $urlopts['feedview'] = $feedview;
+    if ($feedview === 'active') {
+        require_once($CFG->dirroot . '/local/deanpromoodle/locallib.php');
+        $urlopts['feedkind'] = local_deanpromoodle_activity_feed_normalize_kind($feedkind);
+    }
 }
 $PAGE->set_url(new moodle_url('/local/deanpromoodle/pages/admin.php', $urlopts));
 $PAGE->set_context(context_system::instance());
@@ -6945,11 +6950,13 @@ switch ($tab) {
     case 'activityfeed':
         require_once($CFG->dirroot . '/local/deanpromoodle/locallib.php');
 
+        $feedkind = local_deanpromoodle_activity_feed_normalize_kind($feedkind);
+
         echo html_writer::start_div('local-deanpromoodle-admin-content', ['style' => 'margin-bottom: 30px;']);
         echo html_writer::tag('h2', get_string('admintab_activityfeed', 'local_deanpromoodle'), ['style' => 'margin-bottom: 12px;']);
         echo html_writer::div(get_string('feed_help', 'local_deanpromoodle'), 'alert alert-info', ['style' => 'margin-bottom: 16px;']);
 
-        $activeurl = new moodle_url('/local/deanpromoodle/pages/admin.php', ['tab' => 'activityfeed', 'feedview' => 'active']);
+        $activeurl = new moodle_url('/local/deanpromoodle/pages/admin.php', ['tab' => 'activityfeed', 'feedview' => 'active', 'feedkind' => $feedkind]);
         $hiddenurl = new moodle_url('/local/deanpromoodle/pages/admin.php', ['tab' => 'activityfeed', 'feedview' => 'hidden']);
         $isactive = ($feedview !== 'hidden');
         echo html_writer::start_div('', ['style' => 'margin-bottom: 16px;']);
@@ -6962,7 +6969,33 @@ switch ($tab) {
         ]);
         echo html_writer::end_div();
 
-        $items = local_deanpromoodle_get_admin_activity_feed($feedview);
+        if ($isactive) {
+            $kindtabs = [
+                'registration' => get_string('feedkind_registration', 'local_deanpromoodle'),
+                'course' => get_string('feedkind_course', 'local_deanpromoodle'),
+                'cohort' => get_string('feedkind_cohort', 'local_deanpromoodle'),
+            ];
+            echo html_writer::start_div('', ['style' => 'margin-bottom: 16px;']);
+            foreach ($kindtabs as $kindkey => $kindlabel) {
+                $kindurl = new moodle_url('/local/deanpromoodle/pages/admin.php', [
+                    'tab' => 'activityfeed',
+                    'feedview' => 'active',
+                    'feedkind' => $kindkey,
+                ]);
+                $isselected = ($feedkind === $kindkey);
+                $btnclass = $isselected ? 'btn-primary' : 'btn-outline-secondary';
+                if ($kindkey === 'cohort' && !$isselected) {
+                    $btnclass = 'btn-outline-secondary text-muted';
+                }
+                echo html_writer::link($kindurl, $kindlabel, [
+                    'class' => 'btn btn-sm ' . $btnclass,
+                    'style' => 'margin-right: 8px; margin-bottom: 6px;',
+                ]);
+            }
+            echo html_writer::end_div();
+        }
+
+        $items = local_deanpromoodle_get_admin_activity_feed($feedview, $feedkind);
         $studentpageurl = new moodle_url('/local/deanpromoodle/pages/student.php');
         $studentadditionalurl = new moodle_url('/local/deanpromoodle/pages/student.php', [
             'tab' => 'programs',
@@ -6972,10 +7005,16 @@ switch ($tab) {
         $sessk = sesskey();
 
         if (empty($items)) {
-            echo html_writer::div(
-                $isactive ? 'Нет записей за последние 90 дней или все скрыты.' : 'Нет скрытых записей.',
-                'alert alert-info'
-            );
+            if (!$isactive) {
+                $emptymsg = get_string('feedempty_hidden', 'local_deanpromoodle');
+            } else if ($feedkind === 'course') {
+                $emptymsg = get_string('feedempty_course', 'local_deanpromoodle');
+            } else if ($feedkind === 'cohort') {
+                $emptymsg = get_string('feedempty_cohort', 'local_deanpromoodle');
+            } else {
+                $emptymsg = get_string('feedempty_registration', 'local_deanpromoodle');
+            }
+            echo html_writer::div($emptymsg, 'alert alert-info');
         } else {
             echo html_writer::start_tag('table', ['class' => 'table table-striped table-hover', 'style' => 'width:100%;font-size:0.95em;']);
             echo html_writer::start_tag('thead');

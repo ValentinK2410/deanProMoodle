@@ -405,16 +405,54 @@ function local_deanpromoodle_applicant_additional_form_complete($userid, $siprel
 }
 
 /**
+ * Нормализовать подвкладку ленты абитуриентов.
+ *
+ * @param string $kind registration|course|cohort
+ * @return string
+ */
+function local_deanpromoodle_activity_feed_normalize_kind($kind) {
+    $allowed = ['registration', 'course', 'cohort'];
+    return in_array($kind, $allowed, true) ? $kind : 'registration';
+}
+
+/**
+ * student_info для набора пользователей (лента абитуриентов).
+ *
+ * @param array $userids
+ * @return array userid => record
+ */
+function local_deanpromoodle_feed_student_info_by_userids(array $userids) {
+    global $DB;
+
+    $out = [];
+    $userids = array_unique(array_map('intval', array_filter($userids)));
+    if (empty($userids) || !$DB->get_manager()->table_exists('local_deanpromoodle_student_info')) {
+        return $out;
+    }
+    list($insql, $params) = $DB->get_in_or_equal($userids, SQL_PARAMS_NAMED);
+    $sirecs = $DB->get_records_sql(
+        "SELECT * FROM {local_deanpromoodle_student_info} WHERE userid $insql",
+        $params
+    );
+    foreach ($sirecs as $s) {
+        $out[(int) $s->userid] = $s;
+    }
+    return $out;
+}
+
+/**
  * Собрать элементы ленты: активные (не скрытые) или только скрытые.
- * Активная лента: только регистрации; при mbs_only — фильтр по порталу МБС.
+ * Активная лента — по подвкладке feedkind (v2026052201): новые аккаунты, запись на курс, глобальные группы.
  *
  * @param string $view active|hidden
+ * @param string $kind registration|course|cohort — только для active
  * @return array массив объектов с полями для таблицы
  */
-function local_deanpromoodle_get_admin_activity_feed($view) {
+function local_deanpromoodle_get_admin_activity_feed($view, $kind = 'registration') {
     global $DB;
 
     $view = ($view === 'hidden') ? 'hidden' : 'active';
+    $kind = local_deanpromoodle_activity_feed_normalize_kind($kind);
     $dbman = $DB->get_manager();
     if (!$dbman->table_exists('local_deanpromoodle_admin_feed_dismissed')) {
         return [];
@@ -441,60 +479,27 @@ function local_deanpromoodle_get_admin_activity_feed($view) {
     $dismissset = array_flip($dismisskeys);
 
     $items = [];
-
-    // Регистрации студентов (вкладка «Абитуриенты»: только портал МБС при режиме mbs_only).
-    // За «последние 90 дней» считаем и создание аккаунта, и назначение роли student (зачисление на программу/курс).
     $roleid = $DB->get_field('role', 'id', ['shortname' => 'student'], IGNORE_MISSING);
-    if ($roleid) {
+
+    if ($kind === 'registration' && $roleid) {
+        // Новые аккаунты: только user.timecreated за последние 90 дней (без массового назначения роли).
         $users = $DB->get_records_sql(
-            "SELECT DISTINCT u.id, u.firstname, u.lastname, u.email, u.timecreated,
-                    (SELECT MAX(rax.timemodified) FROM {role_assignments} rax
-                       WHERE rax.userid = u.id AND rax.roleid = :roleid2) AS studentrolelastmod
+            "SELECT u.id, u.firstname, u.lastname, u.email, u.timecreated
                FROM {user} u
-               JOIN {role_assignments} ra ON ra.userid = u.id AND ra.roleid = :roleid1
+               JOIN {role_assignments} ra ON ra.userid = u.id AND ra.roleid = :roleid
               WHERE u.deleted = 0 AND u.suspended = 0 AND u.id > 1
-                AND (
-                      u.timecreated >= :since1
-                   OR EXISTS (
-                        SELECT 1 FROM {role_assignments} ra3
-                         WHERE ra3.userid = u.id AND ra3.roleid = :roleid3 AND ra3.timemodified >= :since2
-                      )
-                    )
+                AND u.timecreated >= :since
            ORDER BY u.timecreated DESC",
-            [
-                'roleid1' => $roleid,
-                'roleid2' => $roleid,
-                'roleid3' => $roleid,
-                'since1' => $since,
-                'since2' => $since,
-            ],
+            ['roleid' => $roleid, 'since' => $since],
             0,
             500
         );
-        $users = array_values($users);
-        foreach ($users as $u) {
-            $lastmod = isset($u->studentrolelastmod) ? (int) $u->studentrolelastmod : 0;
-            $u->sorttime = max((int) $u->timecreated, $lastmod);
-        }
-        usort($users, function($a, $b) {
-            return ($b->sorttime ?? 0) <=> ($a->sorttime ?? 0);
-        });
         $uids = array_map(static function($u) {
             return (int) $u->id;
-        }, $users);
+        }, array_values($users));
         $cohortstr = local_deanpromoodle_feed_user_cohort_strings($uids);
         $coursebatch = local_deanpromoodle_feed_user_course_display_batch($uids);
-        $sibyuser = [];
-        if ($dbman->table_exists('local_deanpromoodle_student_info') && count($uids) > 0) {
-            list($insql, $psi) = $DB->get_in_or_equal($uids, SQL_PARAMS_NAMED);
-            $sirecs = $DB->get_records_sql(
-                "SELECT * FROM {local_deanpromoodle_student_info} WHERE userid $insql",
-                $psi
-            );
-            foreach ($sirecs as $s) {
-                $sibyuser[$s->userid] = $s;
-            }
-        }
+        $sibyuser = local_deanpromoodle_feed_student_info_by_userids($uids);
         foreach ($users as $u) {
             if (!local_deanpromoodle_user_is_mbs_portal_applicant($u->id)) {
                 continue;
@@ -517,7 +522,7 @@ function local_deanpromoodle_get_admin_activity_feed($view) {
                 'itemkey' => $key,
                 'type' => 'registration',
                 'typelabel' => get_string('feedtype_registration', 'local_deanpromoodle'),
-                'sorttime' => isset($u->sorttime) ? (int) $u->sorttime : (int) $u->timecreated,
+                'sorttime' => (int) $u->timecreated,
                 'userid' => $u->id,
                 'studentname' => fullname($u),
                 'email' => $u->email,
@@ -525,6 +530,125 @@ function local_deanpromoodle_get_admin_activity_feed($view) {
                 'programs' => $programs ?: '—',
                 'course' => $coursecell !== '' ? $coursecell : '—',
                 'coursedates' => $datescell !== '' ? $datescell : '—',
+                'form_complete' => $formcomplete,
+            ];
+        }
+    } else if ($kind === 'course' && $roleid) {
+        // Индивидуальная запись на курс (без синхронизации из глобальной группы).
+        $enrols = $DB->get_records_sql(
+            "SELECT ue.id AS ueid, ue.userid, ue.timecreated, ue.timestart,
+                    c.fullname AS coursename, c.shortname, c.startdate, c.enddate,
+                    u.firstname, u.lastname, u.email
+               FROM {user_enrolments} ue
+               JOIN {enrol} e ON e.id = ue.enrolid AND e.courseid > 1 AND e.enrol <> 'cohort'
+               JOIN {course} c ON c.id = e.courseid
+               JOIN {user} u ON u.id = ue.userid
+              WHERE ue.status = 0
+                AND u.deleted = 0
+                AND (ue.timecreated >= :since1 OR COALESCE(ue.timestart, 0) >= :since2)
+                AND EXISTS (
+                    SELECT 1 FROM {role_assignments} ra
+                     WHERE ra.userid = ue.userid AND ra.roleid = :roleid
+                )
+           ORDER BY COALESCE(ue.timestart, ue.timecreated) DESC",
+            [
+                'since1' => $since,
+                'since2' => $since,
+                'roleid' => $roleid,
+            ],
+            0,
+            400
+        );
+        $euids = [];
+        foreach ($enrols as $e) {
+            $euids[(int) $e->userid] = true;
+        }
+        $ecohortstr = local_deanpromoodle_feed_user_cohort_strings(array_keys($euids));
+        $esibyuser = local_deanpromoodle_feed_student_info_by_userids(array_keys($euids));
+        foreach ($enrols as $e) {
+            if (!local_deanpromoodle_user_is_mbs_portal_applicant($e->userid)) {
+                continue;
+            }
+            $key = 'ce_' . $e->ueid;
+            if (isset($dismissset[$key])) {
+                continue;
+            }
+            $sortt = !empty($e->timestart) ? (int) $e->timestart : (int) $e->timecreated;
+            $start = $e->startdate > 0 ? userdate($e->startdate, get_string('strftimedate', 'langconfig')) : '—';
+            $end = $e->enddate > 0 ? userdate($e->enddate, get_string('strftimedate', 'langconfig')) : '—';
+            $uobj = (object) ['firstname' => $e->firstname, 'lastname' => $e->lastname, 'email' => $e->email];
+            $programs = local_deanpromoodle_feed_primary_label(local_deanpromoodle_feed_user_program_string($e->userid, false));
+            $cohorts = isset($ecohortstr[$e->userid]) ? $ecohortstr[$e->userid] : '';
+            $sirow = array_key_exists($e->userid, $esibyuser) ? $esibyuser[$e->userid] : false;
+            $formcomplete = local_deanpromoodle_applicant_additional_form_complete($e->userid, $sirow, $uobj);
+            $items[] = (object) [
+                'itemkey' => $key,
+                'type' => 'course',
+                'typelabel' => get_string('feedtype_course', 'local_deanpromoodle'),
+                'sorttime' => $sortt,
+                'userid' => $e->userid,
+                'studentname' => fullname($uobj),
+                'email' => $e->email,
+                'cohorts' => $cohorts ?: '—',
+                'programs' => $programs ?: '—',
+                'course' => format_string($e->coursename) . ' (' . format_string($e->shortname) . ')',
+                'coursedates' => $start . ' — ' . $end,
+                'form_complete' => $formcomplete,
+            ];
+        }
+    } else if ($kind === 'cohort' && $roleid) {
+        // Зачисление в глобальные группы (когорты).
+        $cms = $DB->get_records_sql(
+            "SELECT cm.id AS cmid, cm.userid, cm.cohortid, cm.timeadded,
+                    ch.name AS cohortname,
+                    u.firstname, u.lastname, u.email
+               FROM {cohort_members} cm
+               JOIN {cohort} ch ON ch.id = cm.cohortid
+               JOIN {user} u ON u.id = cm.userid
+              WHERE cm.timeadded >= :since
+                AND u.deleted = 0
+                AND EXISTS (
+                    SELECT 1 FROM {role_assignments} ra
+                     WHERE ra.userid = cm.userid AND ra.roleid = :roleid
+                )
+           ORDER BY cm.timeadded DESC",
+            ['since' => $since, 'roleid' => $roleid],
+            0,
+            400
+        );
+        $cohortids = [];
+        foreach ($cms as $cm) {
+            $cohortids[(int) $cm->cohortid] = true;
+        }
+        $proglab = local_deanpromoodle_feed_program_labels_for_cohorts(array_keys($cohortids), false);
+        $cmuids = [];
+        foreach ($cms as $cm) {
+            $cmuids[(int) $cm->userid] = true;
+        }
+        $cmcohortstr = local_deanpromoodle_feed_user_cohort_strings(array_keys($cmuids));
+        $cmsibyuser = local_deanpromoodle_feed_student_info_by_userids(array_keys($cmuids));
+        foreach ($cms as $cm) {
+            $key = 'cm_' . $cm->cmid;
+            if (isset($dismissset[$key])) {
+                continue;
+            }
+            $prog = isset($proglab[$cm->cohortid]) ? local_deanpromoodle_feed_primary_label($proglab[$cm->cohortid]) : '—';
+            $allcohorts = isset($cmcohortstr[$cm->userid]) ? $cmcohortstr[$cm->userid] : format_string($cm->cohortname);
+            $uobj = (object) ['firstname' => $cm->firstname, 'lastname' => $cm->lastname, 'email' => $cm->email];
+            $sirow = array_key_exists($cm->userid, $cmsibyuser) ? $cmsibyuser[$cm->userid] : false;
+            $formcomplete = local_deanpromoodle_applicant_additional_form_complete($cm->userid, $sirow, $uobj);
+            $items[] = (object) [
+                'itemkey' => $key,
+                'type' => 'cohort',
+                'typelabel' => get_string('feedtype_cohort', 'local_deanpromoodle'),
+                'sorttime' => (int) $cm->timeadded,
+                'userid' => $cm->userid,
+                'studentname' => fullname($uobj),
+                'email' => $cm->email,
+                'cohorts' => $allcohorts,
+                'programs' => $prog,
+                'course' => '—',
+                'coursedates' => userdate($cm->timeadded, get_string('strftimedatetime', 'langconfig')),
                 'form_complete' => $formcomplete,
             ];
         }
@@ -611,6 +735,7 @@ function local_deanpromoodle_feed_resolve_item($itemkey) {
         $cohortstr = local_deanpromoodle_feed_user_cohort_strings([$e->userid]);
         $programs = local_deanpromoodle_feed_primary_label(local_deanpromoodle_feed_user_program_string($e->userid, false));
         $uobj = (object)['firstname' => $e->firstname, 'lastname' => $e->lastname, 'email' => $e->email];
+        $formcomplete = local_deanpromoodle_applicant_additional_form_complete($e->userid, false, $uobj);
         return (object)[
             'itemkey' => $itemkey,
             'type' => 'course',
@@ -623,6 +748,7 @@ function local_deanpromoodle_feed_resolve_item($itemkey) {
             'programs' => $programs ?: '—',
             'course' => format_string($e->coursename) . ' (' . format_string($e->shortname) . ')',
             'coursedates' => $start . ' — ' . $end,
+            'form_complete' => $formcomplete,
         ];
     }
 
@@ -645,6 +771,7 @@ function local_deanpromoodle_feed_resolve_item($itemkey) {
         $allcohorts = local_deanpromoodle_feed_user_cohort_strings([$cm->userid]);
         $cohorts = !empty($allcohorts[$cm->userid]) ? $allcohorts[$cm->userid] : format_string($cm->cohortname);
         $uobj = (object)['firstname' => $cm->firstname, 'lastname' => $cm->lastname, 'email' => $cm->email];
+        $formcomplete = local_deanpromoodle_applicant_additional_form_complete($cm->userid, false, $uobj);
         return (object)[
             'itemkey' => $itemkey,
             'type' => 'cohort',
@@ -657,6 +784,7 @@ function local_deanpromoodle_feed_resolve_item($itemkey) {
             'programs' => $prog,
             'course' => '—',
             'coursedates' => userdate($cm->timeadded, get_string('strftimedatetime', 'langconfig')),
+            'form_complete' => $formcomplete,
         ];
     }
 

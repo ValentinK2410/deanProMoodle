@@ -43,9 +43,9 @@ defined('MOODLE_INTERNAL') || die();
  */
 
 $plugin->component = 'local_deanpromoodle';
-// $plugin->version совпадает с последним savepoint в db/upgrade.php (2026051101). Дополнительные правки только в коде:
-// см. комментарии по фиксу кнопки «Скачать» и списку «Пол» (логические метки 2026051102 / 2026051103).
-$plugin->version = 2026051101;
+// $plugin->version совпадает с последним savepoint в db/upgrade.php (2026052201).
+// v2026052201: подвкладки «Абитуриенты» — новые аккаунты / запись на курс / глобальные группы.
+$plugin->version = 2026052201;
 $plugin->requires = 2022041900; // Moodle 4.0+
 $plugin->maturity = MATURITY_ALPHA;
 $plugin->release = 'v1.0.0-alpha';

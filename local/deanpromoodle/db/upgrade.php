@@ -324,5 +324,10 @@ function xmldb_local_deanpromoodle_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026051101, 'local', 'deanpromoodle');
     }
 
+    // v2026052201: подвкладки ленты абитуриентов (код, без изменений схемы БД).
+    if ($oldversion < 2026052201) {
+        upgrade_plugin_savepoint(true, 2026052201, 'local', 'deanpromoodle');
+    }
+
     return true;
 }
