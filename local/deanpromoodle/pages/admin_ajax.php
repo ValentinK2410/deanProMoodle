@@ -1282,7 +1282,7 @@ if ($action == 'getteachercourses' && $teacherid > 0) {
     global $DB, $USER;
     $itemkey = optional_param('itemkey', '', PARAM_RAW);
     $itemkey = trim($itemkey);
-    if (!preg_match('/^(na|ce|cm)_\d+$/', $itemkey)) {
+    if (!preg_match('/^(na|nr|ce|cm)_\d+$/', $itemkey)) {
         echo json_encode(['success' => false, 'error' => 'Неверный ключ записи']);
         exit;
     }
@@ -1307,7 +1307,7 @@ if ($action == 'getteachercourses' && $teacherid > 0) {
     global $DB;
     $itemkey = optional_param('itemkey', '', PARAM_RAW);
     $itemkey = trim($itemkey);
-    if (!preg_match('/^(na|ce|cm)_\d+$/', $itemkey)) {
+    if (!preg_match('/^(na|nr|ce|cm)_\d+$/', $itemkey)) {
         echo json_encode(['success' => false, 'error' => 'Неверный ключ записи']);
         exit;
     }

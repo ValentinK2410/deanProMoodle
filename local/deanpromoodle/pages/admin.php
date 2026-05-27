@@ -137,7 +137,7 @@ if (!$isadmin) {
 $tab = optional_param('tab', 'history', PARAM_ALPHA); // history, teachers, students, activityfeed, studentregister, subjects, programs, categories
 $teacherid = optional_param('teacherid', 0, PARAM_INT);
 $feedview = optional_param('feedview', 'active', PARAM_ALPHA); // active | hidden — для вкладки «Лента»
-$feedkind = optional_param('feedkind', 'registration', PARAM_ALPHA); // registration | course | cohort
+$feedkind = optional_param('feedkind', 'registration', PARAM_ALPHA); // registration | nostudent | course | cohort
 $period = optional_param('period', 'month', PARAM_ALPHA); // day, week, month, year
 $datefrom = optional_param('datefrom', '', PARAM_TEXT);
 $dateto = optional_param('dateto', '', PARAM_TEXT);
@@ -6972,6 +6972,7 @@ switch ($tab) {
         if ($isactive) {
             $kindtabs = [
                 'registration' => get_string('feedkind_registration', 'local_deanpromoodle'),
+                'nostudent' => get_string('feedkind_nostudent', 'local_deanpromoodle'),
                 'course' => get_string('feedkind_course', 'local_deanpromoodle'),
                 'cohort' => get_string('feedkind_cohort', 'local_deanpromoodle'),
             ];
@@ -7007,6 +7008,8 @@ switch ($tab) {
         if (empty($items)) {
             if (!$isactive) {
                 $emptymsg = get_string('feedempty_hidden', 'local_deanpromoodle');
+            } else if ($feedkind === 'nostudent') {
+                $emptymsg = get_string('feedempty_nostudent', 'local_deanpromoodle');
             } else if ($feedkind === 'course') {
                 $emptymsg = get_string('feedempty_course', 'local_deanpromoodle');
             } else if ($feedkind === 'cohort') {

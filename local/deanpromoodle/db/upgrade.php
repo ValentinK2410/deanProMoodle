@@ -329,5 +329,10 @@ function xmldb_local_deanpromoodle_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026052201, 'local', 'deanpromoodle');
     }
 
+    // v2026052701: подвкладка «Без роли» (новые аккаунты без student).
+    if ($oldversion < 2026052701) {
+        upgrade_plugin_savepoint(true, 2026052701, 'local', 'deanpromoodle');
+    }
+
     return true;
 }

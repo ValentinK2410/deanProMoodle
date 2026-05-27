@@ -407,11 +407,11 @@ function local_deanpromoodle_applicant_additional_form_complete($userid, $siprel
 /**
  * Нормализовать подвкладку ленты абитуриентов.
  *
- * @param string $kind registration|course|cohort
+ * @param string $kind registration|nostudent|course|cohort
  * @return string
  */
 function local_deanpromoodle_activity_feed_normalize_kind($kind) {
-    $allowed = ['registration', 'course', 'cohort'];
+    $allowed = ['registration', 'nostudent', 'course', 'cohort'];
     return in_array($kind, $allowed, true) ? $kind : 'registration';
 }
 
@@ -442,10 +442,10 @@ function local_deanpromoodle_feed_student_info_by_userids(array $userids) {
 
 /**
  * Собрать элементы ленты: активные (не скрытые) или только скрытые.
- * Активная лента — по подвкладке feedkind (v2026052201): новые аккаунты, запись на курс, глобальные группы.
+ * Активная лента — по подвкладке feedkind (v2026052701): аккаунты, без роли, курс, когорты.
  *
  * @param string $view active|hidden
- * @param string $kind registration|course|cohort — только для active
+ * @param string $kind registration|nostudent|course|cohort — только для active
  * @return array массив объектов с полями для таблицы
  */
 function local_deanpromoodle_get_admin_activity_feed($view, $kind = 'registration') {
@@ -530,6 +530,63 @@ function local_deanpromoodle_get_admin_activity_feed($view, $kind = 'registratio
                 'programs' => $programs ?: '—',
                 'course' => $coursecell !== '' ? $coursecell : '—',
                 'coursedates' => $datescell !== '' ? $datescell : '—',
+                'form_complete' => $formcomplete,
+            ];
+        }
+    } else if ($kind === 'nostudent') {
+        // Новые аккаунты без роли «Студент» (зарегистрировались, ещё не зачислены).
+        $studentroleid = $roleid ? (int) $roleid : 0;
+        $params = ['since' => $since];
+        $norolesql = '';
+        if ($studentroleid) {
+            $norolesql = 'AND NOT EXISTS (
+                SELECT 1 FROM {role_assignments} ra
+                 WHERE ra.userid = u.id AND ra.roleid = :roleid
+            )';
+            $params['roleid'] = $studentroleid;
+        }
+        $users = $DB->get_records_sql(
+            "SELECT u.id, u.firstname, u.lastname, u.email, u.timecreated,
+                    u.firstnamephonetic, u.lastnamephonetic, u.middlename, u.alternatename
+               FROM {user} u
+              WHERE u.deleted = 0 AND u.suspended = 0 AND u.id > 1
+                AND u.timecreated >= :since
+                $norolesql
+           ORDER BY u.timecreated DESC",
+            $params,
+            0,
+            500
+        );
+        $uids = array_map(static function($u) {
+            return (int) $u->id;
+        }, array_values($users));
+        $sibyuser = local_deanpromoodle_feed_student_info_by_userids($uids);
+        foreach ($users as $u) {
+            if (!local_deanpromoodle_user_is_mbs_portal_applicant($u->id)) {
+                continue;
+            }
+            $key = 'nr_' . $u->id;
+            if (isset($dismissset[$key])) {
+                continue;
+            }
+            $sirow = array_key_exists($u->id, $sibyuser) ? $sibyuser[$u->id] : false;
+            $formcomplete = local_deanpromoodle_applicant_additional_form_complete($u->id, $sirow, $u);
+            $coursecell = '';
+            if ($sirow && trim((string) ($sirow->intended_course ?? '')) !== '') {
+                $coursecell = format_string(trim($sirow->intended_course));
+            }
+            $items[] = (object) [
+                'itemkey' => $key,
+                'type' => 'nostudent',
+                'typelabel' => get_string('feedtype_nostudent', 'local_deanpromoodle'),
+                'sorttime' => (int) $u->timecreated,
+                'userid' => $u->id,
+                'studentname' => fullname($u),
+                'email' => $u->email,
+                'cohorts' => '—',
+                'programs' => '—',
+                'course' => $coursecell !== '' ? $coursecell : '—',
+                'coursedates' => '—',
                 'form_complete' => $formcomplete,
             ];
         }
@@ -669,11 +726,43 @@ function local_deanpromoodle_get_admin_activity_feed($view, $kind = 'registratio
  */
 function local_deanpromoodle_feed_resolve_item($itemkey) {
     global $DB;
-    if (!preg_match('/^(na|ce|cm)_(\d+)$/', $itemkey, $m)) {
+    if (!preg_match('/^(na|nr|ce|cm)_(\d+)$/', $itemkey, $m)) {
         return null;
     }
     $kind = $m[1];
     $id = (int)$m[2];
+
+    if ($kind === 'nr') {
+        $u = $DB->get_record('user', ['id' => $id, 'deleted' => 0]);
+        if (!$u || local_deanpromoodle_user_is_student($id)) {
+            return null;
+        }
+        if (!local_deanpromoodle_user_is_mbs_portal_applicant($id)) {
+            return null;
+        }
+        $formcomplete = local_deanpromoodle_applicant_additional_form_complete($id);
+        $coursecell = '';
+        if ($DB->get_manager()->table_exists('local_deanpromoodle_student_info')) {
+            $si = $DB->get_record('local_deanpromoodle_student_info', ['userid' => $id]);
+            if ($si && trim((string) ($si->intended_course ?? '')) !== '') {
+                $coursecell = format_string(trim($si->intended_course));
+            }
+        }
+        return (object) [
+            'itemkey' => $itemkey,
+            'type' => 'nostudent',
+            'typelabel' => get_string('feedtype_nostudent', 'local_deanpromoodle'),
+            'sorttime' => $u->timecreated,
+            'userid' => $u->id,
+            'studentname' => fullname($u),
+            'email' => $u->email,
+            'cohorts' => '—',
+            'programs' => '—',
+            'course' => $coursecell !== '' ? $coursecell : '—',
+            'coursedates' => '—',
+            'form_complete' => $formcomplete,
+        ];
+    }
 
     if ($kind === 'na') {
         $u = $DB->get_record('user', ['id' => $id, 'deleted' => 0]);
